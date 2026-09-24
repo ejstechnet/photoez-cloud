@@ -8,6 +8,8 @@ import {
   index,
   unique,
 } from "drizzle-orm/pg-core";
+import { GALLERY_STATUSES } from "../lib/gallery-status";
+import { WATERMARK_POSITIONS } from "../lib/watermark";
 
 // A photographer's account. Better Auth uses this as its user table
 // (see lib/auth.ts), so name, email, emailVerified, image, createdAt and
@@ -19,6 +21,13 @@ export const photographers = pgTable("photographers", {
   emailVerified: boolean("email_verified").notNull().default(false),
   image: text("image"),
   businessName: text("business_name"),
+  // Watermark for proofs, applied the same way as PhotoEZ for WordPress:
+  // 55% of the photo's width, at this opacity, in this position.
+  watermarkKey: text("watermark_key"),
+  watermarkOpacity: integer("watermark_opacity").notNull().default(60),
+  watermarkPosition: text("watermark_position", { enum: WATERMARK_POSITIONS }).notNull().default("center"),
+  // When any watermark setting last changed; proofs made before this are stale.
+  watermarkUpdatedAt: timestamp("watermark_updated_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
@@ -112,9 +121,11 @@ export const galleries = pgTable(
     title: text("title").notNull(),
     // Random, unguessable token used in the client's gallery link.
     shareToken: text("share_token").notNull().unique(),
-    status: text("status", { enum: ["draft", "published", "archived"] })
-      .notNull()
-      .default("draft"),
+    // Same stages as PhotoEZ for WordPress (see lib/gallery-status.ts).
+    status: text("status", { enum: GALLERY_STATUSES }).notNull().default("pending"),
+    // How many photos the client may pick for free (the "0/10 Selected" counter).
+    freeLimit: integer("free_limit").notNull().default(10),
+    submittedAt: timestamp("submitted_at", { withTimezone: true }),
     expiresAt: timestamp("expires_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
@@ -141,6 +152,8 @@ export const photos = pgTable(
     sizeBytes: integer("size_bytes"),
     // Display order within the gallery.
     position: integer("position").notNull().default(0),
+    // When the watermarked proof was last made (null = no proof yet).
+    proofMadeAt: timestamp("proof_made_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index("photos_gallery_idx").on(t.galleryId, t.position)],

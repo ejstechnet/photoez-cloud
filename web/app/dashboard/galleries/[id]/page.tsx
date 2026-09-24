@@ -1,13 +1,15 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, count, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { clients, galleries, photos } from "@/db/schema";
+import { getWatermarkSettings, staleProof } from "@/lib/proofs";
 import { requirePhotographer } from "@/lib/session";
 import { photoKey, signedViewUrl } from "@/lib/storage";
 import { z } from "zod";
 import { StatusPill } from "../status-pill";
 import { PhotoTile } from "./photo-tile";
+import { ProofRefresher } from "./proof-refresher";
 import { Uploader } from "./uploader";
 
 export default async function GalleryPage({ params }: PageProps<"/dashboard/galleries/[id]">) {
@@ -16,7 +18,13 @@ export default async function GalleryPage({ params }: PageProps<"/dashboard/gall
   if (!z.uuid().safeParse(id).success) notFound();
 
   const [gallery] = await db
-    .select({ id: galleries.id, title: galleries.title, status: galleries.status, clientName: clients.name })
+    .select({
+      id: galleries.id,
+      title: galleries.title,
+      status: galleries.status,
+      freeLimit: galleries.freeLimit,
+      clientName: clients.name,
+    })
     .from(galleries)
     .leftJoin(clients, eq(clients.id, galleries.clientId))
     .where(and(eq(galleries.id, id), eq(galleries.photographerId, user.id)));
@@ -27,6 +35,17 @@ export default async function GalleryPage({ params }: PageProps<"/dashboard/gall
     .from(photos)
     .where(eq(photos.galleryId, gallery.id))
     .orderBy(asc(photos.position));
+
+  const watermark = await getWatermarkSettings(user.id);
+  const [{ staleCount }] = watermark
+    ? await db
+        .select({ staleCount: count() })
+        .from(photos)
+        .where(and(eq(photos.galleryId, gallery.id), staleProof(watermark.updatedAt)))
+    : [{ staleCount: 0 }];
+  const watermarkForBrowser = watermark
+    ? { url: watermark.url, opacity: watermark.opacity, position: watermark.position }
+    : null;
 
   const tiles = await Promise.all(
     rows.map(async (photo) => ({
@@ -49,7 +68,10 @@ export default async function GalleryPage({ params }: PageProps<"/dashboard/gall
         <div className="min-w-0">
           <div className="flex items-center gap-3">
             <StatusPill status={gallery.status} />
-            <span className="text-sm font-semibold text-muted">{gallery.clientName ?? "No client"}</span>
+            <span className="text-sm font-semibold text-muted">
+              {gallery.clientName ?? "No client"} · {gallery.freeLimit} free{" "}
+              {gallery.freeLimit === 1 ? "pick" : "picks"}
+            </span>
           </div>
           <h1 className="mt-2 font-display text-4xl font-bold tracking-tight break-words sm:text-5xl">
             {gallery.title}
@@ -67,8 +89,19 @@ export default async function GalleryPage({ params }: PageProps<"/dashboard/gall
         </div>
       </div>
 
-      <div className="mt-8">
-        <Uploader galleryId={gallery.id} />
+      <div className="mt-8 space-y-4">
+        {watermarkForBrowser && staleCount > 0 && (
+          <ProofRefresher galleryId={gallery.id} watermark={watermarkForBrowser} staleCount={staleCount} />
+        )}
+        {!watermarkForBrowser && (
+          <p className="rounded-2xl bg-sky-light/40 px-5 py-4 text-sm">
+            <span className="font-semibold">No watermark yet.</span> Clients will see clean proofs.{" "}
+            <Link href="/dashboard/settings" className="link">
+              Add your watermark
+            </Link>
+          </p>
+        )}
+        <Uploader galleryId={gallery.id} watermark={watermarkForBrowser} />
       </div>
 
       {tiles.length > 0 && (

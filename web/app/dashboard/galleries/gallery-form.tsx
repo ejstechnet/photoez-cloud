@@ -15,7 +15,7 @@ export function GalleryForm({
 }: {
   action: (state: GalleryFormState, formData: FormData) => Promise<GalleryFormState>;
   clients: { id: string; name: string }[];
-  defaultValues?: { title: string; clientId: string | null };
+  defaultValues?: { title: string; clientId: string | null; freeLimit: number };
   submitLabel: string;
   cancelHref: string;
 }) {
@@ -46,6 +46,16 @@ export function GalleryForm({
           </option>
         ))}
       </SelectField>
+      <Field
+        label="Free picks"
+        name="freeLimit"
+        type="number"
+        min={0}
+        inputMode="numeric"
+        defaultValue={defaultValues?.freeLimit ?? 10}
+        error={errors.freeLimit}
+        hint="How many photos the client can choose for free, like “Choose up to 10 photos.”"
+      />
       <FormError message={state.message} />
       <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center">
         <SubmitButton pending={pending} fullWidth={false}>

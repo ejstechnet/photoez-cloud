@@ -14,7 +14,12 @@ export default async function EditGalleryPage({ params }: PageProps<"/dashboard/
   if (!z.uuid().safeParse(id).success) notFound();
 
   const [gallery] = await db
-    .select({ id: galleries.id, title: galleries.title, clientId: galleries.clientId })
+    .select({
+      id: galleries.id,
+      title: galleries.title,
+      clientId: galleries.clientId,
+      freeLimit: galleries.freeLimit,
+    })
     .from(galleries)
     .where(and(eq(galleries.id, id), eq(galleries.photographerId, user.id)));
   if (!gallery) notFound();
