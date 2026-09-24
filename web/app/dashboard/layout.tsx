@@ -1,29 +1,26 @@
-import Link from "next/link";
+import { Logo } from "@/components/brand";
 import { requirePhotographer } from "@/lib/session";
 import { NavLink } from "./nav-link";
 import { SignOutButton } from "./sign-out-button";
 
-// Frame shared by every dashboard page: header, navigation, sign-out.
+// Frame shared by every dashboard page: a PhotoEZ navy band with the logo,
+// navigation pills, and sign-out.
 export default async function DashboardLayout({ children }: LayoutProps<"/dashboard">) {
   await requirePhotographer();
 
   return (
     <div className="flex flex-1 flex-col">
-      <header className="border-b border-border bg-surface">
-        <div className="mx-auto flex max-w-5xl items-center justify-between gap-4 px-4 py-3">
-          <div className="flex items-center gap-6">
-            <Link href="/dashboard" className="text-sm font-semibold tracking-wide text-brand">
-              PhotoEZ Cloud
-            </Link>
-            <nav className="flex gap-1">
-              <NavLink href="/dashboard">Overview</NavLink>
-              <NavLink href="/dashboard/clients">Clients</NavLink>
-            </nav>
-          </div>
+      <header className="bg-brand text-white">
+        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-x-6 gap-y-3 px-4 py-4">
+          <Logo />
+          <nav className="order-last flex w-full gap-1 sm:order-none sm:w-auto">
+            <NavLink href="/dashboard">Overview</NavLink>
+            <NavLink href="/dashboard/clients">Clients</NavLink>
+          </nav>
           <SignOutButton />
         </div>
       </header>
-      <main className="mx-auto w-full max-w-5xl px-4 py-10">{children}</main>
+      <main className="mx-auto w-full max-w-6xl px-4 py-10">{children}</main>
     </div>
   );
 }

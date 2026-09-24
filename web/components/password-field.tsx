@@ -14,10 +14,10 @@ export function PasswordField({
 
   return (
     <div>
-      <label htmlFor={id} className="text-sm font-medium">
+      <label htmlFor={id} className="text-sm font-semibold">
         {label}
       </label>
-      <div className="relative mt-1">
+      <div className="relative mt-1.5">
         <input {...input} id={id} type={visible ? "text" : "password"} className={`${inputClass} pr-11`} />
         <button
           type="button"
@@ -25,12 +25,12 @@ export function PasswordField({
           aria-label={visible ? "Hide password" : "Show password"}
           aria-pressed={visible}
           aria-controls={id}
-          className="absolute inset-y-0 right-0 flex w-11 items-center justify-center rounded-r-lg text-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-brand"
+          className="absolute inset-y-0 right-0 flex w-11 items-center justify-center rounded-r-xl text-muted hover:text-lime-ink focus-visible:outline-2 focus-visible:outline-lime-ink"
         >
           {visible ? <EyeOffIcon /> : <EyeIcon />}
         </button>
       </div>
-      {hint && <span className="mt-1 block text-xs text-muted">{hint}</span>}
+      {hint && <span className="mt-1.5 block text-xs text-muted">{hint}</span>}
     </div>
   );
 }

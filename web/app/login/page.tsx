@@ -15,7 +15,7 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
       subtitle={
         <>
           New here?{" "}
-          <Link href="/signup" className="font-medium text-brand underline-offset-4 hover:underline">
+          <Link href="/signup" className="link">
             Create an account
           </Link>
         </>
