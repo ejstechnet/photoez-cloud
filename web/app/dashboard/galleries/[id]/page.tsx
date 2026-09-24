@@ -10,6 +10,7 @@ import { photoKey, signedViewUrl } from "@/lib/storage";
 import { z } from "zod";
 import { StatusPill } from "../status-pill";
 import { ClientLink } from "./client-link";
+import { DeliverPanel } from "./deliver-panel";
 import { PhotoGrid } from "./photo-grid";
 import { ProofRefresher } from "./proof-refresher";
 import { Uploader } from "./uploader";
@@ -26,6 +27,7 @@ export default async function GalleryPage({ params }: PageProps<"/dashboard/gall
       status: galleries.status,
       freeLimit: galleries.freeLimit,
       shareToken: galleries.shareToken,
+      deliveredAt: galleries.deliveredAt,
       clientName: clients.name,
     })
     .from(galleries)
@@ -36,6 +38,7 @@ export default async function GalleryPage({ params }: PageProps<"/dashboard/gall
   const rows = await db
     .select({
       id: photos.id,
+      kind: photos.kind,
       fileKey: photos.fileKey,
       originalName: photos.originalName,
       width: photos.width,
@@ -52,7 +55,7 @@ export default async function GalleryPage({ params }: PageProps<"/dashboard/gall
     ? await db
         .select({ staleCount: count() })
         .from(photos)
-        .where(and(eq(photos.galleryId, gallery.id), staleProof(watermark.updatedAt)))
+        .where(and(eq(photos.galleryId, gallery.id), eq(photos.kind, "proof"), staleProof(watermark.updatedAt)))
     : [{ staleCount: 0 }];
   const watermarkForBrowser = watermark
     ? { url: watermark.url, opacity: watermark.opacity, position: watermark.position }
@@ -61,6 +64,7 @@ export default async function GalleryPage({ params }: PageProps<"/dashboard/gall
   const tiles = await Promise.all(
     rows.map(async (photo) => ({
       id: photo.id,
+      kind: photo.kind,
       name: photo.originalName,
       aspect: photo.width && photo.height ? photo.width / photo.height : 2 / 3,
       selected: photo.favoriteId !== null,
@@ -68,6 +72,8 @@ export default async function GalleryPage({ params }: PageProps<"/dashboard/gall
       previewUrl: await signedViewUrl(photoKey(photo.fileKey, "preview")),
     })),
   );
+  const proofs = tiles.filter((tile) => tile.kind === "proof");
+  const finals = tiles.filter((tile) => tile.kind === "final");
 
   return (
     <>
@@ -91,44 +97,79 @@ export default async function GalleryPage({ params }: PageProps<"/dashboard/gall
           </h1>
         </div>
         <div className="flex items-center gap-4">
-          {/* PhotoEZ-style round counter */}
-          <div className="flex size-16 flex-col items-center justify-center rounded-full bg-brand text-white ring-4 ring-lime/40">
-            <span className="font-display text-xl leading-none font-bold">{tiles.length}</span>
-            <span className="mt-0.5 text-[9px] font-bold tracking-wider uppercase">photos</span>
-          </div>
+          {/* PhotoEZ-style round counters */}
+          <Counter value={proofs.length} label="proofs" ring="ring-sky/40" />
+          <Counter value={finals.length} label="finals" ring="ring-lime/50" />
           <Link href={`/dashboard/galleries/${gallery.id}/edit`} className="btn-secondary">
             Settings
           </Link>
         </div>
       </div>
 
-      <div className="mt-8 space-y-4">
+      <div className="mt-8">
         <ClientLink
           galleryId={gallery.id}
           url={`${siteUrl}/g/${gallery.shareToken}`}
           submitted={gallery.status === "submitted" || gallery.status === "paid_and_submitted"}
-          selectedNames={tiles.filter((tile) => tile.selected).map((tile) => tile.name)}
+          selectedNames={proofs.filter((tile) => tile.selected).map((tile) => tile.name)}
           freeLimit={gallery.freeLimit}
         />
-        {watermarkForBrowser && staleCount > 0 && (
-          <ProofRefresher galleryId={gallery.id} watermark={watermarkForBrowser} staleCount={staleCount} />
-        )}
-        {!watermarkForBrowser && (
-          <p className="rounded-2xl bg-sky-light/40 px-5 py-4 text-sm">
-            <span className="font-semibold">No watermark yet.</span> Clients will see clean proofs.{" "}
-            <Link href="/dashboard/settings" className="link">
-              Add your watermark
-            </Link>
-          </p>
-        )}
-        <Uploader galleryId={gallery.id} watermark={watermarkForBrowser} />
       </div>
 
-      {tiles.length > 0 && (
-        <div className="mt-8">
-          <PhotoGrid galleryId={gallery.id} photos={tiles} />
+      {/* Step 1: proofs the client chooses from (watermarked for them). */}
+      <section className="mt-12">
+        <SectionHeading step={1} title="Proofs" note="Your client picks favorites from these." />
+        <div className="mt-5 space-y-4">
+          {watermarkForBrowser && staleCount > 0 && (
+            <ProofRefresher galleryId={gallery.id} watermark={watermarkForBrowser} staleCount={staleCount} />
+          )}
+          {!watermarkForBrowser && (
+            <p className="rounded-2xl bg-sky-light/40 px-5 py-4 text-sm">
+              <span className="font-semibold">No watermark yet.</span> Clients will see clean proofs.{" "}
+              <Link href="/dashboard/settings" className="link">
+                Add your watermark
+              </Link>
+            </p>
+          )}
+          <Uploader galleryId={gallery.id} kind="proof" watermark={watermarkForBrowser} />
+          {proofs.length > 0 && <PhotoGrid galleryId={gallery.id} photos={proofs} />}
         </div>
-      )}
+      </section>
+
+      {/* Step 2: the edited finals, delivered clean and full resolution. */}
+      <section className="mt-14">
+        <SectionHeading step={2} title="Finals" note="Edited photos your client downloads, never watermarked." />
+        <div className="mt-5 space-y-4">
+          <DeliverPanel
+            galleryId={gallery.id}
+            finalsCount={finals.length}
+            deliveredAt={gallery.deliveredAt?.toISOString() ?? null}
+          />
+          <Uploader galleryId={gallery.id} kind="final" watermark={null} />
+          {finals.length > 0 && <PhotoGrid galleryId={gallery.id} photos={finals} />}
+        </div>
+      </section>
     </>
+  );
+}
+
+function Counter({ value, label, ring }: { value: number; label: string; ring: string }) {
+  return (
+    <div className={`flex size-16 flex-col items-center justify-center rounded-full bg-brand text-white ring-4 ${ring}`}>
+      <span className="font-display text-xl leading-none font-bold">{value}</span>
+      <span className="mt-0.5 text-[9px] font-bold tracking-wider uppercase">{label}</span>
+    </div>
+  );
+}
+
+function SectionHeading({ step, title, note }: { step: number; title: string; note: string }) {
+  return (
+    <div className="flex items-center gap-3 border-b border-border pb-3">
+      <span className="grid size-8 place-items-center rounded-full bg-lime font-bold text-brand-deep">{step}</span>
+      <div>
+        <h2 className="font-display text-2xl font-bold">{title}</h2>
+        <p className="text-sm text-muted">{note}</p>
+      </div>
+    </div>
   );
 }

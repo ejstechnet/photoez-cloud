@@ -48,9 +48,11 @@ export async function clientPhotos(gallery: ClientGallery) {
     .from(photos)
     .leftJoin(favorites, eq(favorites.photoId, photos.id))
     .where(
-      gallery.hasWatermark
-        ? and(eq(photos.galleryId, gallery.id), isNotNull(photos.proofMadeAt))
-        : eq(photos.galleryId, gallery.id),
+      and(
+        eq(photos.galleryId, gallery.id),
+        eq(photos.kind, "proof"),
+        gallery.hasWatermark ? isNotNull(photos.proofMadeAt) : undefined,
+      ),
     )
     .orderBy(asc(photos.position));
 
@@ -62,6 +64,27 @@ export async function clientPhotos(gallery: ClientGallery) {
     selected: row.favoriteId !== null,
   }));
 }
+
+// The delivered finals, in order. Only available once the gallery is delivered.
+export async function clientFinals(gallery: ClientGallery) {
+  if (!isDelivered(gallery)) return [];
+  const rows = await db
+    .select({
+      id: photos.id,
+      fileKey: photos.fileKey,
+      originalName: photos.originalName,
+      sizeBytes: photos.sizeBytes,
+      width: photos.width,
+      height: photos.height,
+      createdAt: photos.createdAt,
+    })
+    .from(photos)
+    .where(and(eq(photos.galleryId, gallery.id), eq(photos.kind, "final")))
+    .orderBy(asc(photos.position));
+  return rows.map((row) => ({ ...row, aspect: row.width && row.height ? row.width / row.height : 2 / 3 }));
+}
+
+export const isDelivered = (gallery: ClientGallery) => gallery.status === "delivered" || gallery.status === "completed";
 
 // "0" free picks means no limit.
 export const isOverLimit = (count: number, freeLimit: number) => freeLimit > 0 && count >= freeLimit;

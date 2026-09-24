@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { GALLERY_STEPS, PhotoEZCloudMark, WorkflowPills } from "@/components/brand";
-import { clientPhotos, findGalleryByToken } from "@/lib/client-gallery";
+import { clientFinals, clientPhotos, findGalleryByToken, isDelivered } from "@/lib/client-gallery";
+import { formatBytes } from "@/lib/format";
 import { STATUS_STEP } from "@/lib/gallery-status";
 import { photoKey, signedViewUrl } from "@/lib/storage";
+import { DeliveryGallery } from "./delivery-gallery";
 import { ProofingGallery } from "./proofing-gallery";
 
 // The client's private gallery page, reached from the link the photographer
@@ -28,7 +30,23 @@ export default async function ClientGalleryPage({ params, searchParams }: PagePr
   const studio = gallery.studioName ?? gallery.photographerName;
   const isPreview = preview === "1";
 
-  const photos = await clientPhotos(gallery);
+  const delivered = isDelivered(gallery);
+  const finals = await clientFinals(gallery);
+  const finalTiles = await Promise.all(
+    finals.map(async (photo, i) => ({
+      id: photo.id,
+      number: i + 1,
+      name: photo.originalName,
+      aspect: photo.aspect,
+      thumbUrl: await signedViewUrl(photoKey(photo.fileKey, "thumb")),
+      previewUrl: await signedViewUrl(photoKey(photo.fileKey, "preview")),
+      // Full-resolution original, saved under the photographer's file name.
+      downloadUrl: await signedViewUrl(photoKey(photo.fileKey, "original"), { downloadAs: photo.originalName }),
+    })),
+  );
+  const totalSize = formatBytes(finals.reduce((sum, photo) => sum + (photo.sizeBytes ?? 0), 0));
+
+  const photos = delivered ? [] : await clientPhotos(gallery);
   const tiles = await Promise.all(
     photos.map(async (photo, i) => ({
       id: photo.id,
@@ -64,10 +82,18 @@ export default async function ClientGalleryPage({ params, searchParams }: PagePr
           <Notice title="This gallery has expired">
             Contact {studio} if you still need your photos.
           </Notice>
-        ) : gallery.status === "delivered" || gallery.status === "completed" ? (
-          <Notice title="Your final photos are ready">
-            {studio} has delivered your finished photos. Downloads are coming to this page soon.
-          </Notice>
+        ) : delivered ? (
+          finalTiles.length === 0 ? (
+            <Notice title="Your gallery is being prepared!">{studio} is finishing your photos. Check back soon.</Notice>
+          ) : (
+            <DeliveryGallery
+              token={token}
+              tiles={finalTiles}
+              studio={studio}
+              clientFirstName={gallery.clientName?.split(" ")[0] ?? null}
+              totalSize={totalSize}
+            />
+          )
         ) : tiles.length === 0 ? (
           <Notice title="Your photos are on their way">
             {studio} is still getting your gallery ready. Check back soon.

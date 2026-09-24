@@ -27,7 +27,7 @@ export default async function GalleriesPage() {
     .groupBy(galleries.id, clients.name)
     .orderBy(desc(galleries.createdAt));
 
-  // Cover photo = the first photo in each gallery.
+  // Cover photo = the first proof in each gallery (or the first final).
   const covers =
     rows.length === 0
       ? []
@@ -40,7 +40,8 @@ export default async function GalleriesPage() {
               rows.map((row) => row.id),
             ),
           )
-          .orderBy(photos.galleryId, asc(photos.position));
+          // "proof" sorts after "final", so desc puts proofs first; finals are the fallback.
+          .orderBy(photos.galleryId, desc(photos.kind), asc(photos.position));
   const coverUrls = new Map(
     await Promise.all(
       covers.map(async (cover) => [cover.galleryId, await signedViewUrl(photoKey(cover.fileKey, "thumb"))] as const),
