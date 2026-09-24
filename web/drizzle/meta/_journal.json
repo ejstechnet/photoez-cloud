@@ -36,6 +36,13 @@
       "when": 1790276581900,
       "tag": "0004_noisy_network",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1790284051777,
+      "tag": "0005_closed_proudstar",
+      "breakpoints": true
     }
   ]
 }
