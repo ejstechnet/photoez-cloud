@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { authClient } from "@/lib/auth-client";
-import { Field, FormError, SubmitButton } from "@/components/auth-card";
+import { Field, FormError, SubmitButton } from "@/components/form";
 import { PasswordField } from "@/components/password-field";
 
 export function LoginForm({ redirectTo }: { redirectTo: string }) {

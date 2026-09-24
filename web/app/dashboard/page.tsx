@@ -1,34 +1,36 @@
-import { headers } from "next/headers";
-import { redirect } from "next/navigation";
-import { auth } from "@/lib/auth";
-import { SignOutButton } from "./sign-out-button";
+import Link from "next/link";
+import { count, eq } from "drizzle-orm";
+import { db } from "@/db";
+import { clients } from "@/db/schema";
+import { requirePhotographer } from "@/lib/session";
 
 export default async function DashboardPage() {
-  // The real check: look the session up in the database. proxy.ts only
-  // checked that a cookie exists.
-  const session = await auth.api.getSession({ headers: await headers() });
-  if (!session) redirect("/login");
-
-  const { user } = session;
+  const user = await requirePhotographer();
+  const [{ clientCount }] = await db
+    .select({ clientCount: count() })
+    .from(clients)
+    .where(eq(clients.photographerId, user.id));
 
   return (
-    <div className="flex flex-1 flex-col">
-      <header className="border-b border-border bg-surface">
-        <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-3">
-          <span className="text-sm font-semibold tracking-wide text-brand">PhotoEZ Cloud</span>
-          <SignOutButton />
+    <>
+      <h1 className="text-3xl font-semibold">Welcome, {user.name.split(" ")[0]}</h1>
+      <p className="mt-2 text-muted">
+        {user.businessName ? `${user.businessName} · ` : ""}
+        {user.email}
+      </p>
+      <div className="mt-8 grid gap-4 sm:grid-cols-2">
+        <Link
+          href="/dashboard/clients"
+          className="rounded-2xl border border-border bg-surface p-6 transition hover:border-brand"
+        >
+          <p className="text-sm font-medium text-muted">Clients</p>
+          <p className="mt-2 text-3xl font-semibold">{clientCount}</p>
+        </Link>
+        <div className="rounded-2xl border border-dashed border-border p-6 text-muted">
+          <p className="text-sm font-medium">Galleries</p>
+          <p className="mt-2 text-sm">Coming soon.</p>
         </div>
-      </header>
-      <main className="mx-auto w-full max-w-5xl px-4 py-10">
-        <h1 className="text-3xl font-semibold">Welcome, {user.name.split(" ")[0]}</h1>
-        <p className="mt-2 text-muted">
-          {user.businessName ? `${user.businessName} · ` : ""}
-          {user.email}
-        </p>
-        <div className="mt-8 rounded-2xl border border-dashed border-border p-8 text-center text-muted">
-          Your galleries and clients will show up here.
-        </div>
-      </main>
-    </div>
+      </div>
+    </>
   );
 }

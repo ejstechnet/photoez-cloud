@@ -1,7 +1,7 @@
 "use client";
 
 import { useId, useState } from "react";
-import { inputClass } from "./auth-card";
+import { inputClass } from "./form";
 
 // Password input with an eye button that shows or hides what was typed.
 export function PasswordField({

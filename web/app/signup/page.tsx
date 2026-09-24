@@ -4,7 +4,8 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { authClient } from "@/lib/auth-client";
-import { AuthCard, Field, FormError, SubmitButton } from "@/components/auth-card";
+import { AuthCard } from "@/components/auth-card";
+import { Field, FormError, SubmitButton } from "@/components/form";
 import { PasswordField } from "@/components/password-field";
 
 export default function SignUpPage() {
