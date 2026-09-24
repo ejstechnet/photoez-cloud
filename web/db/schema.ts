@@ -124,8 +124,8 @@ export const galleries = pgTable(
   ],
 );
 
-// One uploaded photo. The image file lives in file storage; this row
-// holds where to find it and its details.
+// One uploaded photo. The image files live in R2 storage (see lib/storage.ts);
+// `fileKey` is the storage prefix holding its original, preview and thumbnail.
 export const photos = pgTable(
   "photos",
   {
@@ -135,6 +135,7 @@ export const photos = pgTable(
       .references(() => galleries.id, { onDelete: "cascade" }),
     fileKey: text("file_key").notNull(),
     originalName: text("original_name").notNull(),
+    contentType: text("content_type").notNull().default("image/jpeg"),
     width: integer("width"),
     height: integer("height"),
     sizeBytes: integer("size_bytes"),

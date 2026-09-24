@@ -1,0 +1,1 @@
+ALTER TABLE "photos" ADD COLUMN "content_type" text DEFAULT 'image/jpeg' NOT NULL;
