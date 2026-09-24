@@ -46,10 +46,12 @@ export function Logo({ tone = "light" }: { tone?: "light" | "dark" }) {
   );
 }
 
-// PhotoEZ's step-pill workflow, reimagined as the studio journey.
-const steps = ["Inquiry", "Booked", "Proofing", "Delivered"];
+// PhotoEZ's step-pill workflow. The home page shows the studio journey; the
+// client gallery shows the proofing steps.
+export const STUDIO_STEPS = ["Inquiry", "Booked", "Proofing", "Delivered"];
+export const GALLERY_STEPS = ["Proof gallery", "Submitted", "Awaiting finals", "Final delivery"];
 
-export function WorkflowPills({ active = 2 }: { active?: number }) {
+export function WorkflowPills({ active = 2, steps = STUDIO_STEPS }: { active?: number; steps?: string[] }) {
   return (
     <ol className="flex flex-wrap items-center gap-2">
       {steps.map((step, i) => (
