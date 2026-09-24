@@ -17,6 +17,7 @@ export default async function DashboardLayout({ children }: LayoutProps<"/dashbo
             <NavLink href="/dashboard">Overview</NavLink>
             <NavLink href="/dashboard/galleries">Galleries</NavLink>
             <NavLink href="/dashboard/clients">Clients</NavLink>
+            <NavLink href="/dashboard/settings">Settings</NavLink>
           </nav>
           <SignOutButton />
         </div>

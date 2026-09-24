@@ -1,13 +1,14 @@
 "use server";
 
 import { randomBytes, randomUUID } from "node:crypto";
-import { and, eq, max } from "drizzle-orm";
+import { and, eq, inArray, max } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { db } from "@/db";
-import { clients, galleries, photos } from "@/db/schema";
+import { clients, galleries, photographers, photos } from "@/db/schema";
 import { MAX_PHOTO_BYTES, MAX_PHOTOS_PER_BATCH, PHOTO_TYPES } from "@/lib/photo-limits";
+import { staleProof } from "@/lib/proofs";
 import { requirePhotographer } from "@/lib/session";
 import {
   deletePrefix,
@@ -15,6 +16,7 @@ import {
   photoKey,
   photoPrefix,
   signedUploadUrl,
+  signedViewUrl,
   storedSize,
 } from "@/lib/storage";
 
@@ -36,6 +38,11 @@ async function findOwnedGallery(galleryId: string, photographerId: string) {
 
 const gallerySchema = z.object({
   title: z.string().trim().min(1, "Give the gallery a title.").max(200, "Keep the title under 200 characters."),
+  freeLimit: z.coerce
+    .number({ message: "Enter a number." })
+    .int("Enter a whole number.")
+    .min(0, "Use 0 or more.")
+    .max(10_000, "That's more photos than a gallery can hold."),
   clientId: z
     .string()
     .trim()
@@ -55,6 +62,7 @@ type ParsedGallery =
 async function parseGallery(formData: FormData, photographerId: string): Promise<ParsedGallery> {
   const parsed = gallerySchema.safeParse({
     title: String(formData.get("title") ?? ""),
+    freeLimit: formData.get("freeLimit") ?? "",
     clientId: String(formData.get("clientId") ?? ""),
   });
   if (!parsed.success) {
@@ -138,7 +146,7 @@ const fileInfoSchema = z.object({
 
 export type PreparedUpload = {
   photoId: string;
-  urls: { original: string; preview: string; thumb: string };
+  urls: { original: string; preview: string; thumb: string; proof: string };
 };
 
 export async function prepareUploads(
@@ -162,6 +170,7 @@ export async function prepareUploads(
           original: await signedUploadUrl(photoKey(prefix, "original"), file.type),
           preview: await signedUploadUrl(photoKey(prefix, "preview"), "image/jpeg"),
           thumb: await signedUploadUrl(photoKey(prefix, "thumb"), "image/jpeg"),
+          proof: await signedUploadUrl(photoKey(prefix, "proof"), "image/jpeg"),
         },
       };
     }),
@@ -175,6 +184,8 @@ const confirmSchema = z.object({
   contentType: z.enum(PHOTO_TYPES),
   width: z.number().int().positive().max(100_000),
   height: z.number().int().positive().max(100_000),
+  // True when the browser also uploaded a watermarked proof.
+  hasProof: z.boolean(),
 });
 
 export async function confirmUpload(
@@ -188,12 +199,13 @@ export async function confirmUpload(
   if (!parsed.success) return { error: "That upload couldn't be saved." };
 
   const prefix = photoPrefix(photographer.id, galleryId, parsed.data.photoId);
-  const [originalSize, previewSize, thumbSize] = await Promise.all([
+  const [originalSize, previewSize, thumbSize, proofSize] = await Promise.all([
     storedSize(photoKey(prefix, "original")),
     storedSize(photoKey(prefix, "preview")),
     storedSize(photoKey(prefix, "thumb")),
+    parsed.data.hasProof ? storedSize(photoKey(prefix, "proof")) : Promise.resolve(0),
   ]);
-  if (originalSize === null || previewSize === null || thumbSize === null) {
+  if (originalSize === null || previewSize === null || thumbSize === null || proofSize === null) {
     return { error: "The upload didn't finish. Try that photo again." };
   }
   if (originalSize > MAX_PHOTO_BYTES) {
@@ -218,9 +230,60 @@ export async function confirmUpload(
       height: parsed.data.height,
       sizeBytes: originalSize,
       position: (lastPosition ?? 0) + 1,
+      proofMadeAt: parsed.data.hasProof ? new Date() : null,
     })
     .onConflictDoNothing();
 
+  return { ok: true };
+}
+
+// ---- Updating proofs after the watermark changes ----
+// The browser downloads each clean preview, stamps the current watermark on
+// it, and uploads the new proof; then markProofsMade records the change.
+
+const REFRESH_BATCH = 20;
+
+export type ProofJob = { photoId: string; previewUrl: string; proofUploadUrl: string };
+
+export async function prepareProofRefresh(
+  galleryId: string,
+): Promise<{ jobs: ProofJob[]; remaining: number } | { error: string }> {
+  const photographer = await requirePhotographer();
+  if (!(await findOwnedGallery(galleryId, photographer.id))) return { error: "That gallery could not be found." };
+
+  const [settings] = await db
+    .select({ key: photographers.watermarkKey, updatedAt: photographers.watermarkUpdatedAt })
+    .from(photographers)
+    .where(eq(photographers.id, photographer.id));
+  if (!settings?.key) return { error: "Add a watermark in Settings first." };
+
+  const stale = await db
+    .select({ id: photos.id, fileKey: photos.fileKey })
+    .from(photos)
+    .where(and(eq(photos.galleryId, galleryId), staleProof(settings.updatedAt)))
+    .orderBy(photos.position);
+
+  const jobs = await Promise.all(
+    stale.slice(0, REFRESH_BATCH).map(async (photo) => ({
+      photoId: photo.id,
+      previewUrl: await signedViewUrl(photoKey(photo.fileKey, "preview")),
+      proofUploadUrl: await signedUploadUrl(photoKey(photo.fileKey, "proof"), "image/jpeg"),
+    })),
+  );
+  return { jobs, remaining: stale.length };
+}
+
+export async function markProofsMade(galleryId: string, photoIds: string[]): Promise<{ ok: true } | { error: string }> {
+  const photographer = await requirePhotographer();
+  if (!(await findOwnedGallery(galleryId, photographer.id))) return { error: "That gallery could not be found." };
+  const ids = z.array(z.uuid()).max(REFRESH_BATCH).safeParse(photoIds);
+  if (!ids.success || ids.data.length === 0) return { ok: true };
+
+  await db
+    .update(photos)
+    .set({ proofMadeAt: new Date() })
+    .where(and(eq(photos.galleryId, galleryId), inArray(photos.id, ids.data)));
+  revalidatePath(`/dashboard/galleries/${galleryId}`);
   return { ok: true };
 }
 

@@ -23,9 +23,15 @@ const s3 = new S3Client({
   },
 });
 
-// Each photo is stored three times under one prefix: the untouched original,
-// a ~2000px preview for viewing, and a ~900px thumbnail for grids.
-export type PhotoVariant = "original" | "preview" | "thumb";
+// Each photo is stored under one prefix: the untouched original, a ~2000px
+// clean preview, a ~900px thumbnail for grids, and (when the photographer has
+// a watermark) a watermarked proof — the only version clients see while proofing.
+export type PhotoVariant = "original" | "preview" | "thumb" | "proof";
+
+// A new key each time the watermark is replaced, so browsers never show a cached old one.
+export function watermarkKey(photographerId: string, version: string) {
+  return `photographers/${photographerId}/branding/watermark-${version}.png`;
+}
 
 export function photoPrefix(photographerId: string, galleryId: string, photoId: string) {
   return `photographers/${photographerId}/galleries/${galleryId}/photos/${photoId}`;

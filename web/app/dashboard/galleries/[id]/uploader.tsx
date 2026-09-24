@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { MAX_PHOTO_BYTES, MAX_PHOTOS_PER_BATCH, PHOTO_TYPES } from "@/lib/photo-limits";
+import { loadWatermark, makeProof, renderJpeg, type WatermarkSettings } from "@/lib/proof-maker";
 import { ImagesIcon } from "@/components/icons";
 import { confirmUpload, prepareUploads } from "../actions";
 
@@ -10,21 +11,6 @@ type Status = "waiting" | "uploading" | "done" | "error";
 type Item = { key: string; name: string; status: Status; progress: number; error?: string };
 
 const PARALLEL_UPLOADS = 3;
-
-// Draw the photo at a smaller size and export it as a JPEG. createImageBitmap
-// applies the camera's rotation (EXIF orientation), so previews come out upright.
-async function resized(bitmap: ImageBitmap, maxEdge: number, quality: number) {
-  const scale = Math.min(1, maxEdge / Math.max(bitmap.width, bitmap.height));
-  const canvas = document.createElement("canvas");
-  canvas.width = Math.round(bitmap.width * scale);
-  canvas.height = Math.round(bitmap.height * scale);
-  const context = canvas.getContext("2d")!;
-  context.imageSmoothingQuality = "high";
-  context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-  return new Promise<Blob>((resolve, reject) =>
-    canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error("resize failed"))), "image/jpeg", quality),
-  );
-}
 
 // PUT a file to a signed upload URL, reporting progress (0–1).
 function put(url: string, body: Blob, contentType: string, onProgress?: (fraction: number) => void) {
@@ -39,7 +25,7 @@ function put(url: string, body: Blob, contentType: string, onProgress?: (fractio
   });
 }
 
-export function Uploader({ galleryId }: { galleryId: string }) {
+export function Uploader({ galleryId, watermark }: { galleryId: string; watermark: WatermarkSettings | null }) {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
   const [items, setItems] = useState<Item[]>([]);
@@ -81,19 +67,30 @@ export function Uploader({ galleryId }: { galleryId: string }) {
       return;
     }
 
+    let stamp: Awaited<ReturnType<typeof loadWatermark>> = null;
+    try {
+      stamp = await loadWatermark(watermark);
+    } catch {
+      setNotice("Your watermark couldn't be loaded, so these proofs were saved without it. Use “Update proofs” later.");
+    }
+
     const queue = batch.map((entry, i) => ({ ...entry, upload: prepared.uploads[i] }));
     async function worker() {
       for (let next = queue.shift(); next; next = queue.shift()) {
         const { file, key, upload } = next;
         update(key, { status: "uploading" });
         try {
+          // createImageBitmap applies the camera's rotation, so every version comes out upright.
           const bitmap = await createImageBitmap(file);
-          const [preview, thumb] = [await resized(bitmap, 2048, 0.85), await resized(bitmap, 900, 0.8)];
+          const preview = await renderJpeg(bitmap, 2048, 0.85);
+          const thumb = await renderJpeg(bitmap, 900, 0.8);
+          const proof = stamp ? await makeProof(bitmap, stamp) : null;
           const { width, height } = bitmap;
           bitmap.close();
 
           await put(upload.urls.thumb, thumb, "image/jpeg");
           await put(upload.urls.preview, preview, "image/jpeg");
+          if (proof) await put(upload.urls.proof, proof, "image/jpeg");
           await put(upload.urls.original, file, file.type, (fraction) => update(key, { progress: fraction }));
 
           const saved = await confirmUpload(galleryId, {
@@ -102,6 +99,7 @@ export function Uploader({ galleryId }: { galleryId: string }) {
             contentType: file.type as (typeof PHOTO_TYPES)[number],
             width,
             height,
+            hasProof: proof !== null,
           });
           if ("error" in saved) throw new Error(saved.error);
           update(key, { status: "done", progress: 1 });

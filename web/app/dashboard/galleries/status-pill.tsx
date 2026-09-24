@@ -1,13 +1,18 @@
-const styles = {
-  draft: "bg-sun/25 text-foreground",
-  published: "bg-lime/20 text-lime-ink",
-  archived: "bg-border text-muted",
-} as const;
+import { STATUS_LABELS, type GalleryStatus } from "@/lib/gallery-status";
 
-export function StatusPill({ status }: { status: keyof typeof styles }) {
+const styles: Record<GalleryStatus, string> = {
+  pending: "bg-sky-light text-brand-deep",
+  submitted: "bg-sun text-brand-deep",
+  paid_and_submitted: "bg-sky text-white",
+  delivered: "bg-lime text-brand-deep",
+  completed: "bg-brand text-white",
+  expired: "bg-danger text-white",
+};
+
+export function StatusPill({ status }: { status: GalleryStatus }) {
   return (
     <span className={`rounded-full px-2.5 py-1 text-[11px] font-bold tracking-wider uppercase ${styles[status]}`}>
-      {status}
+      {STATUS_LABELS[status]}
     </span>
   );
 }
