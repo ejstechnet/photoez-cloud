@@ -1,24 +1,30 @@
 "use client";
 
 import { useTransition } from "react";
+import { HeartIcon } from "@/components/icons";
 import { deletePhoto } from "../actions";
 
-// One photo in the gallery grid: PhotoEZ-style number badge, opens the
-// preview on click, and a delete button on hover.
+// One photo in the photographer's grid: uncropped in its own shape, a
+// PhotoEZ-style number badge, a lime heart when the client picked it, and a
+// delete button on hover. Clicking opens the lightbox.
 export function PhotoTile({
   galleryId,
   id,
   number,
   name,
+  aspect,
+  selected,
   thumbUrl,
-  previewUrl,
+  onOpen,
 }: {
   galleryId: string;
   id: string;
   number: number;
   name: string;
+  aspect: number;
+  selected: boolean;
   thumbUrl: string;
-  previewUrl: string;
+  onOpen: () => void;
 }) {
   const [pending, startTransition] = useTransition();
 
@@ -31,9 +37,18 @@ export function PhotoTile({
   }
 
   return (
-    <div className={`group relative overflow-hidden rounded-2xl bg-brand-deep ${pending ? "opacity-40" : ""}`}>
-      {/* 2:3 portrait tiles (a 4×6 print), since most sessions are shot in portrait. */}
-      <a href={previewUrl} target="_blank" rel="noreferrer" className="block aspect-[2/3]">
+    <div
+      className={`group relative overflow-hidden rounded-2xl bg-brand-deep ${selected ? "ring-4 ring-lime" : ""} ${
+        pending ? "opacity-40" : ""
+      }`}
+    >
+      <button
+        type="button"
+        onClick={onOpen}
+        className="block w-full"
+        style={{ aspectRatio: aspect }}
+        aria-label={`View ${name}`}
+      >
         {/* Signed R2 URLs point at pre-sized thumbnails, so next/image optimization isn't needed. */}
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
@@ -42,10 +57,18 @@ export function PhotoTile({
           loading="lazy"
           className="size-full object-cover transition duration-300 group-hover:scale-105"
         />
-      </a>
+      </button>
       <span className="pointer-events-none absolute top-2 left-2 grid size-7 place-items-center rounded-full bg-brand-deep/80 text-xs font-bold text-white">
         {number}
       </span>
+      {selected && (
+        <span
+          className="pointer-events-none absolute right-2 bottom-2 grid size-9 place-items-center rounded-full bg-lime text-brand-deep shadow-lg"
+          title="The client picked this photo"
+        >
+          <HeartIcon size={18} fill="currentColor" />
+        </span>
+      )}
       <button
         type="button"
         onClick={handleDelete}

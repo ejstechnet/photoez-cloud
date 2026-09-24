@@ -1,0 +1,67 @@
+import { and, asc, eq, isNotNull, sql } from "drizzle-orm";
+import { db } from "@/db";
+import { clients, favorites, galleries, photographers, photos } from "@/db/schema";
+
+// The client side of a gallery, reached only through its private share link.
+// There's no login: the unguessable token *is* the key, so every lookup starts
+// here and nothing is ever looked up by gallery id from the client.
+
+const TOKEN_PATTERN = /^[A-Za-z0-9_-]{24}$/;
+
+export async function findGalleryByToken(token: string) {
+  if (!TOKEN_PATTERN.test(token)) return null;
+  const [gallery] = await db
+    .select({
+      id: galleries.id,
+      title: galleries.title,
+      status: galleries.status,
+      freeLimit: galleries.freeLimit,
+      shareToken: galleries.shareToken,
+      clientName: clients.name,
+      studioName: photographers.businessName,
+      photographerName: photographers.name,
+      // Only watermarked proofs are shown when the photographer has a watermark.
+      hasWatermark: sql<boolean>`${photographers.watermarkKey} is not null`,
+    })
+    .from(galleries)
+    .innerJoin(photographers, eq(photographers.id, galleries.photographerId))
+    .leftJoin(clients, eq(clients.id, galleries.clientId))
+    .where(eq(galleries.shareToken, token));
+  return gallery ?? null;
+}
+
+export type ClientGallery = NonNullable<Awaited<ReturnType<typeof findGalleryByToken>>>;
+
+// Photos the client may see, in order, with whether each is a favorite.
+// With a watermark, a photo whose proof hasn't been made yet stays hidden
+// rather than falling back to a clean version.
+export async function clientPhotos(gallery: ClientGallery) {
+  const rows = await db
+    .select({
+      id: photos.id,
+      fileKey: photos.fileKey,
+      width: photos.width,
+      height: photos.height,
+      proofMadeAt: photos.proofMadeAt,
+      favoriteId: favorites.id,
+    })
+    .from(photos)
+    .leftJoin(favorites, eq(favorites.photoId, photos.id))
+    .where(
+      gallery.hasWatermark
+        ? and(eq(photos.galleryId, gallery.id), isNotNull(photos.proofMadeAt))
+        : eq(photos.galleryId, gallery.id),
+    )
+    .orderBy(asc(photos.position));
+
+  return rows.map((row) => ({
+    id: row.id,
+    fileKey: row.fileKey,
+    aspect: row.width && row.height ? row.width / row.height : 2 / 3,
+    variant: gallery.hasWatermark ? ("proof" as const) : ("preview" as const),
+    selected: row.favoriteId !== null,
+  }));
+}
+
+// "0" free picks means no limit.
+export const isOverLimit = (count: number, freeLimit: number) => freeLimit > 0 && count >= freeLimit;

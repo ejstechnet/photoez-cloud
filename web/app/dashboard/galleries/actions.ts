@@ -132,6 +132,18 @@ export async function deleteGallery(galleryId: string): Promise<void> {
   redirect("/dashboard/galleries");
 }
 
+// Let the client change their picks again after submitting.
+export async function reopenProofing(galleryId: string): Promise<void> {
+  const photographer = await requirePhotographer();
+  if (await findOwnedGallery(galleryId, photographer.id)) {
+    await db
+      .update(galleries)
+      .set({ status: "pending", submittedAt: null })
+      .where(and(eq(galleries.id, galleryId), inArray(galleries.status, ["submitted", "paid_and_submitted"])));
+  }
+  revalidatePath(`/dashboard/galleries/${galleryId}`);
+}
+
 // ---- Photo uploads ----
 // 1. prepareUploads: the browser describes the files; we return one-time
 //    upload links (original, preview, thumbnail) for each photo.

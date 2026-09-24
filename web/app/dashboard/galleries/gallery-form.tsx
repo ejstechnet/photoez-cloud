@@ -54,7 +54,7 @@ export function GalleryForm({
         inputMode="numeric"
         defaultValue={defaultValues?.freeLimit ?? 10}
         error={errors.freeLimit}
-        hint="How many photos the client can choose for free, like “Choose up to 10 photos.”"
+        hint="How many photos the client can choose, like “Choose up to 10 photos.” Use 0 for no limit."
       />
       <FormError message={state.message} />
       <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center">

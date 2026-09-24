@@ -2,13 +2,15 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { and, asc, count, eq } from "drizzle-orm";
 import { db } from "@/db";
-import { clients, galleries, photos } from "@/db/schema";
+import { clients, favorites, galleries, photos } from "@/db/schema";
 import { getWatermarkSettings, staleProof } from "@/lib/proofs";
+import { siteUrl } from "@/lib/site";
 import { requirePhotographer } from "@/lib/session";
 import { photoKey, signedViewUrl } from "@/lib/storage";
 import { z } from "zod";
 import { StatusPill } from "../status-pill";
-import { PhotoTile } from "./photo-tile";
+import { ClientLink } from "./client-link";
+import { PhotoGrid } from "./photo-grid";
 import { ProofRefresher } from "./proof-refresher";
 import { Uploader } from "./uploader";
 
@@ -23,6 +25,7 @@ export default async function GalleryPage({ params }: PageProps<"/dashboard/gall
       title: galleries.title,
       status: galleries.status,
       freeLimit: galleries.freeLimit,
+      shareToken: galleries.shareToken,
       clientName: clients.name,
     })
     .from(galleries)
@@ -31,8 +34,16 @@ export default async function GalleryPage({ params }: PageProps<"/dashboard/gall
   if (!gallery) notFound();
 
   const rows = await db
-    .select({ id: photos.id, fileKey: photos.fileKey, originalName: photos.originalName })
+    .select({
+      id: photos.id,
+      fileKey: photos.fileKey,
+      originalName: photos.originalName,
+      width: photos.width,
+      height: photos.height,
+      favoriteId: favorites.id,
+    })
     .from(photos)
+    .leftJoin(favorites, eq(favorites.photoId, photos.id))
     .where(eq(photos.galleryId, gallery.id))
     .orderBy(asc(photos.position));
 
@@ -51,6 +62,8 @@ export default async function GalleryPage({ params }: PageProps<"/dashboard/gall
     rows.map(async (photo) => ({
       id: photo.id,
       name: photo.originalName,
+      aspect: photo.width && photo.height ? photo.width / photo.height : 2 / 3,
+      selected: photo.favoriteId !== null,
       thumbUrl: await signedViewUrl(photoKey(photo.fileKey, "thumb")),
       previewUrl: await signedViewUrl(photoKey(photo.fileKey, "preview")),
     })),
@@ -90,6 +103,13 @@ export default async function GalleryPage({ params }: PageProps<"/dashboard/gall
       </div>
 
       <div className="mt-8 space-y-4">
+        <ClientLink
+          galleryId={gallery.id}
+          url={`${siteUrl}/g/${gallery.shareToken}`}
+          submitted={gallery.status === "submitted" || gallery.status === "paid_and_submitted"}
+          selectedNames={tiles.filter((tile) => tile.selected).map((tile) => tile.name)}
+          freeLimit={gallery.freeLimit}
+        />
         {watermarkForBrowser && staleCount > 0 && (
           <ProofRefresher galleryId={gallery.id} watermark={watermarkForBrowser} staleCount={staleCount} />
         )}
@@ -105,13 +125,9 @@ export default async function GalleryPage({ params }: PageProps<"/dashboard/gall
       </div>
 
       {tiles.length > 0 && (
-        <ul className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-          {tiles.map((tile, i) => (
-            <li key={tile.id}>
-              <PhotoTile galleryId={gallery.id} number={i + 1} {...tile} />
-            </li>
-          ))}
-        </ul>
+        <div className="mt-8">
+          <PhotoGrid galleryId={gallery.id} photos={tiles} />
+        </div>
       )}
     </>
   );
