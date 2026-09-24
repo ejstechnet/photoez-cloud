@@ -6,8 +6,10 @@ import {
   integer,
   timestamp,
   index,
+  jsonb,
   unique,
 } from "drizzle-orm/pg-core";
+import type { TriageResult } from "../lib/ai/triage";
 import { GALLERY_STATUSES } from "../lib/gallery-status";
 import { PHOTO_KINDS } from "../lib/photo-limits";
 import { WATERMARK_POSITIONS } from "../lib/watermark";
@@ -163,6 +165,34 @@ export const photos = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index("photos_gallery_idx").on(t.galleryId, t.kind, t.position)],
+);
+
+// A new-client inquiry (email or contact-form message) and what the AI
+// triage pulled out of it. `triage` holds the validated TriageResult.
+export const inquiries = pgTable(
+  "inquiries",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    photographerId: uuid("photographer_id")
+      .notNull()
+      .references(() => photographers.id, { onDelete: "cascade" }),
+    // Set once the inquiry is turned into a client.
+    clientId: uuid("client_id").references(() => clients.id, { onDelete: "set null" }),
+    status: text("status", { enum: ["new", "replied", "converted", "archived"] })
+      .notNull()
+      .default("new"),
+    fromName: text("from_name"),
+    fromEmail: text("from_email"),
+    message: text("message").notNull(),
+    triage: jsonb("triage").$type<TriageResult>(),
+    triageError: text("triage_error"),
+    model: text("model"),
+    inputTokens: integer("input_tokens"),
+    outputTokens: integer("output_tokens"),
+    triagedAt: timestamp("triaged_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("inquiries_photographer_idx").on(t.photographerId, t.createdAt)],
 );
 
 // A photo the client marked as a favorite. Each photo can be favorited once.
