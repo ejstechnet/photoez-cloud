@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect } from "react";
-import { ArrowRightIcon, HeartIcon } from "./icons";
+import { ArrowRightIcon, DownloadIcon, HeartIcon } from "./icons";
 
-export type LightboxItem = { id: string; number: number; url: string; caption?: string };
+export type LightboxItem = { id: string; number: number; url: string; caption?: string; downloadUrl?: string };
 
 // Full-screen photo viewer, styled after the PhotoEZ for WordPress lightbox:
 // dark backdrop, the photo centered with arrows beside it, a "6 / 14" counter,
@@ -100,7 +100,14 @@ export function Lightbox({
       </div>
 
       <div className="mt-5 flex flex-col items-center gap-3">
-        {onToggle ? (
+        {item.downloadUrl ? (
+          <a
+            href={item.downloadUrl}
+            className="inline-flex items-center gap-2.5 rounded-full border-2 border-white bg-lime px-7 py-3 font-semibold text-brand-deep transition hover:bg-white"
+          >
+            <DownloadIcon size={20} /> Download full resolution
+          </a>
+        ) : onToggle ? (
           <button
             type="button"
             onClick={() => onToggle(item.id)}

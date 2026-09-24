@@ -9,6 +9,7 @@ import {
   unique,
 } from "drizzle-orm/pg-core";
 import { GALLERY_STATUSES } from "../lib/gallery-status";
+import { PHOTO_KINDS } from "../lib/photo-limits";
 import { WATERMARK_POSITIONS } from "../lib/watermark";
 
 // A photographer's account. Better Auth uses this as its user table
@@ -126,6 +127,7 @@ export const galleries = pgTable(
     // How many photos the client may pick for free (the "0/10 Selected" counter).
     freeLimit: integer("free_limit").notNull().default(10),
     submittedAt: timestamp("submitted_at", { withTimezone: true }),
+    deliveredAt: timestamp("delivered_at", { withTimezone: true }),
     expiresAt: timestamp("expires_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
@@ -144,6 +146,10 @@ export const photos = pgTable(
     galleryId: uuid("gallery_id")
       .notNull()
       .references(() => galleries.id, { onDelete: "cascade" }),
+    // "proof": shown to the client while choosing favorites (watermarked).
+    // "final": the edited photos delivered at the end (clean, downloadable).
+    // Matches _photoez_gallery_images and _photoez_final_images in PhotoEZ for WordPress.
+    kind: text("kind", { enum: PHOTO_KINDS }).notNull().default("proof"),
     fileKey: text("file_key").notNull(),
     originalName: text("original_name").notNull(),
     contentType: text("content_type").notNull().default("image/jpeg"),
@@ -156,7 +162,7 @@ export const photos = pgTable(
     proofMadeAt: timestamp("proof_made_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [index("photos_gallery_idx").on(t.galleryId, t.position)],
+  (t) => [index("photos_gallery_idx").on(t.galleryId, t.kind, t.position)],
 );
 
 // A photo the client marked as a favorite. Each photo can be favorited once.

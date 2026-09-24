@@ -1,13 +1,13 @@
 "use server";
 
 import { randomBytes, randomUUID } from "node:crypto";
-import { and, eq, inArray, max } from "drizzle-orm";
+import { and, count, eq, inArray, max, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { db } from "@/db";
 import { clients, galleries, photographers, photos } from "@/db/schema";
-import { MAX_PHOTO_BYTES, MAX_PHOTOS_PER_BATCH, PHOTO_TYPES } from "@/lib/photo-limits";
+import { MAX_PHOTO_BYTES, MAX_PHOTOS_PER_BATCH, PHOTO_KINDS, PHOTO_TYPES } from "@/lib/photo-limits";
 import { staleProof } from "@/lib/proofs";
 import { requirePhotographer } from "@/lib/session";
 import {
@@ -144,6 +144,40 @@ export async function reopenProofing(galleryId: string): Promise<void> {
   revalidatePath(`/dashboard/galleries/${galleryId}`);
 }
 
+// Send the finals to the client: their link switches to the delivery page.
+// Works from any stage, so photographers who skip proofing (e.g. events) can
+// deliver directly.
+export async function deliverGallery(galleryId: string): Promise<{ ok: true } | { error: string }> {
+  const photographer = await requirePhotographer();
+  if (!(await findOwnedGallery(galleryId, photographer.id))) return { error: "That gallery could not be found." };
+
+  const [{ finals }] = await db
+    .select({ finals: count() })
+    .from(photos)
+    .where(and(eq(photos.galleryId, galleryId), eq(photos.kind, "final")));
+  if (finals === 0) return { error: "Upload your final photos before delivering." };
+
+  await db.update(galleries).set({ status: "delivered", deliveredAt: new Date() }).where(eq(galleries.id, galleryId));
+  revalidatePath("/dashboard", "layout");
+  return { ok: true };
+}
+
+// Take a delivery back (e.g. delivered too soon). The client returns to
+// "Submitted" if they had submitted picks, otherwise to proofing.
+export async function undoDelivery(galleryId: string): Promise<void> {
+  const photographer = await requirePhotographer();
+  if (await findOwnedGallery(galleryId, photographer.id)) {
+    await db
+      .update(galleries)
+      .set({
+        status: sql`case when ${galleries.submittedAt} is null then 'pending' else 'submitted' end`,
+        deliveredAt: null,
+      })
+      .where(and(eq(galleries.id, galleryId), eq(galleries.status, "delivered")));
+  }
+  revalidatePath("/dashboard", "layout");
+}
+
 // ---- Photo uploads ----
 // 1. prepareUploads: the browser describes the files; we return one-time
 //    upload links (original, preview, thumbnail) for each photo.
@@ -196,7 +230,8 @@ const confirmSchema = z.object({
   contentType: z.enum(PHOTO_TYPES),
   width: z.number().int().positive().max(100_000),
   height: z.number().int().positive().max(100_000),
-  // True when the browser also uploaded a watermarked proof.
+  kind: z.enum(PHOTO_KINDS),
+  // True when the browser also uploaded a watermarked proof (proofs only).
   hasProof: z.boolean(),
 });
 
@@ -209,13 +244,14 @@ export async function confirmUpload(
 
   const parsed = confirmSchema.safeParse(photo);
   if (!parsed.success) return { error: "That upload couldn't be saved." };
+  const hasProof = parsed.data.kind === "proof" && parsed.data.hasProof;
 
   const prefix = photoPrefix(photographer.id, galleryId, parsed.data.photoId);
   const [originalSize, previewSize, thumbSize, proofSize] = await Promise.all([
     storedSize(photoKey(prefix, "original")),
     storedSize(photoKey(prefix, "preview")),
     storedSize(photoKey(prefix, "thumb")),
-    parsed.data.hasProof ? storedSize(photoKey(prefix, "proof")) : Promise.resolve(0),
+    hasProof ? storedSize(photoKey(prefix, "proof")) : Promise.resolve(0),
   ]);
   if (originalSize === null || previewSize === null || thumbSize === null || proofSize === null) {
     return { error: "The upload didn't finish. Try that photo again." };
@@ -228,13 +264,14 @@ export async function confirmUpload(
   const [{ lastPosition }] = await db
     .select({ lastPosition: max(photos.position) })
     .from(photos)
-    .where(eq(photos.galleryId, galleryId));
+    .where(and(eq(photos.galleryId, galleryId), eq(photos.kind, parsed.data.kind)));
 
   await db
     .insert(photos)
     .values({
       id: parsed.data.photoId,
       galleryId,
+      kind: parsed.data.kind,
       fileKey: prefix,
       originalName: parsed.data.originalName,
       contentType: parsed.data.contentType,
@@ -242,7 +279,7 @@ export async function confirmUpload(
       height: parsed.data.height,
       sizeBytes: originalSize,
       position: (lastPosition ?? 0) + 1,
-      proofMadeAt: parsed.data.hasProof ? new Date() : null,
+      proofMadeAt: hasProof ? new Date() : null,
     })
     .onConflictDoNothing();
 
@@ -272,7 +309,7 @@ export async function prepareProofRefresh(
   const stale = await db
     .select({ id: photos.id, fileKey: photos.fileKey })
     .from(photos)
-    .where(and(eq(photos.galleryId, galleryId), staleProof(settings.updatedAt)))
+    .where(and(eq(photos.galleryId, galleryId), eq(photos.kind, "proof"), staleProof(settings.updatedAt)))
     .orderBy(photos.position);
 
   const jobs = await Promise.all(

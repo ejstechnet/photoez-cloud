@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { MAX_PHOTO_BYTES, MAX_PHOTOS_PER_BATCH, PHOTO_TYPES } from "@/lib/photo-limits";
+import { MAX_PHOTO_BYTES, MAX_PHOTOS_PER_BATCH, PHOTO_TYPES, type PhotoKind } from "@/lib/photo-limits";
 import { loadWatermark, makeProof, renderJpeg, type WatermarkSettings } from "@/lib/proof-maker";
 import { ImagesIcon } from "@/components/icons";
 import { confirmUpload, prepareUploads } from "../actions";
@@ -25,7 +25,17 @@ function put(url: string, body: Blob, contentType: string, onProgress?: (fractio
   });
 }
 
-export function Uploader({ galleryId, watermark }: { galleryId: string; watermark: WatermarkSettings | null }) {
+// `kind` decides where the photos go: watermarked proofs for the client to
+// choose from, or clean finals for delivery.
+export function Uploader({
+  galleryId,
+  kind,
+  watermark,
+}: {
+  galleryId: string;
+  kind: PhotoKind;
+  watermark: WatermarkSettings | null;
+}) {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
   const [items, setItems] = useState<Item[]>([]);
@@ -69,7 +79,8 @@ export function Uploader({ galleryId, watermark }: { galleryId: string; watermar
 
     let stamp: Awaited<ReturnType<typeof loadWatermark>> = null;
     try {
-      stamp = await loadWatermark(watermark);
+      // Finals are delivered clean, so only proofs get the watermark.
+      stamp = kind === "proof" ? await loadWatermark(watermark) : null;
     } catch {
       setNotice("Your watermark couldn't be loaded, so these proofs were saved without it. Use “Update proofs” later.");
     }
@@ -99,6 +110,7 @@ export function Uploader({ galleryId, watermark }: { galleryId: string; watermar
             contentType: file.type as (typeof PHOTO_TYPES)[number],
             width,
             height,
+            kind,
             hasProof: proof !== null,
           });
           if ("error" in saved) throw new Error(saved.error);
@@ -134,7 +146,9 @@ export function Uploader({ galleryId, watermark }: { galleryId: string; watermar
         <span className="grid size-14 place-items-center rounded-2xl bg-violet text-brand-deep">
           <ImagesIcon size={26} />
         </span>
-        <p className="mt-4 font-display text-xl font-bold">Drop photos here</p>
+        <p className="mt-4 font-display text-xl font-bold">
+          {kind === "proof" ? "Drop proofs here" : "Drop final photos here"}
+        </p>
         <p className="mt-1 text-sm text-muted">JPEG, PNG, or WebP · up to 50 MB each</p>
         <button
           type="button"
