@@ -1,39 +1,46 @@
 import Link from "next/link";
 import { HeartIcon, ImagesIcon, SparklesIcon } from "./icons";
 
-// The PhotoEZ mark: a photo frame (mountains and sun) with the lime swoosh
-// arrow. The frame uses currentColor so it can be navy on light backgrounds
-// and white on the navy header.
-export function PhotoEZMark({ className = "" }: { className?: string }) {
+// The PhotoEZ Cloud mark: the PhotoEZ photo frame (mountains and sun) and
+// lime swoosh arrow, in front of a sky-blue cloud. Vector, so it stays crisp
+// at any size; same artwork as app/icon.svg.
+export function PhotoEZCloudMark({ className = "" }: { className?: string }) {
   return (
-    <svg viewBox="60 30 205 175" className={className} aria-hidden="true">
-      <rect x="88" y="46" width="119" height="131" fill="none" stroke="currentColor" strokeWidth="16" />
-      <circle cx="146" cy="77" r="10" fill="currentColor" />
+    <svg viewBox="10 20 300 210" className={className} aria-hidden="true">
       <path
-        d="M98 131 125 101l17 17 24-23 34 34"
-        fill="none"
-        stroke="currentColor"
+        d="M70 205C33 205 18 168 42 146C26 112 60 84 96 94C108 44 176 30 206 76C238 58 278 80 272 116C302 132 296 205 256 205Z"
+        fill="var(--sky-light)"
+        stroke="var(--sky)"
         strokeWidth="9"
-        strokeLinejoin="miter"
+        strokeLinejoin="round"
       />
+      <rect x="100" y="56" width="106" height="112" fill="#fff" stroke="var(--brand)" strokeWidth="13" />
+      <circle cx="152" cy="87" r="10" fill="var(--brand)" />
+      <path d="M110 144 133 114l15 15 21-21 28 30" fill="none" stroke="var(--brand)" strokeWidth="8.5" />
       {/* Tapered swoosh: thin at the left, thick where it meets the arrowhead. */}
-      <path d="M66 148C76 196 160 206 228 121L215 111C152 181 88 180 66 148Z" fill="var(--lime)" />
-      <path d="M200 99 259 76 239 136Z" fill="var(--lime)" />
+      <path d="M72 160C82 214 196 208 262 112L248 102C188 184 98 190 72 160Z" fill="var(--lime)" stroke="#fff" strokeWidth="3" />
+      <path d="M232 88 300 58 276 132Z" fill="var(--lime)" stroke="#fff" strokeWidth="3" strokeLinejoin="round" />
     </svg>
   );
 }
 
-// Logo lockup: mark + "Photo" + lime "EZ", with a CLOUD tag for this product.
+// Logo lockup, matching the PhotoEZ Cloud logo: mark, "Photo" + lime "EZ",
+// and CLOUD in spaced capitals between two rules.
 export function Logo({ tone = "light" }: { tone?: "light" | "dark" }) {
   const ink = tone === "light" ? "text-white" : "text-brand dark:text-white";
+  const cloud = tone === "light" ? "text-sky-light" : "text-sky";
   return (
-    <Link href="/" className={`inline-flex items-center gap-2 ${ink}`} aria-label="PhotoEZ Cloud home">
-      <PhotoEZMark className="h-11 w-12" />
-      <span className="text-2xl font-extrabold tracking-tight">
-        Photo<span className="text-lime">EZ</span>
-      </span>
-      <span className="rounded-md bg-sun px-1.5 py-0.5 text-[10px] font-extrabold tracking-widest text-brand-deep">
-        CLOUD
+    <Link href="/" className={`inline-flex items-center gap-2.5 ${ink}`} aria-label="PhotoEZ Cloud home">
+      <PhotoEZCloudMark className="h-11 w-16" />
+      <span className="flex flex-col leading-none">
+        <span className="text-2xl font-extrabold tracking-tight">
+          Photo<span className="text-lime">EZ</span>
+        </span>
+        <span className={`mt-1 flex items-center gap-1.5 text-[10px] font-bold tracking-[0.35em] ${cloud}`}>
+          <span className="h-px flex-1 bg-current" />
+          CLOUD
+          <span className="h-px flex-1 bg-current" />
+        </span>
       </span>
     </Link>
   );

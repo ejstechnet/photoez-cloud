@@ -15,6 +15,7 @@ export default async function DashboardLayout({ children }: LayoutProps<"/dashbo
           <Logo />
           <nav className="order-last flex w-full gap-1 sm:order-none sm:w-auto">
             <NavLink href="/dashboard">Overview</NavLink>
+            <NavLink href="/dashboard/galleries">Galleries</NavLink>
             <NavLink href="/dashboard/clients">Clients</NavLink>
           </nav>
           <SignOutButton />

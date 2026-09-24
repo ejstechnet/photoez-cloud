@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="web/public/brand/photoez-cloud-logo.webp" alt="PhotoEZ Cloud" width="280">
+</p>
+
 # PhotoEZ Cloud
 
 **AI-assisted studio software for photographers.** Client galleries, inquiry handling, and delivery prep, with AI that does the busywork: reading inquiries, finding the right shots, and flagging the ones to cut.

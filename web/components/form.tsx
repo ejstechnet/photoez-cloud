@@ -37,6 +37,24 @@ export function TextAreaField({
   );
 }
 
+export function SelectField({
+  label,
+  hint,
+  error,
+  children,
+  ...select
+}: FieldExtras & React.SelectHTMLAttributes<HTMLSelectElement>) {
+  return (
+    <label className="block">
+      <span className="text-sm font-semibold">{label}</span>
+      <select {...select} aria-invalid={error ? true : undefined} className={`mt-1.5 ${inputClass}`}>
+        {children}
+      </select>
+      <FieldMessage hint={hint} error={error} />
+    </label>
+  );
+}
+
 export function FieldMessage({ hint, error }: { hint?: string; error?: string }) {
   if (error) return <span className="mt-1.5 block text-xs font-medium text-danger">{error}</span>;
   if (hint) return <span className="mt-1.5 block text-xs text-muted">{hint}</span>;

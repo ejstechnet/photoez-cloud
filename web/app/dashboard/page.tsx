@@ -1,18 +1,30 @@
 import Link from "next/link";
 import { count, eq } from "drizzle-orm";
 import { db } from "@/db";
-import { clients } from "@/db/schema";
+import { clients, galleries, photos } from "@/db/schema";
 import { ArrowRightIcon, HeartIcon, ImagesIcon, SparklesIcon, UsersIcon } from "@/components/icons";
 import { requirePhotographer } from "@/lib/session";
 
 export default async function DashboardPage() {
   const user = await requirePhotographer();
-  const [{ clientCount }] = await db
-    .select({ clientCount: count() })
-    .from(clients)
-    .where(eq(clients.photographerId, user.id));
+  const [[{ clientCount }], [{ galleryCount }], [{ photoCount }]] = await Promise.all([
+    db.select({ clientCount: count() }).from(clients).where(eq(clients.photographerId, user.id)),
+    db.select({ galleryCount: count() }).from(galleries).where(eq(galleries.photographerId, user.id)),
+    db
+      .select({ photoCount: count() })
+      .from(photos)
+      .innerJoin(galleries, eq(galleries.id, photos.galleryId))
+      .where(eq(galleries.photographerId, user.id)),
+  ]);
 
   const tiles = [
+    {
+      label: "Galleries",
+      value: galleryCount,
+      icon: <ImagesIcon size={22} />,
+      tint: "bg-violet",
+      href: "/dashboard/galleries",
+    },
     {
       label: "Clients",
       value: clientCount,
@@ -20,8 +32,7 @@ export default async function DashboardPage() {
       tint: "bg-coral",
       href: "/dashboard/clients",
     },
-    { label: "Galleries", value: "Soon", icon: <ImagesIcon size={22} />, tint: "bg-violet" },
-    { label: "Favorites", value: "Soon", icon: <HeartIcon size={22} />, tint: "bg-sun" },
+    { label: "Photos", value: photoCount, icon: <HeartIcon size={22} />, tint: "bg-sun", href: "/dashboard/galleries" },
     { label: "AI tools", value: "Soon", icon: <SparklesIcon size={22} />, tint: "bg-lime" },
   ];
 
