@@ -60,7 +60,10 @@ export function ClientForm({
         <SubmitButton pending={pending} fullWidth={false}>
           {submitLabel}
         </SubmitButton>
-        <Link href="/dashboard/clients" className="text-center text-sm font-medium text-muted hover:text-foreground">
+        <Link
+          href="/dashboard/clients"
+          className="text-center text-xs font-bold tracking-wider text-muted uppercase hover:text-foreground"
+        >
           Cancel
         </Link>
       </div>

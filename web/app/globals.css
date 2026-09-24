@@ -1,14 +1,44 @@
 @import "tailwindcss";
 
+/* PhotoEZ palette: navy + lime green (Seahawks colors), with a
+   creative-studio set of supporting accents. */
 :root {
-  --background: #f7f5f2;
-  --foreground: #1c1917;
+  --background: #f4f4f8;
+  --foreground: #17171d;
   --surface: #ffffff;
-  --muted: #6b645c;
-  --border: #e4dfd8;
-  --brand: #052a4a;
-  --brand-foreground: #ffffff;
-  --danger: #b42318;
+  --muted: #5b6477;
+  --border: #e2e8f0;
+
+  --brand: #1a3a6b;
+  --brand-deep: #0f2447;
+  --lime: #46c12f;
+  --lime-ink: #2e7d1e;
+
+  --coral: #ff6b5b;
+  --sun: #ffc53d;
+  --violet: #8b5cf6;
+  --pink: #f472b6;
+  --danger: #d92d20;
+
+  --primary: #1a3a6b;
+  --primary-foreground: #ffffff;
+  --link: #1a3a6b;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0f0f12;
+    --foreground: #ededf2;
+    --surface: #17171d;
+    --muted: #a8a8b8;
+    --border: #2a2a35;
+    --lime-ink: #7ee06a;
+    --danger: #f97066;
+
+    --primary: #46c12f;
+    --primary-foreground: #0f2447;
+    --link: #7ee06a;
+  }
 }
 
 @theme inline {
@@ -18,27 +48,39 @@
   --color-muted: var(--muted);
   --color-border: var(--border);
   --color-brand: var(--brand);
-  --color-brand-foreground: var(--brand-foreground);
+  --color-brand-deep: var(--brand-deep);
+  --color-lime: var(--lime);
+  --color-lime-ink: var(--lime-ink);
+  --color-coral: var(--coral);
+  --color-sun: var(--sun);
+  --color-violet: var(--violet);
+  --color-pink: var(--pink);
   --color-danger: var(--danger);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #121110;
-    --foreground: #ede9e4;
-    --surface: #1c1a18;
-    --muted: #a39a90;
-    --border: #34302c;
-    --brand: #8fb8de;
-    --brand-foreground: #0b1a28;
-    --danger: #f97066;
-  }
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-link: var(--link);
+  --font-sans: var(--font-jakarta);
+  --font-display: var(--font-fraunces);
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-sans), system-ui, sans-serif;
+  font-family: var(--font-jakarta), system-ui, sans-serif;
+}
+
+@layer components {
+  /* PhotoEZ-style call to action: uppercase, letter-spaced, with an arrow. */
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 rounded-full bg-primary px-6 py-3 text-sm font-bold tracking-wider text-primary-foreground uppercase transition hover:-translate-y-0.5 hover:shadow-lg hover:shadow-brand/20 disabled:translate-y-0 disabled:opacity-60 disabled:shadow-none;
+  }
+  .btn-secondary {
+    @apply inline-flex items-center justify-center gap-2 rounded-full border-2 border-border bg-surface px-5 py-2.5 text-sm font-bold tracking-wider uppercase transition hover:border-brand;
+  }
+  .card {
+    @apply rounded-3xl border border-border bg-surface;
+  }
+  .link {
+    @apply font-semibold text-link underline decoration-2 decoration-lime underline-offset-4 hover:decoration-coral;
+  }
 }

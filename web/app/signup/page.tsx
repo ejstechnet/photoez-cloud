@@ -42,7 +42,7 @@ export default function SignUpPage() {
       subtitle={
         <>
           Already have an account?{" "}
-          <Link href="/login" className="font-medium text-brand underline-offset-4 hover:underline">
+          <Link href="/login" className="link">
             Log in
           </Link>
         </>

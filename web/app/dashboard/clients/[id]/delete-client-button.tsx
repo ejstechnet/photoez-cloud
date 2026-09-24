@@ -16,7 +16,7 @@ export function DeleteClientButton({ clientId, clientName }: { clientId: string;
       type="button"
       onClick={handleClick}
       disabled={pending}
-      className="rounded-lg border border-danger/40 px-4 py-2 text-sm font-medium text-danger hover:bg-danger/10 disabled:opacity-60"
+      className="rounded-full border-2 border-danger/40 px-5 py-2 text-xs font-bold tracking-wider text-danger uppercase transition hover:bg-danger/10 disabled:opacity-60"
     >
       {pending ? "Deleting…" : "Delete client"}
     </button>
