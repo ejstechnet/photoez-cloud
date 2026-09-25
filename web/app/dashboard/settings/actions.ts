@@ -1,14 +1,16 @@
 "use server";
 
 import { randomBytes } from "node:crypto";
-import { eq } from "drizzle-orm";
+import { and, eq, ne } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { db } from "@/db";
 import { photographers } from "@/db/schema";
 import { requirePhotographer } from "@/lib/session";
-import { deletePrefix, signedUploadUrl, storedSize, watermarkKey } from "@/lib/storage";
+import { deletePrefix, signedUploadUrl, storedSize, studioLogoKey, watermarkKey } from "@/lib/storage";
 import { MAX_WATERMARK_BYTES, WATERMARK_POSITIONS } from "@/lib/watermark";
+import { OFFERABLE_TYPES, SHOOT_LOCATIONS } from "@/lib/session-types";
+import { isAllowedSlug } from "@/lib/studio";
 
 // Step 1 of replacing the watermark: a one-time link to upload the new PNG.
 export async function prepareWatermarkUpload(
@@ -78,6 +80,140 @@ export async function saveWatermarkSettings(
     .where(eq(photographers.id, photographer.id));
 
   revalidatePath("/dashboard", "layout");
+  return { saved: true };
+}
+
+// ---- Studio logo ----
+// Same two steps as the watermark: a one-time upload link, then a save that
+// checks the file really arrived.
+
+const LOGO_TYPES = { "image/png": "png", "image/jpeg": "jpg", "image/webp": "webp" } as const;
+const MAX_LOGO_BYTES = 5 * 1024 * 1024;
+
+export async function prepareLogoUpload(file: {
+  type: string;
+  size: number;
+}): Promise<{ version: string; extension: string; url: string } | { error: string }> {
+  const photographer = await requirePhotographer();
+  const extension = LOGO_TYPES[file.type as keyof typeof LOGO_TYPES];
+  if (!extension) return { error: "Use a PNG, JPG, or WebP image." };
+  if (file.size > MAX_LOGO_BYTES) return { error: "Keep the logo under 5 MB." };
+
+  const version = randomBytes(6).toString("hex");
+  const url = await signedUploadUrl(studioLogoKey(photographer.id, version, extension), file.type);
+  return { version, extension, url };
+}
+
+export async function saveStudioLogo(version: string, extension: string): Promise<{ ok: true } | { error: string }> {
+  const photographer = await requirePhotographer();
+  if (!/^[a-f0-9]{12}$/.test(version) || !Object.values(LOGO_TYPES).includes(extension as "png")) {
+    return { error: "That upload couldn't be saved." };
+  }
+  const key = studioLogoKey(photographer.id, version, extension);
+  const size = await storedSize(key);
+  if (size === null) return { error: "The logo upload didn't finish. Try again." };
+  if (size > MAX_LOGO_BYTES) {
+    await deletePrefix(key);
+    return { error: "Keep the logo under 5 MB." };
+  }
+
+  const [current] = await db
+    .select({ key: photographers.studioLogoKey })
+    .from(photographers)
+    .where(eq(photographers.id, photographer.id));
+  if (current?.key) await deletePrefix(current.key);
+
+  await db.update(photographers).set({ studioLogoKey: key }).where(eq(photographers.id, photographer.id));
+  revalidatePath("/dashboard/settings");
+  revalidatePath("/studio/[slug]", "page");
+  return { ok: true };
+}
+
+// The card color behind the logo, so logos with white (or any color) stay visible.
+export async function saveLogoBackground(color: string): Promise<{ ok: true } | { error: string }> {
+  const photographer = await requirePhotographer();
+  const value = color.trim().toLowerCase();
+  if (value !== "transparent" && !/^#[0-9a-f]{6}$/.test(value)) return { error: "Pick a color from the list." };
+  await db.update(photographers).set({ studioLogoBg: value }).where(eq(photographers.id, photographer.id));
+  revalidatePath("/dashboard/settings");
+  revalidatePath("/studio/[slug]", "page");
+  return { ok: true };
+}
+
+export async function removeStudioLogo(): Promise<void> {
+  const photographer = await requirePhotographer();
+  const [current] = await db
+    .select({ key: photographers.studioLogoKey })
+    .from(photographers)
+    .where(eq(photographers.id, photographer.id));
+  if (current?.key) await deletePrefix(current.key);
+  await db.update(photographers).set({ studioLogoKey: null }).where(eq(photographers.id, photographer.id));
+  revalidatePath("/dashboard/settings");
+  revalidatePath("/studio/[slug]", "page");
+}
+
+// ---- Studio profile ----
+
+const typeList = z.array(z.enum(OFFERABLE_TYPES));
+
+const studioSchema = z.object({
+  businessName: z.string().trim().min(1, "Enter your studio's name.").max(120),
+  studioSlug: z
+    .string()
+    .trim()
+    .toLowerCase()
+    .refine(isAllowedSlug, "Use 3–40 lowercase letters, numbers, and single hyphens (like elle-jones-studios)."),
+  studioTagline: z.string().trim().max(140).transform((v) => v || null),
+  studioBio: z.string().trim().max(2000).transform((v) => v || null),
+  serviceArea: z.string().trim().max(120).transform((v) => v || null),
+  offeredTypes: typeList.min(1, "Pick at least one session type you offer."),
+  shootLocations: z.array(z.enum(SHOOT_LOCATIONS)).min(1, "Pick at least one place you shoot."),
+  quoteOnlyTypes: typeList,
+});
+
+export type StudioFormState = {
+  errors?: Partial<Record<keyof z.input<typeof studioSchema>, string>>;
+  saved?: boolean;
+};
+
+export async function saveStudioProfile(_prev: StudioFormState, formData: FormData): Promise<StudioFormState> {
+  const photographer = await requirePhotographer();
+  const parsed = studioSchema.safeParse({
+    businessName: String(formData.get("businessName") ?? ""),
+    studioSlug: String(formData.get("studioSlug") ?? ""),
+    studioTagline: String(formData.get("studioTagline") ?? ""),
+    studioBio: String(formData.get("studioBio") ?? ""),
+    serviceArea: String(formData.get("serviceArea") ?? ""),
+    offeredTypes: formData.getAll("offeredTypes").map(String),
+    shootLocations: formData.getAll("shootLocations").map(String),
+    quoteOnlyTypes: formData.getAll("quoteOnlyTypes").map(String),
+  });
+  if (!parsed.success) {
+    const errors: StudioFormState["errors"] = {};
+    for (const issue of parsed.error.issues) {
+      const field = issue.path[0] as keyof z.input<typeof studioSchema>;
+      errors[field] ??= issue.message;
+    }
+    return { errors };
+  }
+
+  // The page address must be unique across all studios.
+  const [taken] = await db
+    .select({ id: photographers.id })
+    .from(photographers)
+    .where(and(eq(photographers.studioSlug, parsed.data.studioSlug), ne(photographers.id, photographer.id)));
+  if (taken) return { errors: { studioSlug: "That address is taken. Try adding your city or last name." } };
+
+  // A quote-only service must also be one you offer.
+  const quoteOnlyTypes = parsed.data.quoteOnlyTypes.filter((type) => parsed.data.offeredTypes.includes(type));
+
+  await db
+    .update(photographers)
+    .set({ ...parsed.data, quoteOnlyTypes, updatedAt: new Date() })
+    .where(eq(photographers.id, photographer.id));
+
+  revalidatePath("/dashboard", "layout");
+  revalidatePath(`/studio/${parsed.data.studioSlug}`);
   return { saved: true };
 }
 

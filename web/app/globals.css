@@ -64,13 +64,25 @@
   --color-primary-foreground: var(--primary-foreground);
   --color-link: var(--link);
   --font-sans: var(--font-jakarta);
-  --font-display: var(--font-fraunces);
+  --font-display: var(--font-young-serif);
+}
+
+html {
+  scroll-behavior: smooth;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-jakarta), system-ui, sans-serif;
+}
+
+@layer base {
+  /* Young Serif has a single weight; never let the browser smear a fake bold
+     over it when headings use font-bold. */
+  .font-display {
+    font-synthesis-weight: none;
+  }
 }
 
 @layer components {

@@ -50,10 +50,11 @@ export default function Home() {
             </p>
             <h1 className="mt-6 font-display text-5xl leading-[1.05] font-bold tracking-tight sm:text-6xl">
               Studio software with a{" "}
-              <span className="relative inline-block italic text-lime">
+              {/* Padding below the words leaves room for the underline. */}
+              <span className="relative inline-block pb-4 italic text-lime">
                 creative streak
                 <svg
-                  className="absolute -bottom-2 left-0 w-full text-sun"
+                  className="absolute bottom-0 left-0 h-3 w-full text-sun"
                   viewBox="0 0 200 12"
                   preserveAspectRatio="none"
                   aria-hidden="true"

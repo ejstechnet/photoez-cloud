@@ -33,6 +33,12 @@ export function watermarkKey(photographerId: string, version: string) {
   return `photographers/${photographerId}/branding/watermark-${version}.png`;
 }
 
+// The studio logo shown on the public studio page. A new key per upload, so
+// browsers never show a cached old logo.
+export function studioLogoKey(photographerId: string, version: string, extension: string) {
+  return `photographers/${photographerId}/branding/logo-${version}.${extension}`;
+}
+
 export function photoPrefix(photographerId: string, galleryId: string, photoId: string) {
   return `photographers/${photographerId}/galleries/${galleryId}/photos/${photoId}`;
 }

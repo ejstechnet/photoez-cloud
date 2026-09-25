@@ -1,20 +1,6 @@
 import type { TriageResult } from "@/lib/ai/triage";
 
-export const SESSION_LABELS: Record<TriageResult["sessionType"], string> = {
-  wedding: "Wedding",
-  elopement: "Elopement",
-  engagement: "Engagement",
-  portrait: "Portrait",
-  family: "Family",
-  maternity: "Maternity",
-  newborn: "Newborn",
-  senior: "Senior",
-  headshot: "Headshot",
-  boudoir: "Boudoir",
-  event: "Event",
-  commercial: "Commercial",
-  other: "Other",
-};
+export { SESSION_LABELS } from "@/lib/session-types";
 
 export const STATUS_STYLES = {
   new: { label: "New", className: "bg-coral text-brand-deep" },

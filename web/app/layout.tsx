@@ -1,13 +1,15 @@
 import type { Metadata } from "next";
-import { Fraunces, Plus_Jakarta_Sans } from "next/font/google";
+import { Plus_Jakarta_Sans, Young_Serif } from "next/font/google";
 import "./globals.css";
 
-// Fraunces: a bold, characterful serif for headings (a nod to PhotoEZ's
-// serif titles). Plus Jakarta Sans: friendly and clear for everything else.
-const display = Fraunces({
-  variable: "--font-fraunces",
+// Young Serif: a warm, sturdy serif for headings (a nod to PhotoEZ's serif
+// titles), with steady letters at every size. It comes in one weight, so
+// globals.css turns off the browser's fake bold for it.
+// Plus Jakarta Sans: friendly and clear for everything else.
+const display = Young_Serif({
+  variable: "--font-young-serif",
   subsets: ["latin"],
-  axes: ["SOFT", "WONK", "opsz"],
+  weight: "400",
 });
 
 const sans = Plus_Jakarta_Sans({

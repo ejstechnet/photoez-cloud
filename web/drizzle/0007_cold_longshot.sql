@@ -1,0 +1,1 @@
+ALTER TABLE "photographers" ADD COLUMN "studio_logo_key" text;

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { desc, eq } from "drizzle-orm";
 import { db } from "@/db";
-import { inquiries } from "@/db/schema";
+import { inquiries, photographers } from "@/db/schema";
 import { ArrowRightIcon, InboxIcon, PlusIcon, SparklesIcon } from "@/components/icons";
 import { requirePhotographer } from "@/lib/session";
 import { SESSION_LABELS, STATUS_STYLES, formatEventDate } from "./labels";
@@ -14,6 +14,10 @@ export default async function InquiriesPage() {
     .where(eq(inquiries.photographerId, user.id))
     .orderBy(desc(inquiries.createdAt));
   const newCount = rows.filter((row) => row.status === "new").length;
+  const [{ studioSlug }] = await db
+    .select({ studioSlug: photographers.studioSlug })
+    .from(photographers)
+    .where(eq(photographers.id, user.id));
 
   return (
     <>
@@ -28,6 +32,25 @@ export default async function InquiriesPage() {
           <PlusIcon size={18} /> New inquiry
         </Link>
       </div>
+
+      <p className="mt-6 rounded-2xl bg-sky-light/40 px-5 py-4 text-sm">
+        {studioSlug ? (
+          <>
+            <span className="font-semibold">Inquiries from your studio page arrive here already triaged.</span>{" "}
+            <a href={`/studio/${studioSlug}`} target="_blank" rel="noreferrer" className="link">
+              View your studio page
+            </a>
+          </>
+        ) : (
+          <>
+            <span className="font-semibold">Let clients reach you directly.</span> Set up your public studio page and its
+            inquiries land here, already triaged.{" "}
+            <Link href="/dashboard/settings#studio" className="link">
+              Set up your studio page
+            </Link>
+          </>
+        )}
+      </p>
 
       {rows.length === 0 ? (
         <div className="card mt-10 flex flex-col items-center border-2 border-dashed px-6 py-14 text-center">
@@ -63,6 +86,11 @@ export default async function InquiriesPage() {
                       {t && (
                         <span className="rounded-full bg-violet/15 px-2.5 py-0.5 text-[11px] font-bold tracking-wider text-violet uppercase">
                           {SESSION_LABELS[t.sessionType]}
+                        </span>
+                      )}
+                      {inquiry.source === "form" && (
+                        <span className="rounded-full bg-sky-light px-2.5 py-0.5 text-[11px] font-bold tracking-wider text-brand-deep uppercase">
+                          Web form
                         </span>
                       )}
                       <span className="text-xs text-muted">
