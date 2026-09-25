@@ -99,4 +99,40 @@ body {
   .link {
     @apply font-semibold text-link underline decoration-2 decoration-lime underline-offset-4 hover:decoration-coral;
   }
+
+  /* Formatted text from the rich-text editor, both while editing and on
+     public pages (Tailwind resets list bullets and heading sizes). */
+  .rich-text {
+    @apply leading-relaxed;
+  }
+  .rich-text > * + * {
+    @apply mt-3;
+  }
+  .rich-text h2 {
+    @apply font-display text-xl;
+  }
+  .rich-text h3 {
+    @apply text-lg font-bold;
+  }
+  .rich-text ul {
+    @apply list-disc pl-6;
+  }
+  .rich-text ol {
+    @apply list-decimal pl-6;
+  }
+  .rich-text li + li {
+    @apply mt-1;
+  }
+  .rich-text li > p {
+    @apply mt-0;
+  }
+  .rich-text blockquote {
+    @apply border-l-4 border-lime pl-4 italic;
+  }
+  .rich-text a {
+    @apply font-semibold text-link underline decoration-2 decoration-lime underline-offset-4 hover:decoration-coral;
+  }
+  .rich-text hr {
+    @apply border-border;
+  }
 }

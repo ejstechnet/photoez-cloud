@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { db } from "@/db";
 import { photographers } from "@/db/schema";
+import { cleanRichTextInput, richTextToPlain } from "@/lib/rich-text";
 import { requirePhotographer } from "@/lib/session";
 import { deletePrefix, signedUploadUrl, storedSize, studioLogoKey, watermarkKey } from "@/lib/storage";
 import { MAX_WATERMARK_BYTES, WATERMARK_POSITIONS } from "@/lib/watermark";
@@ -164,7 +165,11 @@ const studioSchema = z.object({
     .toLowerCase()
     .refine(isAllowedSlug, "Use 3–40 lowercase letters, numbers, and single hyphens (like elle-jones-studios)."),
   studioTagline: z.string().trim().max(140).transform((v) => v || null),
-  studioBio: z.string().trim().max(2000).transform((v) => v || null),
+  studioBio: z
+    .string()
+    .max(20000, "That's too long for the About section.")
+    .transform(cleanRichTextInput)
+    .refine((v) => v === null || richTextToPlain(v).length <= 2000, "Keep the About section under 2,000 characters."),
   serviceArea: z.string().trim().max(120).transform((v) => v || null),
   offeredTypes: typeList.min(1, "Pick at least one session type you offer."),
   shootLocations: z.array(z.enum(SHOOT_LOCATIONS)).min(1, "Pick at least one place you shoot."),

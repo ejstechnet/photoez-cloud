@@ -3,6 +3,7 @@ import { db } from "@/db";
 import { photographers } from "@/db/schema";
 import { requirePhotographer } from "@/lib/session";
 import { siteUrl } from "@/lib/site";
+import { richTextHtml } from "@/lib/rich-text";
 import { signedViewUrl } from "@/lib/storage";
 import { StudioForm } from "./studio-form";
 import { StudioLogo } from "./studio-logo";
@@ -53,7 +54,7 @@ export default async function SettingsPage() {
               businessName: settings.businessName ?? user.name,
               studioSlug: settings.studioSlug ?? "",
               studioTagline: settings.studioTagline ?? "",
-              studioBio: settings.studioBio ?? "",
+              studioBio: richTextHtml(settings.studioBio),
               serviceArea: settings.serviceArea ?? "",
               offeredTypes: settings.offeredTypes,
               shootLocations: settings.shootLocations,
