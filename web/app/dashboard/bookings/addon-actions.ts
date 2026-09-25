@@ -1,12 +1,13 @@
 "use server";
 
 import { randomBytes } from "node:crypto";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, asc, eq, inArray } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { db } from "@/db";
 import { addons, sessionTypeAddons, sessionTypes } from "@/db/schema";
+import { moveInList } from "@/lib/reorder";
 import { requirePhotographer } from "@/lib/session";
 import { addonImageKey, deletePrefix, signedUploadUrl, storedSize } from "@/lib/storage";
 
@@ -196,4 +197,26 @@ export async function saveSessionAddons(
   });
   refresh();
   return { saved: true };
+}
+
+// Moves an add-on up or down in the order clients see when booking.
+export async function moveAddon(addonId: string, by: -1 | 1): Promise<void> {
+  const photographer = await requirePhotographer();
+  const rows = await db
+    .select({ id: addons.id })
+    .from(addons)
+    .where(eq(addons.photographerId, photographer.id))
+    .orderBy(asc(addons.sortOrder), asc(addons.createdAt));
+  const order = moveInList(
+    rows.map((r) => r.id),
+    addonId,
+    by,
+  );
+  if (!order) return;
+  await db.transaction(async (tx) => {
+    for (const [i, id] of order.entries()) {
+      await tx.update(addons).set({ sortOrder: i }).where(eq(addons.id, id));
+    }
+  });
+  refresh();
 }
