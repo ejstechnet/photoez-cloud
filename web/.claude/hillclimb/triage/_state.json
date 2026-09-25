@@ -1,0 +1,108 @@
+{
+  "flow": "triage",
+  "description": "Inquiry triage (lib/ai/triage.ts): 25 anonymized studio inquiries; fields graded in code, draft reply graded by Claude Sonnet 5.",
+  "metrics": [
+    {
+      "id": "reply_ok",
+      "kind": "binary",
+      "label": "Reply safe"
+    },
+    {
+      "id": "fields",
+      "kind": "float",
+      "label": "Details right"
+    },
+    {
+      "id": "found",
+      "kind": "float",
+      "label": "Details found"
+    },
+    {
+      "id": "all_right",
+      "kind": "binary",
+      "label": "Everything"
+    },
+    {
+      "id": "under_180",
+      "kind": "binary",
+      "label": "Under 180 wds"
+    },
+    {
+      "id": "f_session",
+      "kind": "binary",
+      "label": "Session type"
+    },
+    {
+      "id": "f_name",
+      "kind": "binary",
+      "label": "Name"
+    },
+    {
+      "id": "f_phone",
+      "kind": "binary",
+      "label": "Phone"
+    },
+    {
+      "id": "f_date",
+      "kind": "binary",
+      "label": "Exact date"
+    },
+    {
+      "id": "f_date_seen",
+      "kind": "binary",
+      "label": "Date noted"
+    },
+    {
+      "id": "f_location",
+      "kind": "binary",
+      "label": "Location"
+    },
+    {
+      "id": "f_budget",
+      "kind": "binary",
+      "label": "Budget"
+    },
+    {
+      "id": "f_people",
+      "kind": "binary",
+      "label": "People"
+    },
+    {
+      "id": "f_urgency",
+      "kind": "binary",
+      "label": "Urgency"
+    }
+  ],
+  "perf_fields": [
+    {
+      "id": "cost_usd",
+      "label": "Cost",
+      "unit": "$"
+    },
+    {
+      "id": "latency_s",
+      "label": "Time",
+      "unit": "s"
+    },
+    {
+      "id": "reply_words",
+      "label": "Reply words"
+    }
+  ],
+  "prices": {
+    "claude-opus-5": {
+      "in": 5,
+      "out": 25
+    },
+    "claude-sonnet-5": {
+      "in": 2,
+      "out": 10
+    }
+  },
+  "harness_paths": [
+    "lib/ai/triage.ts",
+    "evals/triage/grader.mjs",
+    "evals/triage/cases.json"
+  ],
+  "harness_sha": "620e0dd9dd0abfddeed57ef1dd31d40655682d2de78aa28ce2a0f8a7bd1434fb"
+}
