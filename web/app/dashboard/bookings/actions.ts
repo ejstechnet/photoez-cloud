@@ -1,7 +1,7 @@
 "use server";
 
 import { randomBytes } from "node:crypto";
-import { and, eq } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
@@ -10,6 +10,7 @@ import { blackoutDates, bookingHours, bookings, photographers, sessionTypes } fr
 import { isOverlapError } from "@/lib/booking/availability";
 import { isValidTimeZone } from "@/lib/booking/time";
 import { cleanRichTextInput, richTextToPlain } from "@/lib/rich-text";
+import { moveInList } from "@/lib/reorder";
 import { requirePhotographer } from "@/lib/session";
 import { deletePrefix, sessionImageKey, signedUploadUrl, storedSize } from "@/lib/storage";
 import { SHOOT_LOCATIONS } from "@/lib/session-types";
@@ -345,4 +346,27 @@ export async function setBookingStatus(
   revalidatePath("/dashboard", "layout");
   revalidatePath("/studio/[slug]", "layout");
   return {};
+}
+
+// Moves a session up or down in the order clients see on the booking page.
+export async function moveSessionType(sessionTypeId: string, by: -1 | 1): Promise<void> {
+  const photographer = await requirePhotographer();
+  const rows = await db
+    .select({ id: sessionTypes.id })
+    .from(sessionTypes)
+    .where(eq(sessionTypes.photographerId, photographer.id))
+    .orderBy(asc(sessionTypes.sortOrder), asc(sessionTypes.createdAt));
+  const order = moveInList(
+    rows.map((r) => r.id),
+    sessionTypeId,
+    by,
+  );
+  if (!order) return;
+  await db.transaction(async (tx) => {
+    for (const [i, id] of order.entries()) {
+      await tx.update(sessionTypes).set({ sortOrder: i }).where(eq(sessionTypes.id, id));
+    }
+  });
+  revalidatePath("/dashboard/bookings", "layout");
+  revalidatePath("/studio/[slug]", "layout");
 }

@@ -10,7 +10,9 @@ import { requirePhotographer } from "@/lib/session";
 import { LOCATION_LABELS, type ShootLocation } from "@/lib/session-types";
 import { siteUrl } from "@/lib/site";
 import { signedViewUrl } from "@/lib/storage";
-import { deleteTimeOff } from "../actions";
+import { moveAddon } from "../addon-actions";
+import { deleteTimeOff, moveSessionType } from "../actions";
+import { MoveButtons } from "../move-buttons";
 import { ConfirmButton } from "../confirm-button";
 import { AvailabilityForm } from "./availability-form";
 import { ClientChangesForm } from "./client-changes-form";
@@ -102,7 +104,7 @@ export default async function BookingSetupPage() {
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <h2 className="font-display text-2xl font-bold">Sessions</h2>
-            <p className="mt-1 text-sm text-muted">What clients can book, with its length and price.</p>
+            <p className="mt-1 text-sm text-muted">What clients can book. Use ↑ ↓ to set the order on your booking page.</p>
           </div>
           <Link href="/dashboard/bookings/sessions/new" className="btn-primary">
             <PlusIcon size={18} /> Add session
@@ -114,11 +116,18 @@ export default async function BookingSetupPage() {
           </p>
         ) : (
           <ul className="mt-6 grid gap-3">
-            {sessions.map((s) => (
-              <li key={s.id}>
+            {sessions.map((s, i) => (
+              <li key={s.id} className="flex items-center gap-2">
+                <MoveButtons
+                  label={s.name}
+                  isFirst={i === 0}
+                  isLast={i === sessions.length - 1}
+                  moveUp={moveSessionType.bind(null, s.id, -1)}
+                  moveDown={moveSessionType.bind(null, s.id, 1)}
+                />
                 <Link
                   href={`/dashboard/bookings/sessions/${s.id}`}
-                  className="group flex items-center gap-4 rounded-2xl border-2 border-border px-5 py-4 transition hover:border-lime"
+                  className="group flex min-w-0 flex-1 items-center gap-4 rounded-2xl border-2 border-border px-5 py-4 transition hover:border-lime"
                 >
                   {thumbs.has(s.id) ? (
                     // eslint-disable-next-line @next/next/no-img-element
@@ -172,11 +181,18 @@ export default async function BookingSetupPage() {
           </p>
         ) : (
           <ul className="mt-6 grid gap-3">
-            {addonList.map((a) => (
-              <li key={a.id}>
+            {addonList.map((a, i) => (
+              <li key={a.id} className="flex items-center gap-2">
+                <MoveButtons
+                  label={a.name}
+                  isFirst={i === 0}
+                  isLast={i === addonList.length - 1}
+                  moveUp={moveAddon.bind(null, a.id, -1)}
+                  moveDown={moveAddon.bind(null, a.id, 1)}
+                />
                 <Link
                   href={`/dashboard/bookings/addons/${a.id}`}
-                  className="group flex items-center gap-4 rounded-2xl border-2 border-border px-5 py-4 transition hover:border-lime"
+                  className="group flex min-w-0 flex-1 items-center gap-4 rounded-2xl border-2 border-border px-5 py-4 transition hover:border-lime"
                 >
                   {thumbs.has(a.id) ? (
                     // eslint-disable-next-line @next/next/no-img-element
