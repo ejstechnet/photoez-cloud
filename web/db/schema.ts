@@ -184,6 +184,23 @@ export const photos = pgTable(
   (t) => [index("photos_gallery_idx").on(t.galleryId, t.kind, t.position)],
 );
 
+// The studio's answers to common client questions (payment plans, what to
+// wear, turnaround…). Shown on the public studio page, and the source AI
+// triage answers from, so clients get answers without back-and-forth.
+export const studioFaqs = pgTable(
+  "studio_faqs",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    photographerId: uuid("photographer_id")
+      .notNull()
+      .references(() => photographers.id, { onDelete: "cascade" }),
+    question: text("question").notNull(),
+    answer: text("answer").notNull(),
+    sortOrder: integer("sort_order").notNull().default(0),
+  },
+  (t) => [index("studio_faqs_photographer_idx").on(t.photographerId, t.sortOrder)],
+);
+
 // ---- Booking (modeled on PhotoEZ Booking for WordPress) ----
 // One photographer per studio for now. Extra photographers may come later as
 // a paid add-on; these tables would then gain a photographer/member column.

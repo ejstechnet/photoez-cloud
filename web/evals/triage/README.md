@@ -31,7 +31,7 @@ From `web/` (needs `ANTHROPIC_API_KEY` in `.env`):
 npm run eval:triage
 ```
 
-About $1.90 and 3–4 minutes for 25 cases × 2 runs. Results go to `.claude/hillclimb/triage/baseline/`. A new experiment goes in its own variant (`npm run eval:triage -- --variant v1`). The runner refuses to run after the eval code changes until someone reviews it and adds `--approve-harness`.
+Since v3 (which sends the studio's FAQ with every inquiry) it's about $3.20 and 5 minutes for 25 cases × 2 runs, or $1.60 with `--reps 1`. Results go to `.claude/hillclimb/triage/baseline/`. A new experiment goes in its own variant (`npm run eval:triage -- --variant v1`). The runner refuses to run after the eval code changes until someone reviews it and adds `--approve-harness`.
 
 ## Baseline (September 24, 2026 · Claude Opus 5)
 
@@ -49,3 +49,23 @@ What failed:
 - **Asking for more than three session details (2 runs):** an extra "feel free to share a budget range" after three questions.
 - **Name trap (2 of 2 runs):** "…a photo shoot for my daughter Joy" recorded the daughter as the client, when the parent never gave a name.
 - **A garbled word (1 run):** the stray text "inh" where a dash belonged.
+
+## From drafts to "set it and forget it" (September 25, 2026)
+
+The baseline drafted replies for the photographer to edit. The goal changed to what PhotoEZ is for: **no back-and-forth**. Replies should point clients to answers that already exist (the booking page, the studio's FAQ, session descriptions), and the AI should flag the few inquiries the photographer must handle personally, so the rest can be sent automatically.
+
+| Version | What changed | Reply safe | Needs-you flag right | Cost |
+|---|---|---|---|---|
+| Baseline | Drafts only, no studio details | 88% ± 9 (50 runs) | n/a | $0.031 |
+| v1 | Studio profile + booking link; client = the sender; no timeline promises; 3-question cap | 92% ± 8 (50) | n/a | $0.033 |
+| v2 | Payment-plan and timing rules; text cleanup (checked on the 5 failing cases only) | 10 of 10 | n/a | n/a |
+| v3 | Studio FAQ and session descriptions; handled / needs-you flag; replies meant to send as is | 90% ± 8 (50) | 81% (34 of 42) | $0.051 |
+| **v4** | "How much?" and price-matching point to the booking page; topic-level FAQ matching; no em dashes | **96% ± 8 (25, one run per case)** | **100% (21 of 21)** | $0.050 |
+
+What the new checks measure:
+- **Needs-you flag (code):** whether the AI correctly decides the photographer must step in (a quote, a question the FAQ doesn't answer, a sensitive situation, a manipulation attempt, or an unclear request). Expected flags were reviewed by the photographer; 4 borderline cases accept either answer. **No version ever missed an inquiry that needed the photographer.** All flag errors were over-cautious, which is the safe direction for auto-send.
+- **Routing (code):** bookable sessions get the booking link; quote-only work never does. 100% since v1.
+- **Clean text (code):** no garbled characters. Opus 5 occasionally wrote an escape code or a mis-encoded dash (4 of 160 replies across runs, always where a dash or full-width punctuation belonged); `lib/ai/clean-text.ts` repairs these before a reply is saved.
+- **Judge (Sonnet 5)** now sees the studio information and also checks that nothing about the studio is invented and that the reply doesn't promise to follow up with information that already exists.
+
+Remaining v4 failure (1 of 25): for a Valentine's boudoir album, "a January session gives us comfortable room ahead of Valentine's Day" implies a deadline promise. v4 was run once per case to save cost, so its ± is wider than it looks at 96%; a second run would tighten it.

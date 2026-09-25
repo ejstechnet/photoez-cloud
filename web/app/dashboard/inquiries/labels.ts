@@ -1,4 +1,4 @@
-import type { TriageResult } from "@/lib/ai/triage";
+import type { HandoffReason, TriageResult } from "@/lib/ai/triage";
 
 export { SESSION_LABELS } from "@/lib/session-types";
 
@@ -32,4 +32,23 @@ export function formatEventDate(t: TriageResult) {
     }
   }
   return t.dateText;
+}
+
+// "Handled" or "Needs you". Inquiries triaged before this existed have no flag.
+const HANDOFF_LABELS: Record<HandoffReason, string> = {
+  quote: "Needs a quote",
+  unanswered_question: "Question to answer",
+  sensitive: "Personal touch",
+  suspicious: "Looks suspicious",
+  unclear: "Unclear request",
+};
+
+export function handoffBadge(t: Partial<TriageResult>) {
+  if (t.needsPhotographer === undefined) return null;
+  if (!t.needsPhotographer) return { label: "Handled", className: "bg-lime text-brand-deep", note: null };
+  return {
+    label: `Needs you${t.handoffReason ? ` · ${HANDOFF_LABELS[t.handoffReason]}` : ""}`,
+    className: "bg-sun text-brand-deep",
+    note: t.handoffNote ?? null,
+  };
 }

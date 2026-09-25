@@ -5,7 +5,8 @@ import { and, eq, ne } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { db } from "@/db";
-import { photographers } from "@/db/schema";
+import { photographers, studioFaqs } from "@/db/schema";
+import { MAX_FAQS } from "@/lib/faq";
 import { cleanRichTextInput, richTextToPlain } from "@/lib/rich-text";
 import { requirePhotographer } from "@/lib/session";
 import { deletePrefix, signedUploadUrl, storedSize, studioLogoKey, watermarkKey } from "@/lib/storage";
@@ -235,4 +236,38 @@ export async function removeWatermark(): Promise<void> {
     .set({ watermarkKey: null, watermarkUpdatedAt: new Date() })
     .where(eq(photographers.id, photographer.id));
   revalidatePath("/dashboard", "layout");
+}
+
+// ---- Client FAQ ----
+
+export type FaqFormState = { message?: string; saved?: boolean };
+
+// Saves the whole FAQ at once: every question with an answer, in the order
+// shown. Questions left unanswered aren't saved (or shown to clients).
+export async function saveFaqs(_prev: FaqFormState, formData: FormData): Promise<FaqFormState> {
+  const photographer = await requirePhotographer();
+  const questions = formData.getAll("question").map((v) => String(v).trim());
+  const answers = formData.getAll("answer").map((v) => String(v).trim());
+  if (questions.length !== answers.length) return { message: "Something went wrong. Please reload and try again." };
+
+  const rows = questions
+    .map((question, i) => ({ question, answer: answers[i] }))
+    .filter((row) => row.answer !== "");
+  if (rows.some((row) => row.question === "")) return { message: "Every answer needs a question above it." };
+  if (rows.length > MAX_FAQS) return { message: `Keep it to ${MAX_FAQS} questions or fewer.` };
+  if (rows.some((row) => row.question.length > 200)) return { message: "Keep each question under 200 characters." };
+  if (rows.some((row) => row.answer.length > 2000)) return { message: "Keep each answer under 2,000 characters." };
+
+  await db.transaction(async (tx) => {
+    await tx.delete(studioFaqs).where(eq(studioFaqs.photographerId, photographer.id));
+    if (rows.length > 0) {
+      await tx
+        .insert(studioFaqs)
+        .values(rows.map((row, i) => ({ ...row, sortOrder: i, photographerId: photographer.id })));
+    }
+  });
+
+  revalidatePath("/dashboard", "layout");
+  revalidatePath("/studio/[slug]", "layout");
+  return { saved: true };
 }

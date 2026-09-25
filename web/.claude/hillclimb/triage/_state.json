@@ -28,6 +28,21 @@
       "label": "Under 180 wds"
     },
     {
+      "id": "flag_right",
+      "kind": "binary",
+      "label": "Needs-you flag"
+    },
+    {
+      "id": "clean_text",
+      "kind": "binary",
+      "label": "Clean text"
+    },
+    {
+      "id": "routes",
+      "kind": "binary",
+      "label": "Routing"
+    },
+    {
       "id": "f_session",
       "kind": "binary",
       "label": "Session type"
@@ -101,8 +116,9 @@
   },
   "harness_paths": [
     "lib/ai/triage.ts",
+    "lib/ai/clean-text.ts",
     "evals/triage/grader.mjs",
     "evals/triage/cases.json"
   ],
-  "harness_sha": "620e0dd9dd0abfddeed57ef1dd31d40655682d2de78aa28ce2a0f8a7bd1434fb"
+  "harness_sha": "f99cd6a75b7590830761b0ea0d25db1f21df153345478f580b9617f59b136592"
 }

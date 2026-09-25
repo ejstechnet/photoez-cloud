@@ -4,7 +4,7 @@ import { db } from "@/db";
 import { inquiries, photographers } from "@/db/schema";
 import { ArrowRightIcon, InboxIcon, PlusIcon, SparklesIcon } from "@/components/icons";
 import { requirePhotographer } from "@/lib/session";
-import { SESSION_LABELS, STATUS_STYLES, formatEventDate } from "./labels";
+import { SESSION_LABELS, STATUS_STYLES, formatEventDate, handoffBadge } from "./labels";
 
 export default async function InquiriesPage() {
   const user = await requirePhotographer();
@@ -72,6 +72,7 @@ export default async function InquiriesPage() {
             const t = inquiry.triage;
             const status = STATUS_STYLES[inquiry.status];
             const when = t ? formatEventDate(t) : null;
+            const handoff = t ? handoffBadge(t) : null;
             return (
               <li key={inquiry.id}>
                 <Link
@@ -83,6 +84,11 @@ export default async function InquiriesPage() {
                       <span className={`rounded-full px-2.5 py-0.5 text-[11px] font-bold tracking-wider uppercase ${status.className}`}>
                         {status.label}
                       </span>
+                      {handoff && (
+                        <span className={`rounded-full px-2.5 py-0.5 text-[11px] font-bold tracking-wider uppercase ${handoff.className}`}>
+                          {handoff.label}
+                        </span>
+                      )}
                       {t && (
                         <span className="rounded-full bg-violet/15 px-2.5 py-0.5 text-[11px] font-bold tracking-wider text-violet uppercase">
                           {SESSION_LABELS[t.sessionType]}
