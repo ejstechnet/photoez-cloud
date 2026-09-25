@@ -18,12 +18,15 @@ export type FinalTile = {
 // masonry grid, a download on every photo, and one ZIP for everything.
 export function DeliveryGallery({
   token,
+  preview = false,
   tiles,
   studio,
   clientFirstName,
   totalSize,
 }: {
   token: string;
+  // The photographer's "Preview as client": downloads work but aren't recorded.
+  preview?: boolean;
   tiles: FinalTile[];
   studio: string;
   clientFirstName: string | null;
@@ -42,7 +45,7 @@ export function DeliveryGallery({
             {tiles.length} {tiles.length === 1 ? "photo" : "photos"} from {studio}, full resolution and ready to keep.
           </p>
         </div>
-        <a href={`/g/${token}/download`} className="btn-primary">
+        <a href={`/g/${token}/download${preview ? "?preview=1" : ""}`} className="btn-primary">
           <DownloadIcon size={18} /> Download all · {totalSize}
         </a>
       </div>

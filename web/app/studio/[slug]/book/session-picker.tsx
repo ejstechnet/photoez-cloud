@@ -9,6 +9,8 @@ export type PickerSession = {
   summary: string | null;
   facts: string;
   price: string;
+  // The regular price, struck through, when the session is on sale.
+  wasPrice: string | null;
   photoUrl: string | null;
   // Sanitized on the server (richTextHtml), safe to render.
   descriptionHtml: string;
@@ -45,7 +47,17 @@ export function SessionPicker({ sessions }: { sessions: PickerSession[] }) {
                 <span className="font-display text-xl font-bold">{s.name}</span>
                 {s.summary && <span className="mt-1.5 line-clamp-2 text-sm text-muted">{s.summary}</span>}
                 <span className="mt-auto pt-4">
-                  <span className="block text-2xl font-bold text-lime-ink">{s.price}</span>
+                  <span className="flex items-baseline gap-2">
+                    <span className="text-2xl font-bold text-lime-ink">{s.price}</span>
+                    {s.wasPrice && (
+                      <>
+                        <s className="text-base text-muted">{s.wasPrice}</s>
+                        <span className="rounded-full bg-coral px-2 py-0.5 text-[10px] font-bold tracking-wider text-brand-deep uppercase">
+                          Sale
+                        </span>
+                      </>
+                    )}
+                  </span>
                   <span className="mt-0.5 block text-xs text-muted">{s.facts}</span>
                   <span className="btn-primary mt-4 w-full">Select Session</span>
                 </span>
@@ -86,7 +98,10 @@ export function SessionPicker({ sessions }: { sessions: PickerSession[] }) {
             )}
             <div className="mt-6 flex flex-wrap items-center justify-between gap-4 border-t border-border pt-5">
               <div>
-                <p className="text-2xl font-bold text-lime-ink">{open.price}</p>
+                <p className="flex items-baseline gap-2">
+                  <span className="text-2xl font-bold text-lime-ink">{open.price}</span>
+                  {open.wasPrice && <s className="text-base text-muted">{open.wasPrice}</s>}
+                </p>
                 <p className="text-xs text-muted">{open.facts}</p>
               </div>
               <Link href={open.href} scroll={false} onClick={() => dialogRef.current?.close()} className="btn-primary">

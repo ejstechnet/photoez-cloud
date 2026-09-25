@@ -57,6 +57,18 @@ const sessionTypeSchema = z.object({
     .transform((value) => value.replace(/[$,]/g, ""))
     .refine((value) => /^\d{1,6}(\.\d{1,2})?$/.test(value), "Enter a price like 150 or 150.00.")
     .transform((value) => Math.round(Number(value) * 100)),
+  // Optional special price, also in dollars; blank means no sale.
+  salePrice: z
+    .string()
+    .trim()
+    .transform((value) => value.replace(/[$,]/g, ""))
+    .refine((value) => value === "" || /^\d{1,6}(\.\d{1,2})?$/.test(value), "Enter a sale price like 120, or leave it blank.")
+    .transform((value) => (value === "" ? null : Math.round(Number(value) * 100))),
+  saleEndsOn: z
+    .string()
+    .trim()
+    .refine((value) => value === "" || /^\d{4}-\d{2}-\d{2}$/.test(value), "Pick a date, or leave it blank.")
+    .transform((value) => value || null),
   depositPercent: z.coerce
     .number({ error: "Enter a percentage." })
     .int("Use a whole percentage.")
@@ -72,7 +84,11 @@ const sessionTypeSchema = z.object({
     .refine((value) => value === "" || /^\d{1,4}$/.test(value), "Enter a number of photos, or leave it blank.")
     .transform((value) => (value === "" ? null : Number(value))),
   hidden: z.boolean(),
-});
+})
+  .refine((v) => v.salePrice === null || v.salePrice < v.price, {
+    path: ["salePrice"],
+    message: "The sale price must be lower than the regular price.",
+  });
 
 type SessionTypeField = keyof z.input<typeof sessionTypeSchema>;
 
@@ -88,6 +104,8 @@ function parseSessionType(formData: FormData) {
     description: text(formData, "description"),
     durationMinutes: text(formData, "durationMinutes"),
     price: text(formData, "price"),
+    salePrice: text(formData, "salePrice"),
+    saleEndsOn: text(formData, "saleEndsOn"),
     depositPercent: text(formData, "depositPercent"),
     location: text(formData, "location"),
     photosIncluded: text(formData, "photosIncluded"),
@@ -106,7 +124,7 @@ export async function addSessionType(_prev: SessionTypeFormState, formData: Form
   const parsed = parseSessionType(formData);
   if (!parsed.success) return sessionTypeErrors(parsed.error);
 
-  const { price, ...values } = parsed.data;
+  const { price, salePrice, ...values } = parsed.data;
   const existing = await db
     .select({ id: sessionTypes.id })
     .from(sessionTypes)
@@ -116,6 +134,7 @@ export async function addSessionType(_prev: SessionTypeFormState, formData: Form
     .values({
       ...values,
       priceCents: price,
+      salePriceCents: salePrice,
       photographerId: photographer.id,
       sortOrder: existing.length,
     })
@@ -134,10 +153,10 @@ export async function updateSessionType(
   const parsed = parseSessionType(formData);
   if (!parsed.success) return sessionTypeErrors(parsed.error);
 
-  const { price, ...values } = parsed.data;
+  const { price, salePrice, ...values } = parsed.data;
   const updated = await db
     .update(sessionTypes)
-    .set({ ...values, priceCents: price })
+    .set({ ...values, priceCents: price, salePriceCents: salePrice })
     .where(and(eq(sessionTypes.id, sessionTypeId), eq(sessionTypes.photographerId, photographer.id)))
     .returning({ id: sessionTypes.id });
   if (updated.length === 0) return { message: "That session could not be found." };

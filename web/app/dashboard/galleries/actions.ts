@@ -12,7 +12,10 @@ import { staleProof } from "@/lib/proofs";
 import { requirePhotographer } from "@/lib/session";
 import {
   deletePrefix,
+  galleryHeaderKey,
+  galleryHeaderSourceKey,
   galleryPrefix,
+  headerSourceVersion,
   photoKey,
   photoPrefix,
   signedUploadUrl,
@@ -352,5 +355,112 @@ export async function deletePhoto(galleryId: string, photoId: string): Promise<{
   await db.delete(photos).where(eq(photos.id, photoId));
 
   revalidatePath(`/dashboard/galleries/${galleryId}`);
+  return { ok: true };
+}
+
+// ---- Header image (top of the client's gallery page) ----
+// The browser crops the banner (and, for a new photo, keeps a resized
+// original for re-cropping), uploads both straight to storage, then
+// saveGalleryHeader checks they arrived and swaps them in.
+
+const MAX_HEADER_BYTES = 8 * 1024 * 1024;
+const VERSION = /^[a-f0-9]{12}$/;
+
+async function currentHeaderKey(galleryId: string) {
+  const [row] = await db.select({ key: galleries.headerImageKey }).from(galleries).where(eq(galleries.id, galleryId));
+  return row?.key ?? null;
+}
+
+export async function prepareGalleryHeaderUpload(
+  galleryId: string,
+  sizes: { source: number | null; banner: number },
+): Promise<
+  { source: string; crop: string; sourceUrl: string | null; bannerUrl: string } | { error: string }
+> {
+  const photographer = await requirePhotographer();
+  const gallery = await findOwnedGallery(galleryId, photographer.id);
+  if (!gallery) return { error: "That gallery could not be found." };
+  if (sizes.banner > MAX_HEADER_BYTES || (sizes.source ?? 0) > MAX_HEADER_BYTES) {
+    return { error: "That photo is too large. Try a smaller one." };
+  }
+  // Re-cropping reuses the kept original; a new photo gets a new one.
+  let source: string;
+  if (sizes.source === null) {
+    const key = await currentHeaderKey(gallery.id);
+    const existing = key ? headerSourceVersion(key) : null;
+    if (!existing) return { error: "Choose the photo again to crop it." };
+    source = existing;
+  } else {
+    source = randomBytes(6).toString("hex");
+  }
+  const crop = randomBytes(6).toString("hex");
+  return {
+    source,
+    crop,
+    sourceUrl:
+      sizes.source === null
+        ? null
+        : await signedUploadUrl(galleryHeaderSourceKey(photographer.id, gallery.id, source), "image/jpeg"),
+    bannerUrl: await signedUploadUrl(galleryHeaderKey(photographer.id, gallery.id, source, crop), "image/jpeg"),
+  };
+}
+
+export async function saveGalleryHeader(
+  galleryId: string,
+  source: string,
+  crop: string,
+): Promise<{ ok: true } | { error: string }> {
+  const photographer = await requirePhotographer();
+  const gallery = await findOwnedGallery(galleryId, photographer.id);
+  if (!gallery || !VERSION.test(source) || !VERSION.test(crop)) return { error: "That upload couldn't be saved." };
+  const bannerKey = galleryHeaderKey(photographer.id, gallery.id, source, crop);
+  const sourceKey = galleryHeaderSourceKey(photographer.id, gallery.id, source);
+  const [bannerSize, sourceSize] = await Promise.all([storedSize(bannerKey), storedSize(sourceKey)]);
+  if (bannerSize === null || sourceSize === null) return { error: "The photo upload didn't finish. Try again." };
+  if (bannerSize > MAX_HEADER_BYTES || sourceSize > MAX_HEADER_BYTES) {
+    await deletePrefix(bannerKey);
+    return { error: "That photo is too large. Try a smaller one." };
+  }
+
+  // Clear out the old banner, and the old original if this is a new photo.
+  const old = await currentHeaderKey(gallery.id);
+  if (old && old !== bannerKey) {
+    await deletePrefix(old);
+    const oldSource = headerSourceVersion(old);
+    if (oldSource && oldSource !== source) {
+      await deletePrefix(galleryHeaderSourceKey(photographer.id, gallery.id, oldSource));
+    }
+  }
+  await db.update(galleries).set({ headerImageKey: bannerKey }).where(eq(galleries.id, gallery.id));
+  revalidatePath("/dashboard/galleries", "layout");
+  revalidatePath("/g/[token]", "page");
+  return { ok: true };
+}
+
+export async function removeGalleryHeader(galleryId: string): Promise<void> {
+  const photographer = await requirePhotographer();
+  const gallery = await findOwnedGallery(galleryId, photographer.id);
+  if (!gallery) return;
+  const current = await currentHeaderKey(gallery.id);
+  if (current) {
+    await deletePrefix(current);
+    const source = headerSourceVersion(current);
+    if (source) await deletePrefix(galleryHeaderSourceKey(photographer.id, gallery.id, source));
+  }
+  await db.update(galleries).set({ headerImageKey: null }).where(eq(galleries.id, gallery.id));
+  revalidatePath("/dashboard/galleries", "layout");
+  revalidatePath("/g/[token]", "page");
+}
+
+// Rename from the gallery page, without opening Settings.
+export async function renameGallery(galleryId: string, title: string): Promise<{ ok: true } | { error: string }> {
+  const photographer = await requirePhotographer();
+  if (!(await findOwnedGallery(galleryId, photographer.id))) return { error: "That gallery could not be found." };
+  const clean = title.trim();
+  if (!clean) return { error: "Give the gallery a title." };
+  if (clean.length > 200) return { error: "Keep the title under 200 characters." };
+  await db.update(galleries).set({ title: clean }).where(eq(galleries.id, galleryId));
+  revalidatePath("/dashboard", "layout");
+  revalidatePath("/g/[token]", "page");
   return { ok: true };
 }

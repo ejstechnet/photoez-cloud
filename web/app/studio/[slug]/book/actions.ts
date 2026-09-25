@@ -9,6 +9,7 @@ import { db } from "@/db";
 import { bookingAddons, bookings, clients, photographers, sessionTypes } from "@/db/schema";
 import { pickAddons } from "@/lib/booking/addons";
 import { isOverlapError, loadRules, slotsForDate } from "@/lib/booking/availability";
+import { currentPrice } from "@/lib/booking/pricing";
 import { offeredAddons } from "@/lib/booking/session-addons";
 import { localDateOf } from "@/lib/booking/time";
 
@@ -136,7 +137,8 @@ export async function createBooking(
         sessionTypeId: session.id,
         clientId,
         sessionName: session.name,
-        priceCents: session.priceCents,
+        // The special price, if one applies today in the studio's time zone.
+        priceCents: currentPrice(session, localDateOf(new Date(), rules.timeZone)).priceCents,
         depositPercent: session.depositPercent,
         startsAt,
         endsAt: new Date(startsAt.getTime() + session.durationMinutes * 60_000),

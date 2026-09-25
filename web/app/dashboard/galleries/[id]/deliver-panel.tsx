@@ -10,10 +10,13 @@ export function DeliverPanel({
   galleryId,
   finalsCount,
   deliveredAt,
+  downloads,
 }: {
   galleryId: string;
   finalsCount: number;
   deliveredAt: string | null;
+  // Whether the client has downloaded yet (see lib/downloads.ts).
+  downloads?: { text: string; any: boolean };
 }) {
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -27,6 +30,16 @@ export function DeliverPanel({
             {new Date(deliveredAt).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}.
           </span>{" "}
           <span className="text-muted">Your client can view and download their final photos from their link.</span>
+          {downloads && (
+            <span
+              className={`mt-2 flex items-start gap-2 rounded-lg px-3 py-2 font-semibold ${
+                downloads.any ? "bg-lime/25 text-brand-deep" : "bg-sun/30 text-brand-deep"
+              }`}
+            >
+              <span aria-hidden="true">{downloads.any ? "✓" : "…"}</span>
+              {downloads.text}
+            </span>
+          )}
         </p>
         <button
           type="button"

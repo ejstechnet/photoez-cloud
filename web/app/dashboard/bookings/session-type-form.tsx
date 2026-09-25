@@ -13,6 +13,8 @@ export type SessionTypeValues = {
   description: string | null;
   durationMinutes: number;
   priceCents: number;
+  salePriceCents: number | null;
+  saleEndsOn: string | null;
   depositPercent: number;
   location: string | null;
   photosIncluded: number | null;
@@ -32,7 +34,8 @@ export function SessionTypeForm({
 }) {
   const [state, formAction, pending] = useActionState(action, {});
   const errors = state.errors ?? {};
-  const price = defaultValues ? (defaultValues.priceCents / 100).toFixed(defaultValues.priceCents % 100 ? 2 : 0) : "";
+  const dollars = (cents: number) => (cents / 100).toFixed(cents % 100 ? 2 : 0);
+  const price = defaultValues ? dollars(defaultValues.priceCents) : "";
 
   return (
     <form action={formAction} className="space-y-4" noValidate>
@@ -87,6 +90,25 @@ export function SessionTypeForm({
           defaultValue={defaultValues?.depositPercent ?? 100}
           error={errors.depositPercent}
           hint="Collected online once payments arrive."
+        />
+      </div>
+      <div className="grid gap-4 rounded-2xl border-2 border-dashed border-border p-4 sm:grid-cols-2">
+        <Field
+          label="Special price ($)"
+          name="salePrice"
+          inputMode="decimal"
+          defaultValue={defaultValues?.salePriceCents != null ? dollars(defaultValues.salePriceCents) : ""}
+          error={errors.salePrice}
+          placeholder="Optional"
+          hint="Shown with the regular price crossed out."
+        />
+        <Field
+          label="Sale ends"
+          name="saleEndsOn"
+          type="date"
+          defaultValue={defaultValues?.saleEndsOn ?? ""}
+          error={errors.saleEndsOn}
+          hint="Last day of the sale. Blank = until you remove it."
         />
       </div>
       <div className="grid gap-4 sm:grid-cols-2">

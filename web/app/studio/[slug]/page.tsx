@@ -8,6 +8,8 @@ import { db } from "@/db";
 import { bookingHours, photographers, sessionTypes, studioFaqs } from "@/db/schema";
 import { PhotoEZCloudMark } from "@/components/brand";
 import { formatDuration, formatPrice } from "@/lib/booking/format";
+import { currentPrice } from "@/lib/booking/pricing";
+import { localDateOf } from "@/lib/booking/time";
 import { LOCATION_LABELS, OFFERABLE_TYPES, SESSION_LABELS, type ShootLocation } from "@/lib/session-types";
 import { richTextHtml } from "@/lib/rich-text";
 import { signedViewUrl } from "@/lib/storage";
@@ -31,6 +33,7 @@ async function findStudio(slug: string) {
       offeredTypes: photographers.offeredTypes,
       shootLocations: photographers.shootLocations,
       quoteOnlyTypes: photographers.quoteOnlyTypes,
+      timeZone: photographers.timeZone,
     })
     .from(photographers)
     .where(eq(photographers.studioSlug, slug.toLowerCase()));
@@ -68,6 +71,8 @@ export default async function StudioPage({ params }: PageProps<"/studio/[slug]">
         shortDescription: sessionTypes.shortDescription,
         durationMinutes: sessionTypes.durationMinutes,
         priceCents: sessionTypes.priceCents,
+        salePriceCents: sessionTypes.salePriceCents,
+        saleEndsOn: sessionTypes.saleEndsOn,
       })
       .from(sessionTypes)
       .where(and(eq(sessionTypes.photographerId, studio.id), eq(sessionTypes.hidden, false)))
@@ -80,6 +85,8 @@ export default async function StudioPage({ params }: PageProps<"/studio/[slug]">
       .orderBy(asc(studioFaqs.sortOrder)),
   ]);
   const bookingOpen = bookable.length > 0 && Boolean(hours);
+  // Special prices apply by the studio's own calendar day.
+  const today = localDateOf(new Date(), studio.timeZone);
   const bookHref = `/studio/${slug.toLowerCase()}/book`;
 
   // The owner viewing their own page gets a shortcut to edit it.
@@ -192,7 +199,12 @@ export default async function StudioPage({ params }: PageProps<"/studio/[slug]">
                           {s.shortDescription ?? formatDuration(s.durationMinutes)}
                         </p>
                       </div>
-                      <span className="font-bold text-lime-ink">{formatPrice(s.priceCents)}</span>
+                      <span className="text-right">
+                        <span className="block font-bold text-lime-ink">{formatPrice(currentPrice(s, today).priceCents)}</span>
+                        {currentPrice(s, today).wasCents !== null && (
+                          <s className="block text-xs text-muted">{formatPrice(currentPrice(s, today).wasCents!)}</s>
+                        )}
+                      </span>
                       <span className="rounded-full bg-lime px-3 py-1 text-[11px] font-bold tracking-wider text-brand-deep uppercase">
                         Book
                       </span>
@@ -258,10 +270,15 @@ export default async function StudioPage({ params }: PageProps<"/studio/[slug]">
           )}
         </section>
 
-        <section id="contact" className="card relative scroll-mt-24 p-6 sm:p-8">
-          <h2 className="font-display text-3xl font-bold">Let&apos;s talk</h2>
-          <p className="mt-1 text-muted">Send a message and {name} will get back to you.</p>
-          <div className="mt-6">
+        {/* Navy panel so the contact form stands apart from the rest of the page. */}
+        <section
+          id="contact"
+          className="relative scroll-mt-24 self-start overflow-hidden rounded-3xl bg-brand-deep p-6 text-white shadow-xl shadow-brand-deep/25 sm:p-8"
+        >
+          <div className="pointer-events-none absolute -top-20 -right-20 size-56 rounded-full bg-lime/20 blur-3xl" />
+          <h2 className="relative font-display text-3xl font-bold">Let&apos;s talk</h2>
+          <p className="relative mt-1 text-white/75">Send a message and {name} will get back to you.</p>
+          <div className="relative mt-6 rounded-2xl bg-surface p-5 text-foreground sm:p-6">
             <InquiryForm slug={slug.toLowerCase()} studioName={name} sessions={sessions} />
           </div>
         </section>

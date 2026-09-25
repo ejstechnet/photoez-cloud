@@ -7,6 +7,7 @@ import { photographers, sessionTypes } from "@/db/schema";
 import { addonsForSession } from "@/lib/booking/session-addons";
 import { loadRules, openDatesInMonth, slotsForDate } from "@/lib/booking/availability";
 import { formatDuration, formatPrice } from "@/lib/booking/format";
+import { currentPrice } from "@/lib/booking/pricing";
 import { addMonths, formatDate, formatTime, localDateOf, zoneLabel } from "@/lib/booking/time";
 import { LOCATION_LABELS, type ShootLocation } from "@/lib/session-types";
 import { richTextHtml, richTextToPlain } from "@/lib/rich-text";
@@ -64,6 +65,9 @@ export default async function BookPage({ params, searchParams }: PageProps<"/stu
   ]);
   const tz = rules.timeZone;
   const now = new Date();
+  const today = localDateOf(now, tz);
+  // Special prices apply by the studio's own calendar day.
+  const priceOf = (s: (typeof sessions)[number]) => currentPrice(s, today);
   const thisMonth = localDateOf(now, tz).slice(0, 7);
   const lastMonth = addMonths(thisMonth, MONTHS_AHEAD);
 
@@ -135,7 +139,7 @@ export default async function BookPage({ params, searchParams }: PageProps<"/stu
                 <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-lime/15 px-5 py-4">
                   <div>
                     <p className="font-semibold">{session.name}</p>
-                    <p className="text-sm text-muted">{sessionFacts(session)}</p>
+                    <p className="text-sm text-muted">{sessionFacts({ ...session, priceCents: priceOf(session).priceCents })}</p>
                   </div>
                   <Link href={href({})} scroll={false} className="link text-sm font-semibold">
                     Change
@@ -156,7 +160,8 @@ export default async function BookPage({ params, searchParams }: PageProps<"/stu
                       ]
                         .filter(Boolean)
                         .join(" · "),
-                      price: formatPrice(s.priceCents),
+                      price: formatPrice(priceOf(s).priceCents),
+                      wasPrice: priceOf(s).wasCents !== null ? formatPrice(priceOf(s).wasCents!) : null,
                       photoUrl: photoUrls.get(s.id) ?? null,
                       descriptionHtml: richTextHtml(s.description),
                       href: href({ session: s.id }),
@@ -227,7 +232,7 @@ export default async function BookPage({ params, searchParams }: PageProps<"/stu
                 sessionTypeId={session.id}
                 startsAt={time.toISOString()}
                 backHref={href({ session: session.id, month })}
-                priceCents={session.priceCents}
+                priceCents={priceOf(session).priceCents}
                 depositPercent={session.depositPercent}
                 addons={sessionAddons}
                 summary={
