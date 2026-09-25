@@ -1,0 +1,1 @@
+ALTER TABLE "photographers" ADD COLUMN "studio_logo_bg" text DEFAULT '#ffffff' NOT NULL;

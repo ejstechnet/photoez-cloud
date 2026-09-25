@@ -6,7 +6,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { db } from "@/db";
 import { clients, inquiries } from "@/db/schema";
-import { triageInquiry } from "@/lib/ai/triage";
+import { runTriage } from "@/lib/inquiries";
 import { requirePhotographer } from "@/lib/session";
 
 // Inquiry actions. Every one re-checks who is logged in and only touches that
@@ -21,46 +21,6 @@ async function findOwnedInquiry(inquiryId: string, photographerId: string) {
     .from(inquiries)
     .where(and(eq(inquiries.id, inquiryId), eq(inquiries.photographerId, photographerId)));
   return inquiry ?? null;
-}
-
-// Run the AI triage and store the result (or the error, so the inquiry is
-// never lost just because the AI step failed).
-async function runTriage(
-  inquiry: { id: string; message: string; fromName: string | null; fromEmail: string | null },
-  photographer: { name: string; businessName?: string | null },
-) {
-  try {
-    const run = await triageInquiry({
-      message: inquiry.message,
-      fromName: inquiry.fromName,
-      fromEmail: inquiry.fromEmail,
-      photographerName: photographer.name,
-      studioName: photographer.businessName ?? null,
-      today: new Date(),
-    });
-    await db
-      .update(inquiries)
-      .set({
-        triage: run.result,
-        triageError: null,
-        model: run.model,
-        inputTokens: run.inputTokens,
-        outputTokens: run.outputTokens,
-        triagedAt: new Date(),
-      })
-      .where(eq(inquiries.id, inquiry.id));
-  } catch (error) {
-    console.error("Inquiry triage failed", error);
-    await db
-      .update(inquiries)
-      .set({
-        triageError:
-          error instanceof Error && error.message.startsWith("The AI")
-            ? error.message
-            : "The AI couldn't read this inquiry right now. Try again in a minute.",
-      })
-      .where(eq(inquiries.id, inquiry.id));
-  }
 }
 
 const newInquirySchema = z.object({

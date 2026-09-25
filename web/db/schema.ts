@@ -31,6 +31,19 @@ export const photographers = pgTable("photographers", {
   watermarkPosition: text("watermark_position", { enum: WATERMARK_POSITIONS }).notNull().default("center"),
   // When any watermark setting last changed; proofs made before this are stale.
   watermarkUpdatedAt: timestamp("watermark_updated_at", { withTimezone: true }),
+  // Studio profile: the public studio page (/studio/<studioSlug>) and the
+  // context AI triage uses when drafting replies.
+  studioSlug: text("studio_slug").unique(),
+  studioLogoKey: text("studio_logo_key"),
+  // Card color behind the logo on the studio page: a hex color or "transparent".
+  studioLogoBg: text("studio_logo_bg").notNull().default("#ffffff"),
+  studioTagline: text("studio_tagline"),
+  studioBio: text("studio_bio"),
+  serviceArea: text("service_area"),
+  offeredTypes: jsonb("offered_types").$type<string[]>().notNull().default([]),
+  shootLocations: jsonb("shoot_locations").$type<string[]>().notNull().default([]),
+  // Services that need a quote instead of regular booking (e.g. events, product work).
+  quoteOnlyTypes: jsonb("quote_only_types").$type<string[]>().notNull().default([]),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
@@ -181,6 +194,8 @@ export const inquiries = pgTable(
     status: text("status", { enum: ["new", "replied", "converted", "archived"] })
       .notNull()
       .default("new"),
+    // "form" = sent from the public studio page; "pasted" = added by the photographer.
+    source: text("source", { enum: ["pasted", "form"] }).notNull().default("pasted"),
     fromName: text("from_name"),
     fromEmail: text("from_email"),
     message: text("message").notNull(),
