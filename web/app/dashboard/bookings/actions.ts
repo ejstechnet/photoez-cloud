@@ -1,5 +1,6 @@
 "use server";
 
+import { randomBytes } from "node:crypto";
 import { and, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -10,6 +11,7 @@ import { isOverlapError } from "@/lib/booking/availability";
 import { isValidTimeZone } from "@/lib/booking/time";
 import { cleanRichTextInput, richTextToPlain } from "@/lib/rich-text";
 import { requirePhotographer } from "@/lib/session";
+import { deletePrefix, sessionImageKey, signedUploadUrl, storedSize } from "@/lib/storage";
 import { SHOOT_LOCATIONS } from "@/lib/session-types";
 
 // Server actions for booking setup and managing bookings. Like every other
@@ -108,13 +110,17 @@ export async function addSessionType(_prev: SessionTypeFormState, formData: Form
     .select({ id: sessionTypes.id })
     .from(sessionTypes)
     .where(eq(sessionTypes.photographerId, photographer.id));
-  await db.insert(sessionTypes).values({
-    ...values,
-    priceCents: price,
-    photographerId: photographer.id,
-    sortOrder: existing.length,
-  });
-  done("/dashboard/bookings/setup");
+  const [created] = await db
+    .insert(sessionTypes)
+    .values({
+      ...values,
+      priceCents: price,
+      photographerId: photographer.id,
+      sortOrder: existing.length,
+    })
+    .returning({ id: sessionTypes.id });
+  // Straight to the session's page, where its photo can be added.
+  done(`/dashboard/bookings/sessions/${created.id}?added=1`);
 }
 
 export async function updateSessionType(
@@ -142,11 +148,67 @@ export async function updateSessionType(
 export async function deleteSessionType(sessionTypeId: string): Promise<void> {
   const photographer = await requirePhotographer();
   if (isUuid(sessionTypeId)) {
-    await db
+    const [deleted] = await db
       .delete(sessionTypes)
-      .where(and(eq(sessionTypes.id, sessionTypeId), eq(sessionTypes.photographerId, photographer.id)));
+      .where(and(eq(sessionTypes.id, sessionTypeId), eq(sessionTypes.photographerId, photographer.id)))
+      .returning({ imageKey: sessionTypes.imageKey });
+    if (deleted?.imageKey) await deletePrefix(deleted.imageKey);
   }
   done("/dashboard/bookings/setup");
+}
+
+// ---- Session photos ----
+// The browser resizes the photo to a JPEG and uploads it straight to storage
+// with a one-time link; then saveSessionImage checks it arrived and swaps it in.
+
+const MAX_SESSION_IMAGE_BYTES = 4 * 1024 * 1024;
+
+async function ownedSessionType(photographerId: string, sessionTypeId: string) {
+  if (!isUuid(sessionTypeId)) return null;
+  const [row] = await db
+    .select({ id: sessionTypes.id, imageKey: sessionTypes.imageKey })
+    .from(sessionTypes)
+    .where(and(eq(sessionTypes.id, sessionTypeId), eq(sessionTypes.photographerId, photographerId)));
+  return row ?? null;
+}
+
+export async function prepareSessionImageUpload(
+  sessionTypeId: string,
+  size: number,
+): Promise<{ version: string; url: string } | { error: string }> {
+  const photographer = await requirePhotographer();
+  if (!(await ownedSessionType(photographer.id, sessionTypeId))) return { error: "That session could not be found." };
+  if (size > MAX_SESSION_IMAGE_BYTES) return { error: "That photo is too large. Try a smaller one." };
+  const version = randomBytes(6).toString("hex");
+  return { version, url: await signedUploadUrl(sessionImageKey(photographer.id, sessionTypeId, version), "image/jpeg") };
+}
+
+export async function saveSessionImage(sessionTypeId: string, version: string): Promise<{ ok: true } | { error: string }> {
+  const photographer = await requirePhotographer();
+  const session = await ownedSessionType(photographer.id, sessionTypeId);
+  if (!session || !/^[a-f0-9]{12}$/.test(version)) return { error: "That upload couldn't be saved." };
+  const key = sessionImageKey(photographer.id, sessionTypeId, version);
+  const size = await storedSize(key);
+  if (size === null) return { error: "The photo upload didn't finish. Try again." };
+  if (size > MAX_SESSION_IMAGE_BYTES) {
+    await deletePrefix(key);
+    return { error: "That photo is too large. Try a smaller one." };
+  }
+  if (session.imageKey) await deletePrefix(session.imageKey);
+  await db.update(sessionTypes).set({ imageKey: key }).where(eq(sessionTypes.id, session.id));
+  revalidatePath("/dashboard/bookings", "layout");
+  revalidatePath("/studio/[slug]", "layout");
+  return { ok: true };
+}
+
+export async function removeSessionImage(sessionTypeId: string): Promise<void> {
+  const photographer = await requirePhotographer();
+  const session = await ownedSessionType(photographer.id, sessionTypeId);
+  if (!session?.imageKey) return;
+  await deletePrefix(session.imageKey);
+  await db.update(sessionTypes).set({ imageKey: null }).where(eq(sessionTypes.id, session.id));
+  revalidatePath("/dashboard/bookings", "layout");
+  revalidatePath("/studio/[slug]", "layout");
 }
 
 // ---- Availability: time zone, notice, weekly hours ----
@@ -194,6 +256,40 @@ export async function saveAvailability(_prev: AvailabilityFormState, formData: F
   return { saved: true };
 }
 
+// ---- Client changes (self-service from the booking link) ----
+
+export type ClientChangesFormState = { message?: string; saved?: boolean };
+
+export async function saveClientChanges(
+  _prev: ClientChangesFormState,
+  formData: FormData,
+): Promise<ClientChangesFormState> {
+  const photographer = await requirePhotographer();
+  const whole = (name: string, max: number) => {
+    const value = Number(text(formData, name));
+    return Number.isInteger(value) && value >= 0 && value <= max ? value : null;
+  };
+  const rescheduleNoticeHours = whole("rescheduleNoticeHours", 720);
+  const freeReschedules = whole("freeReschedules", 10);
+  const cancelNoticeHours = whole("cancelNoticeHours", 720);
+  if (rescheduleNoticeHours === null || cancelNoticeHours === null) {
+    return { message: "Notice times must be whole hours from 0 to 720 (30 days)." };
+  }
+  if (freeReschedules === null) return { message: "Free reschedules must be 0 to 10." };
+
+  await db
+    .update(photographers)
+    .set({
+      clientChangesEnabled: formData.get("clientChangesEnabled") === "on",
+      rescheduleNoticeHours,
+      freeReschedules,
+      cancelNoticeHours,
+    })
+    .where(eq(photographers.id, photographer.id));
+  revalidatePath("/dashboard/bookings", "layout");
+  return { saved: true };
+}
+
 // ---- Time off ----
 
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
@@ -235,7 +331,11 @@ export async function setBookingStatus(
   try {
     await db
       .update(bookings)
-      .set({ status, cancelledAt: status === "cancelled" ? new Date() : null })
+      .set(
+        status === "cancelled"
+          ? { status, cancelledAt: new Date(), cancelledBy: "studio", creditDue: false }
+          : { status, cancelledAt: null, cancelledBy: null, creditDue: false },
+      )
       .where(and(eq(bookings.id, bookingId), eq(bookings.photographerId, photographer.id)));
   } catch (error) {
     // Restoring a cancelled booking whose time has since been taken.

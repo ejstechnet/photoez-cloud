@@ -39,6 +39,12 @@ export function studioLogoKey(photographerId: string, version: string, extension
   return `photographers/${photographerId}/branding/logo-${version}.${extension}`;
 }
 
+// The photo shown above a session on the booking page. A new key per upload,
+// so browsers never show a cached old photo.
+export function sessionImageKey(photographerId: string, sessionTypeId: string, version: string) {
+  return `photographers/${photographerId}/sessions/${sessionTypeId}-${version}.jpg`;
+}
+
 export function photoPrefix(photographerId: string, galleryId: string, photoId: string) {
   return `photographers/${photographerId}/galleries/${galleryId}/photos/${photoId}`;
 }

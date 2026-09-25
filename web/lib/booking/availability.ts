@@ -39,8 +39,10 @@ export async function loadRules(photographerId: string): Promise<BookingRules> {
   return { photographerId, timeZone: studio.timeZone, minNoticeDays: studio.minNoticeDays, hours, blackouts };
 }
 
-// Active (not cancelled) bookings that overlap the given window.
-async function busyBetween(photographerId: string, from: Date, to: Date) {
+// Active (not cancelled) bookings that overlap the given window. A client
+// rescheduling passes their own booking as ignoreBookingId, so its current
+// time doesn't block the times around it.
+async function busyBetween(photographerId: string, from: Date, to: Date, ignoreBookingId?: string) {
   return db
     .select({ startsAt: bookings.startsAt, endsAt: bookings.endsAt })
     .from(bookings)
@@ -50,6 +52,7 @@ async function busyBetween(photographerId: string, from: Date, to: Date) {
         ne(bookings.status, "cancelled"),
         lt(bookings.startsAt, to),
         gt(bookings.endsAt, from),
+        ignoreBookingId ? ne(bookings.id, ignoreBookingId) : undefined,
       ),
     )
     .orderBy(asc(bookings.startsAt));
@@ -64,19 +67,31 @@ function windowFor(rules: BookingRules, first: LocalDate, last: LocalDate) {
   };
 }
 
-export async function slotsForDate(rules: BookingRules, durationMinutes: number, date: LocalDate, now = new Date()) {
+export async function slotsForDate(
+  rules: BookingRules,
+  durationMinutes: number,
+  date: LocalDate,
+  now = new Date(),
+  ignoreBookingId?: string,
+) {
   const { from, to } = windowFor(rules, date, date);
-  const busy = await busyBetween(rules.photographerId, from, to);
+  const busy = await busyBetween(rules.photographerId, from, to, ignoreBookingId);
   return availableSlots({ ...rules, date, durationMinutes, busy, now });
 }
 
 // Every date in a month ("2026-10") that has at least one open slot.
-export async function openDatesInMonth(rules: BookingRules, durationMinutes: number, month: string, now = new Date()) {
+export async function openDatesInMonth(
+  rules: BookingRules,
+  durationMinutes: number,
+  month: string,
+  now = new Date(),
+  ignoreBookingId?: string,
+) {
   const first = `${month}-01`;
   const dates: LocalDate[] = [];
   for (let d = first; d.startsWith(month); d = addDays(d, 1)) dates.push(d);
   const { from, to } = windowFor(rules, first, dates[dates.length - 1]);
-  const busy = await busyBetween(rules.photographerId, from, to);
+  const busy = await busyBetween(rules.photographerId, from, to, ignoreBookingId);
   return dates.filter((date) => availableSlots({ ...rules, date, durationMinutes, busy, now }).length > 0);
 }
 

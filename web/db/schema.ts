@@ -48,6 +48,12 @@ export const photographers = pgTable("photographers", {
   // Booking settings. Weekly hours are wall-clock times in this time zone.
   timeZone: text("time_zone").notNull().default("America/Los_Angeles"),
   minNoticeDays: integer("min_notice_days").notNull().default(1),
+  // Client self-service from their booking link.
+  clientChangesEnabled: boolean("client_changes_enabled").notNull().default(true),
+  rescheduleNoticeHours: integer("reschedule_notice_hours").notNull().default(48),
+  freeReschedules: integer("free_reschedules").notNull().default(1),
+  // Cancelling earlier than this turns the deposit into a session credit.
+  cancelNoticeHours: integer("cancel_notice_hours").notNull().default(72),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
@@ -223,6 +229,8 @@ export const sessionTypes = pgTable(
     depositPercent: integer("deposit_percent").notNull().default(100),
     location: text("location"),
     photosIncluded: integer("photos_included"),
+    // Photo shown above the session on the booking page (a storage key).
+    imageKey: text("image_key"),
     hidden: boolean("hidden").notNull().default(false),
     sortOrder: integer("sort_order").notNull().default(0),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
@@ -287,7 +295,11 @@ export const bookings = pgTable(
     notes: text("notes"),
     // Private link for the client to view their booking.
     manageToken: text("manage_token").notNull().unique(),
+    rescheduleCount: integer("reschedule_count").notNull().default(0),
     cancelledAt: timestamp("cancelled_at", { withTimezone: true }),
+    cancelledBy: text("cancelled_by", { enum: ["client", "studio"] }),
+    // The client cancelled early enough that their deposit becomes a credit.
+    creditDue: boolean("credit_due").notNull().default(false),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index("bookings_photographer_idx").on(t.photographerId, t.startsAt)],
