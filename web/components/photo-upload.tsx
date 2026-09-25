@@ -4,14 +4,33 @@ import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { ImagesIcon } from "@/components/icons";
 import { renderJpeg } from "@/lib/proof-maker";
-import { prepareSessionImageUpload, removeSessionImage, saveSessionImage } from "../../actions";
 
-// Long side of the stored photo: sharp on the booking page, still quick to load.
+// Long side of the stored photo: sharp on public pages, still quick to load.
 const MAX_EDGE = 1600;
 
-// The photo shown above this session on the booking page. Saves right away,
-// separately from the rest of the session form.
-export function SessionPhoto({ sessionTypeId, currentUrl }: { sessionTypeId: string; currentUrl: string | null }) {
+type Saved = { ok: true } | { error: string };
+
+// A photo that saves right away (separately from any form around it). The
+// browser resizes it to a JPEG and uploads it straight to storage with a
+// one-time link from `prepare`; `save` then checks it arrived and swaps it in.
+// Used for session photos and add-on photos.
+export function PhotoUpload({
+  label,
+  hint,
+  aspect,
+  currentUrl,
+  prepare,
+  save,
+  remove,
+}: {
+  label: string;
+  hint: string;
+  aspect: "portrait" | "square";
+  currentUrl: string | null;
+  prepare: (size: number) => Promise<{ version: string; url: string } | { error: string }>;
+  save: (version: string) => Promise<Saved>;
+  remove: () => Promise<void>;
+}) {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
   const [preview, setPreview] = useState<string | null>(null);
@@ -24,15 +43,14 @@ export function SessionPhoto({ sessionTypeId, currentUrl }: { sessionTypeId: str
     setPreview(URL.createObjectURL(file));
     startTransition(async () => {
       try {
-        // Resize in the browser, so a 20 MB camera file becomes a light JPEG.
         const bitmap = await createImageBitmap(file);
         const jpeg = await renderJpeg(bitmap, MAX_EDGE, 0.85);
         bitmap.close();
-        const prepared = await prepareSessionImageUpload(sessionTypeId, jpeg.size);
+        const prepared = await prepare(jpeg.size);
         if ("error" in prepared) throw new Error(prepared.error);
         const response = await fetch(prepared.url, { method: "PUT", headers: { "Content-Type": "image/jpeg" }, body: jpeg });
         if (!response.ok) throw new Error("The photo didn't upload. Try again.");
-        const saved = await saveSessionImage(sessionTypeId, prepared.version);
+        const saved = await save(prepared.version);
         if ("error" in saved) throw new Error(saved.error);
         router.refresh();
       } catch (e) {
@@ -44,12 +62,16 @@ export function SessionPhoto({ sessionTypeId, currentUrl }: { sessionTypeId: str
 
   return (
     <div>
-      <span className="text-sm font-semibold">Session photo</span>
+      <span className="text-sm font-semibold">{label}</span>
       <div className="mt-1.5 grid gap-4 sm:grid-cols-[10rem_1fr] sm:items-center">
-        <div className="grid aspect-[2/3] w-40 place-items-center overflow-hidden rounded-2xl border-2 border-border bg-background">
+        <div
+          className={`grid w-40 place-items-center overflow-hidden rounded-2xl border-2 border-border bg-background ${
+            aspect === "portrait" ? "aspect-[2/3]" : "aspect-square"
+          }`}
+        >
           {shown ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={shown} alt="Session photo" className="size-full object-cover" />
+            <img src={shown} alt={label} className="size-full object-cover" />
           ) : (
             <ImagesIcon size={28} className="text-muted" />
           )}
@@ -63,9 +85,9 @@ export function SessionPhoto({ sessionTypeId, currentUrl }: { sessionTypeId: str
               <button
                 type="button"
                 onClick={() =>
-                  confirm("Remove this session's photo?") &&
+                  confirm("Remove this photo?") &&
                   startTransition(async () => {
-                    await removeSessionImage(sessionTypeId);
+                    await remove();
                     setPreview(null);
                     router.refresh();
                   })
@@ -76,7 +98,7 @@ export function SessionPhoto({ sessionTypeId, currentUrl }: { sessionTypeId: str
               </button>
             )}
           </div>
-          <p className="text-xs text-muted">Shown above this session on your booking page as a 2:3 portrait, so a vertical photo fits best.</p>
+          <p className="text-xs text-muted">{hint}</p>
           {error && <p className="text-xs font-medium text-danger">{error}</p>}
         </div>
       </div>

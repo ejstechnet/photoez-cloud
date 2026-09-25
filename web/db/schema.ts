@@ -269,6 +269,45 @@ export const blackoutDates = pgTable(
   (t) => [index("blackout_dates_photographer_idx").on(t.photographerId, t.startDate)],
 );
 
+// Extras a client can add to a booking (more edited photos, prints…), like
+// PhotoEZ Booking's add-ons. A studio keeps one list and attaches add-ons to
+// sessions; a session can include some for free (e.g. 15 edited photos).
+export const addons = pgTable(
+  "addons",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    photographerId: uuid("photographer_id")
+      .notNull()
+      .references(() => photographers.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    description: text("description"),
+    // Price per one, in cents.
+    priceCents: integer("price_cents").notNull(),
+    // Most a client can add to one booking.
+    maxQuantity: integer("max_quantity").notNull().default(10),
+    imageKey: text("image_key"),
+    sortOrder: integer("sort_order").notNull().default(0),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("addons_photographer_idx").on(t.photographerId, t.sortOrder)],
+);
+
+// Which add-ons a session offers, and how many of each come with it.
+export const sessionTypeAddons = pgTable(
+  "session_type_addons",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    sessionTypeId: uuid("session_type_id")
+      .notNull()
+      .references(() => sessionTypes.id, { onDelete: "cascade" }),
+    addonId: uuid("addon_id")
+      .notNull()
+      .references(() => addons.id, { onDelete: "cascade" }),
+    includedQuantity: integer("included_quantity").notNull().default(0),
+  },
+  (t) => [unique("session_type_addons_unique").on(t.sessionTypeId, t.addonId)],
+);
+
 // A booked session. Times are exact instants; the session's name, price, and
 // deposit are copied in so later edits to the session type don't rewrite history.
 // Migration 0009 adds a database rule that no two active bookings overlap.
@@ -300,9 +339,30 @@ export const bookings = pgTable(
     cancelledBy: text("cancelled_by", { enum: ["client", "studio"] }),
     // The client cancelled early enough that their deposit becomes a credit.
     creditDue: boolean("credit_due").notNull().default(false),
+    // Total of the extras the client added; the booking total is priceCents + addonsCents.
+    addonsCents: integer("addons_cents").notNull().default(0),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index("bookings_photographer_idx").on(t.photographerId, t.startsAt)],
+);
+
+// The extras on a booking, with the name and price copied in so later edits
+// to the add-on don't change past bookings.
+export const bookingAddons = pgTable(
+  "booking_addons",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    bookingId: uuid("booking_id")
+      .notNull()
+      .references(() => bookings.id, { onDelete: "cascade" }),
+    addonId: uuid("addon_id").references(() => addons.id, { onDelete: "set null" }),
+    name: text("name").notNull(),
+    priceCents: integer("price_cents").notNull(),
+    // Extra units bought, beyond any included with the session.
+    quantity: integer("quantity").notNull(),
+    includedQuantity: integer("included_quantity").notNull().default(0),
+  },
+  (t) => [index("booking_addons_booking_idx").on(t.bookingId)],
 );
 
 // A new-client inquiry (email or contact-form message) and what the AI

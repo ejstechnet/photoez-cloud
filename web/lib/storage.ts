@@ -45,6 +45,11 @@ export function sessionImageKey(photographerId: string, sessionTypeId: string, v
   return `photographers/${photographerId}/sessions/${sessionTypeId}-${version}.jpg`;
 }
 
+// The photo shown on an add-on card in the booking flow.
+export function addonImageKey(photographerId: string, addonId: string, version: string) {
+  return `photographers/${photographerId}/addons/${addonId}-${version}.jpg`;
+}
+
 export function photoPrefix(photographerId: string, galleryId: string, photoId: string) {
   return `photographers/${photographerId}/galleries/${galleryId}/photos/${photoId}`;
 }

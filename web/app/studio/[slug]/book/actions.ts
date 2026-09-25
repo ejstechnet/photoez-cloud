@@ -6,8 +6,10 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { db } from "@/db";
-import { bookings, clients, photographers, sessionTypes } from "@/db/schema";
+import { bookingAddons, bookings, clients, photographers, sessionTypes } from "@/db/schema";
+import { pickAddons } from "@/lib/booking/addons";
 import { isOverlapError, loadRules, slotsForDate } from "@/lib/booking/availability";
+import { offeredAddons } from "@/lib/booking/session-addons";
 import { localDateOf } from "@/lib/booking/time";
 
 // The public "Book" button. Anyone can call this, so it re-checks everything
@@ -102,6 +104,15 @@ export async function createBooking(
     return { message: "You've made several bookings in the last hour. Please contact the studio to book more." };
   }
 
+  // Extras: the form sends addon.<id> = quantity; only this session's add-ons,
+  // within their limits, are accepted.
+  const picked: Record<string, number> = {};
+  for (const [key, value] of formData.entries()) {
+    if (key.startsWith("addon.")) picked[key.slice("addon.".length)] = Number(value);
+  }
+  const extras = pickAddons(await offeredAddons(session.id), picked);
+  if (!extras.ok) return { message: extras.message };
+
   const manageToken = randomBytes(24).toString("base64url");
   try {
     await db.transaction(async (tx) => {
@@ -120,7 +131,7 @@ export async function createBooking(
             .returning({ id: clients.id })
         )[0].id;
 
-      await tx.insert(bookings).values({
+      const [booking] = await tx.insert(bookings).values({
         photographerId: studio.id,
         sessionTypeId: session.id,
         clientId,
@@ -134,7 +145,21 @@ export async function createBooking(
         clientPhone: data.phone,
         notes: data.notes,
         manageToken,
-      });
+        addonsCents: extras.addonsCents,
+      }).returning({ id: bookings.id });
+
+      if (extras.lines.length > 0) {
+        await tx.insert(bookingAddons).values(
+          extras.lines.map((line) => ({
+            bookingId: booking.id,
+            addonId: line.id,
+            name: line.name,
+            priceCents: line.priceCents,
+            quantity: line.quantity,
+            includedQuantity: line.includedQuantity,
+          })),
+        );
+      }
     });
   } catch (error) {
     if (isOverlapError(error)) return { taken: true };
