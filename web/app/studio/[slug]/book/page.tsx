@@ -3,7 +3,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { and, asc, eq } from "drizzle-orm";
 import { db } from "@/db";
-import { photographers, sessionTypes } from "@/db/schema";
+import { bookingFields, photographers, sessionTypes } from "@/db/schema";
+import { fieldsForSession } from "@/lib/booking/fields";
 import { addonsForSession } from "@/lib/booking/session-addons";
 import { loadRules, openDatesInMonth, slotsForDate } from "@/lib/booking/availability";
 import { formatDuration, formatPrice } from "@/lib/booking/format";
@@ -32,6 +33,7 @@ async function findStudio(slug: string) {
       businessName: photographers.businessName,
       logoKey: photographers.studioLogoKey,
       logoBg: photographers.studioLogoBg,
+      inspoMode: photographers.inspoMode,
     })
     .from(photographers)
     .where(eq(photographers.studioSlug, slug.toLowerCase()));
@@ -104,6 +106,24 @@ export default async function BookPage({ params, searchParams }: PageProps<"/stu
   const timeParam = one(query.time);
   const time = slots.find((slot) => slot.toISOString() === timeParam) ?? null;
   const sessionAddons = session && time ? await addonsForSession(session.id) : [];
+  const questions =
+    session && time
+      ? fieldsForSession(
+          await db
+            .select({
+              id: bookingFields.id,
+              label: bookingFields.label,
+              type: bookingFields.type,
+              options: bookingFields.options,
+              required: bookingFields.required,
+              sessionTypeIds: bookingFields.sessionTypeIds,
+            })
+            .from(bookingFields)
+            .where(eq(bookingFields.photographerId, studio.id))
+            .orderBy(asc(bookingFields.sortOrder), asc(bookingFields.createdAt)),
+          session.id,
+        )
+      : [];
 
   const href = (params: { session?: string; month?: string; date?: string; time?: string }) => {
     const search = new URLSearchParams(Object.entries(params).filter((e): e is [string, string] => Boolean(e[1])));
@@ -235,6 +255,8 @@ export default async function BookPage({ params, searchParams }: PageProps<"/stu
                 priceCents={priceOf(session).priceCents}
                 depositPercent={session.depositPercent}
                 addons={sessionAddons}
+                questions={questions}
+                inspoMode={studio.inspoMode}
                 summary={
                   <>
                     <p className="font-semibold">

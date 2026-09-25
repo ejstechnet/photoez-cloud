@@ -50,6 +50,12 @@ export function addonImageKey(photographerId: string, addonId: string, version: 
   return `photographers/${photographerId}/addons/${addonId}-${version}.jpg`;
 }
 
+// Inspiration photos a client uploads while booking. `batch` is random per
+// upload, so one client can't guess or overwrite another's files.
+export function inspoKey(photographerId: string, batch: string, index: number) {
+  return `photographers/${photographerId}/inspo/${batch}/${index}.jpg`;
+}
+
 export function photoPrefix(photographerId: string, galleryId: string, photoId: string) {
   return `photographers/${photographerId}/galleries/${galleryId}/photos/${photoId}`;
 }

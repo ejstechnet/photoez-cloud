@@ -1,14 +1,15 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { and, eq } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db";
-import { bookings, photographers } from "@/db/schema";
+import { bookingInspoPhotos, bookings, photographers } from "@/db/schema";
 import { depositCents, formatDuration, formatPrice } from "@/lib/booking/format";
 import { formatDate, formatTime } from "@/lib/booking/time";
 import { bookingExtras } from "@/lib/booking/session-addons";
 import { requirePhotographer } from "@/lib/session";
 import { siteUrl } from "@/lib/site";
+import { signedViewUrl } from "@/lib/storage";
 import { setBookingStatus } from "../actions";
 import { ConfirmButton } from "../confirm-button";
 import { BookingStatusPill } from "../status-pill";
@@ -31,6 +32,12 @@ export default async function BookingPage({ params }: PageProps<"/dashboard/book
   const minutes = Math.round((booking.endsAt.getTime() - booking.startsAt.getTime()) / 60_000);
   const isPast = booking.endsAt < new Date();
   const extras = await bookingExtras(booking.id);
+  const inspoRows = await db
+    .select({ id: bookingInspoPhotos.id, fileKey: bookingInspoPhotos.fileKey })
+    .from(bookingInspoPhotos)
+    .where(eq(bookingInspoPhotos.bookingId, booking.id))
+    .orderBy(asc(bookingInspoPhotos.position));
+  const inspo = await Promise.all(inspoRows.map(async (p) => ({ id: p.id, url: await signedViewUrl(p.fileKey) })));
   const totalCents = booking.priceCents + booking.addonsCents;
   const details: [string, React.ReactNode][] = [
     ["When", `${formatDate(booking.startsAt, tz)}, ${formatTime(booking.startsAt, tz)} – ${formatTime(booking.endsAt, tz)}`],
@@ -99,7 +106,30 @@ export default async function BookingPage({ params }: PageProps<"/dashboard/book
             <dd className="whitespace-pre-line">{booking.notes}</dd>
           </div>
         )}
+        {booking.answers.map((a, i) => (
+          <div key={i} className="grid gap-1 py-3.5 sm:grid-cols-[8rem_1fr]">
+            <dt className="text-sm font-semibold text-muted">{a.label}</dt>
+            <dd className="whitespace-pre-line">{a.value}</dd>
+          </div>
+        ))}
       </dl>
+
+      {inspo.length > 0 && (
+        <section className="card mt-6 p-6 sm:p-8">
+          <h2 className="font-display text-xl font-bold">Inspiration photos</h2>
+          <p className="mt-1 text-sm text-muted">Click a photo to open it full size.</p>
+          <ul className="mt-4 grid grid-cols-3 gap-2 sm:grid-cols-5">
+            {inspo.map((photo) => (
+              <li key={photo.id}>
+                <a href={photo.url} target="_blank" className="block overflow-hidden rounded-xl border-2 border-border transition hover:border-lime">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={photo.url} alt="" className="aspect-square w-full object-cover" />
+                </a>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       <div className="mt-6 flex flex-wrap items-start gap-3">
         {booking.clientId && (

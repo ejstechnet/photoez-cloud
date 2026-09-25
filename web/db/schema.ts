@@ -11,6 +11,7 @@ import {
   date,
 } from "drizzle-orm/pg-core";
 import type { TriageResult } from "../lib/ai/triage";
+import { BOOKING_FIELD_TYPES, type BookingAnswer } from "../lib/booking/fields";
 import { GALLERY_STATUSES } from "../lib/gallery-status";
 import { PHOTO_KINDS } from "../lib/photo-limits";
 import { WATERMARK_POSITIONS } from "../lib/watermark";
@@ -54,6 +55,8 @@ export const photographers = pgTable("photographers", {
   freeReschedules: integer("free_reschedules").notNull().default(1),
   // Cancelling earlier than this turns the deposit into a session credit.
   cancelNoticeHours: integer("cancel_notice_hours").notNull().default(72),
+  // Inspiration photos on the booking form: off, optional, or required.
+  inspoMode: text("inspo_mode", { enum: ["off", "optional", "required"] }).notNull().default("optional"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
@@ -363,6 +366,9 @@ export const bookings = pgTable(
     creditDue: boolean("credit_due").notNull().default(false),
     // Total of the extras the client added; the booking total is priceCents + addonsCents.
     addonsCents: integer("addons_cents").notNull().default(0),
+    // The client's answers to the studio's custom booking questions, copied
+    // with each question's wording so later edits don't change past bookings.
+    answers: jsonb("answers").$type<BookingAnswer[]>().notNull().default([]),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index("bookings_photographer_idx").on(t.photographerId, t.startsAt)],
@@ -370,6 +376,41 @@ export const bookings = pgTable(
 
 // The extras on a booking, with the name and price copied in so later edits
 // to the add-on don't change past bookings.
+// The studio's own questions on the booking form (like PhotoEZ Booking's
+// custom fields). sessionTypeIds empty = asked for every session.
+export const bookingFields = pgTable(
+  "booking_fields",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    photographerId: uuid("photographer_id")
+      .notNull()
+      .references(() => photographers.id, { onDelete: "cascade" }),
+    label: text("label").notNull(),
+    type: text("type", { enum: BOOKING_FIELD_TYPES }).notNull(),
+    // Choices for a dropdown.
+    options: jsonb("options").$type<string[]>().notNull().default([]),
+    required: boolean("required").notNull().default(false),
+    sessionTypeIds: jsonb("session_type_ids").$type<string[]>().notNull().default([]),
+    sortOrder: integer("sort_order").notNull().default(0),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("booking_fields_photographer_idx").on(t.photographerId, t.sortOrder)],
+);
+
+// Inspiration photos a client uploaded with their booking (storage keys).
+export const bookingInspoPhotos = pgTable(
+  "booking_inspo_photos",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    bookingId: uuid("booking_id")
+      .notNull()
+      .references(() => bookings.id, { onDelete: "cascade" }),
+    fileKey: text("file_key").notNull(),
+    position: integer("position").notNull().default(0),
+  },
+  (t) => [index("booking_inspo_photos_booking_idx").on(t.bookingId)],
+);
+
 export const bookingAddons = pgTable(
   "booking_addons",
   {

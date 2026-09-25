@@ -7,6 +7,7 @@ import { and, asc, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { bookingHours, photographers, sessionTypes, studioFaqs } from "@/db/schema";
 import { PhotoEZCloudMark } from "@/components/brand";
+import { GearIcon } from "@/components/icons";
 import { formatDuration, formatPrice } from "@/lib/booking/format";
 import { currentPrice } from "@/lib/booking/pricing";
 import { localDateOf } from "@/lib/booking/time";
@@ -130,9 +131,9 @@ export default async function StudioPage({ params }: PageProps<"/studio/[slug]">
             {isOwner && (
               <Link
                 href="/dashboard/settings#studio"
-                className="rounded-full px-3 py-1.5 text-xs font-bold tracking-wider text-sun uppercase hover:bg-white/10"
+                className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold tracking-wider text-sun uppercase hover:bg-white/10"
               >
-                Edit page
+                <GearIcon size={14} /> Settings
               </Link>
             )}
             {bookingOpen ? (

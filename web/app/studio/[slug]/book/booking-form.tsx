@@ -1,10 +1,20 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { startTransition, useActionState, useState } from "react";
 import Link from "next/link";
-import { Field, FormError, SubmitButton, TextAreaField } from "@/components/form";
+import { Field, FormError, SelectField, SubmitButton, TextAreaField, inputClass } from "@/components/form";
+import type { BookingFieldType } from "@/lib/booking/fields";
 import { depositCents, formatPrice } from "@/lib/booking/format";
 import { createBooking, type BookingFormState } from "./actions";
+import { InspoUploader } from "./inspo-uploader";
+
+export type BookingQuestion = {
+  id: string;
+  label: string;
+  type: BookingFieldType;
+  options: string[];
+  required: boolean;
+};
 
 export type BookingAddon = {
   id: string;
@@ -27,6 +37,8 @@ export function BookingForm({
   priceCents,
   depositPercent,
   addons,
+  questions,
+  inspoMode,
 }: {
   slug: string;
   sessionTypeId: string;
@@ -36,6 +48,8 @@ export function BookingForm({
   priceCents: number;
   depositPercent: number;
   addons: BookingAddon[];
+  questions: BookingQuestion[];
+  inspoMode: "off" | "optional" | "required";
 }) {
   const [state, formAction, pending] = useActionState<BookingFormState, FormData>(
     createBooking.bind(null, slug, sessionTypeId, startsAt),
@@ -43,6 +57,7 @@ export function BookingForm({
   );
   const [quantities, setQuantities] = useState<Record<string, number>>({});
   const errors = state.errors ?? {};
+  const fieldErrors = state.fieldErrors ?? {};
   const extrasCents = addons.reduce((sum, a) => sum + (quantities[a.id] ?? 0) * a.priceCents, 0);
   const totalCents = priceCents + extrasCents;
   const step = (n: number) => (addons.length > 0 ? n : n - 1);
@@ -64,7 +79,17 @@ export function BookingForm({
   }
 
   return (
-    <form action={formAction} className="space-y-6" noValidate>
+    <form
+      // Submitted by hand instead of action={…}: a form action resets every field
+      // when it finishes, which would wipe the client's answers after an error.
+      onSubmit={(e) => {
+        e.preventDefault();
+        const formData = new FormData(e.currentTarget);
+        startTransition(() => formAction(formData));
+      }}
+      className="space-y-6"
+      noValidate
+    >
       {addons.length > 0 && (
         <section className="card p-6 sm:p-8">
           <StepHeading n={3}>Add extras</StepHeading>
@@ -183,6 +208,10 @@ export function BookingForm({
             placeholder="Who's in the photos, ideas, questions…"
             hint="Optional"
           />
+          {questions.map((q) => (
+            <Question key={q.id} question={q} error={fieldErrors[q.id]} />
+          ))}
+          {inspoMode !== "off" && <InspoUploader slug={slug} required={inspoMode === "required"} error={state.inspoError} />}
           <FormError message={state.message} />
           <SubmitButton pending={pending}>Confirm booking</SubmitButton>
         </div>
@@ -199,5 +228,51 @@ function StepHeading({ n, children }: { n: number; children: React.ReactNode }) 
       </span>
       {children}
     </h2>
+  );
+}
+
+// One of the studio's own questions, drawn to match its answer type.
+function Question({ question: q, error }: { question: BookingQuestion; error?: string }) {
+  const name = `field.${q.id}`;
+  const label = (
+    <>
+      {q.label}
+      {q.required && <span className="text-danger"> *</span>}
+    </>
+  );
+  if (q.type === "checkbox") {
+    return (
+      <div>
+        <label className="flex items-start gap-3 rounded-xl border-2 border-border px-3.5 py-3">
+          <input type="checkbox" name={name} className="mt-1 size-4 accent-lime-ink" />
+          <span className="text-sm font-semibold">{label}</span>
+        </label>
+        {error && <p className="mt-1.5 text-xs font-medium text-danger">{error}</p>}
+      </div>
+    );
+  }
+  if (q.type === "select") {
+    return (
+      <SelectField label={q.label + (q.required ? " *" : "")} name={name} defaultValue="" error={error}>
+        <option value="" disabled={q.required}>
+          {q.required ? "Choose one…" : "No preference"}
+        </option>
+        {q.options.map((o) => (
+          <option key={o} value={o}>
+            {o}
+          </option>
+        ))}
+      </SelectField>
+    );
+  }
+  if (q.type === "textarea") {
+    return <TextAreaField label={q.label + (q.required ? " *" : "")} name={name} rows={3} error={error} />;
+  }
+  return (
+    <label className="block">
+      <span className="text-sm font-semibold">{label}</span>
+      <input name={name} aria-invalid={error ? true : undefined} className={`mt-1.5 ${inputClass}`} />
+      {error && <span className="mt-1.5 block text-xs font-medium text-danger">{error}</span>}
+    </label>
   );
 }

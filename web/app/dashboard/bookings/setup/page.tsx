@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { asc, eq } from "drizzle-orm";
 import { db } from "@/db";
-import { addons, photographers, sessionTypes } from "@/db/schema";
+import { addons, bookingFields, photographers, sessionTypes } from "@/db/schema";
+import { FIELD_TYPE_LABELS } from "@/lib/booking/fields";
 import { ArrowRightIcon, PlusIcon } from "@/components/icons";
 import { loadRules, upcomingTimeOff } from "@/lib/booking/availability";
 import { formatDuration, formatPrice } from "@/lib/booking/format";
@@ -12,6 +13,8 @@ import { LOCATION_LABELS, type ShootLocation } from "@/lib/session-types";
 import { siteUrl } from "@/lib/site";
 import { signedViewUrl } from "@/lib/storage";
 import { moveAddon } from "../addon-actions";
+import { moveField } from "../field-actions";
+import { InspoMode } from "./inspo-mode";
 import { deleteTimeOff, moveSessionType } from "../actions";
 import { MoveButtons } from "../move-buttons";
 import { ConfirmButton } from "../confirm-button";
@@ -34,7 +37,7 @@ function formatDay(date: string) {
 
 export default async function BookingSetupPage() {
   const user = await requirePhotographer();
-  const [rules, sessions, [studio], addonList] = await Promise.all([
+  const [rules, sessions, [studio], addonList, fields] = await Promise.all([
     loadRules(user.id),
     db
       .select()
@@ -48,6 +51,7 @@ export default async function BookingSetupPage() {
         rescheduleNoticeHours: photographers.rescheduleNoticeHours,
         freeReschedules: photographers.freeReschedules,
         cancelNoticeHours: photographers.cancelNoticeHours,
+        inspoMode: photographers.inspoMode,
       })
       .from(photographers)
       .where(eq(photographers.id, user.id)),
@@ -56,7 +60,13 @@ export default async function BookingSetupPage() {
       .from(addons)
       .where(eq(addons.photographerId, user.id))
       .orderBy(asc(addons.sortOrder), asc(addons.createdAt)),
+    db
+      .select()
+      .from(bookingFields)
+      .where(eq(bookingFields.photographerId, user.id))
+      .orderBy(asc(bookingFields.sortOrder), asc(bookingFields.createdAt)),
   ]);
+  const sessionName = new Map(sessions.map((s) => [s.id, s.name]));
   const today = localDateOf(new Date(), rules.timeZone);
   const thumbs = new Map(
     await Promise.all(
@@ -217,6 +227,60 @@ export default async function BookingSetupPage() {
             ))}
           </ul>
         )}
+      </section>
+
+      <section id="form" className="card mt-8 scroll-mt-8 p-6 sm:p-8">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <h2 className="font-display text-2xl font-bold">Booking form</h2>
+            <p className="mt-1 text-sm text-muted">
+              Every booking asks for name, email, phone, and notes. Add your own questions here.
+            </p>
+          </div>
+          <Link href="/dashboard/bookings/fields/new" className="btn-primary">
+            <PlusIcon size={18} /> Add question
+          </Link>
+        </div>
+        {fields.length === 0 ? (
+          <p className="mt-6 rounded-2xl border-2 border-dashed border-border px-5 py-6 text-center text-sm text-muted">
+            No questions yet, like outfit count, special requests, or an agreement checkbox.
+          </p>
+        ) : (
+          <ul className="mt-6 grid gap-3">
+            {fields.map((f, i) => (
+              <li key={f.id} className="flex items-center gap-2">
+                <MoveButtons
+                  label={f.label}
+                  isFirst={i === 0}
+                  isLast={i === fields.length - 1}
+                  moveUp={moveField.bind(null, f.id, -1)}
+                  moveDown={moveField.bind(null, f.id, 1)}
+                />
+                <Link
+                  href={`/dashboard/bookings/fields/${f.id}`}
+                  className="group flex min-w-0 flex-1 items-center gap-4 rounded-2xl border-2 border-border px-5 py-4 transition hover:border-lime"
+                >
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate font-semibold">
+                      {f.label}
+                      {f.required && <span className="text-danger"> *</span>}
+                    </p>
+                    <p className="truncate text-sm text-muted">
+                      {FIELD_TYPE_LABELS[f.type]} ·{" "}
+                      {f.sessionTypeIds.length === 0
+                        ? "Every session"
+                        : f.sessionTypeIds.map((id) => sessionName.get(id)).filter(Boolean).join(", ")}
+                    </p>
+                  </div>
+                  <ArrowRightIcon size={18} className="shrink-0 text-muted transition group-hover:translate-x-1" />
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
+        <div className="mt-6 border-t border-border pt-6">
+          <InspoMode mode={studio.inspoMode} />
+        </div>
       </section>
 
       <section className="card mt-8 p-6 sm:p-8">
