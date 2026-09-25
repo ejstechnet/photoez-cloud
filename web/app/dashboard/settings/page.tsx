@@ -10,6 +10,9 @@ import { syncStripeStatus } from "@/lib/payments/connect";
 import { stripeConfigured } from "@/lib/stripe";
 import { FaqForm } from "./faq-form";
 import { PaymentsCard } from "./payments-card";
+import { PlanCard } from "./plan-card";
+import { PLAN_LABELS, planFor } from "@/lib/plans";
+import { studioPlan } from "@/lib/studio-plan";
 import { StudioForm } from "./studio-form";
 import { StudioLogo } from "./studio-logo";
 import { WatermarkForm } from "./watermark-form";
@@ -45,6 +48,7 @@ export default async function SettingsPage() {
   const askedAlready = new Set(faqs.map((faq) => faq.question.trim().toLowerCase()));
   const suggestions = SUGGESTED_FAQ_QUESTIONS.filter((q) => !askedAlready.has(q.toLowerCase()));
 
+  const plan = await studioPlan(user.id);
   // Still waiting on Stripe's approval? Ask Stripe now instead of relying on its webhook.
   let stripeReady = settings.stripeReady;
   if (!stripeReady && settings.stripeAccountId && stripeConfigured()) {
@@ -104,6 +108,12 @@ export default async function SettingsPage() {
         </div>
         <div className="space-y-8">
           <PaymentsCard configured={stripeConfigured()} accountId={settings.stripeAccountId} ready={stripeReady} />
+          <PlanCard
+            planLabel={PLAN_LABELS[plan.plan]}
+            upsells={plan.upsells}
+            upgradePlanLabel={PLAN_LABELS[planFor("galleryUpsells")]}
+            extraPhotoPriceCents={plan.extraPhotoPriceCents}
+          />
           <section id="faq" className="card scroll-mt-8 p-6 sm:p-8">
             <h2 className="font-display text-2xl font-bold">Client FAQ</h2>
             <p className="mt-1 text-sm text-muted">

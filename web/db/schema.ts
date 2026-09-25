@@ -13,6 +13,7 @@ import {
 import type { TriageResult } from "../lib/ai/triage";
 import { BOOKING_FIELD_TYPES, type BookingAnswer } from "../lib/booking/fields";
 import { BOOKING_STATUSES } from "../lib/booking/status";
+import { PLANS } from "../lib/plans";
 import { GALLERY_STATUSES } from "../lib/gallery-status";
 import { PHOTO_KINDS } from "../lib/photo-limits";
 import { WATERMARK_POSITIONS } from "../lib/watermark";
@@ -62,6 +63,11 @@ export const photographers = pgTable("photographers", {
   // go straight to it; chargesEnabled is Stripe's "ready to take payments".
   stripeAccountId: text("stripe_account_id"),
   stripeChargesEnabled: boolean("stripe_charges_enabled").notNull().default(false),
+  // Subscription tier (lib/plans.ts). Billing comes later; set by hand for now.
+  plan: text("plan", { enum: PLANS }).notNull().default("free"),
+  // Price per photo a client selects beyond a gallery's included number
+  // (PhotoEZ's "global extra price"; galleries can override it).
+  extraPhotoPriceCents: integer("extra_photo_price_cents").notNull().default(1000),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
@@ -164,6 +170,12 @@ export const galleries = pgTable(
     expiresAt: timestamp("expires_at", { withTimezone: true }),
     // Large photo across the top of the client's gallery page (a storage key).
     headerImageKey: text("header_image_key"),
+    // This gallery's price per extra photo; null uses the studio's price.
+    extraPhotoPriceCents: integer("extra_photo_price_cents"),
+    // Extra photos the client chose past freeLimit when they submitted, and
+    // what they cost (paid through Stripe, or owed when it isn't connected).
+    extrasCount: integer("extras_count").notNull().default(0),
+    extrasCents: integer("extras_cents").notNull().default(0),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
@@ -454,10 +466,12 @@ export const payments = pgTable(
   "payments",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    bookingId: uuid("booking_id")
-      .notNull()
-      .references(() => bookings.id, { onDelete: "cascade" }),
-    kind: text("kind", { enum: ["deposit", "balance"] }).notNull(),
+    // A payment is for a booking or for a gallery's extra photos.
+    bookingId: uuid("booking_id").references(() => bookings.id, { onDelete: "cascade" }),
+    galleryId: uuid("gallery_id").references(() => galleries.id, { onDelete: "cascade" }),
+    kind: text("kind", { enum: ["deposit", "balance", "gallery_extras"] }).notNull(),
+    // How many extra photos a gallery_extras payment covers.
+    quantity: integer("quantity"),
     amountCents: integer("amount_cents").notNull(),
     status: text("status", { enum: ["pending", "paid", "expired"] }).notNull().default("pending"),
     stripeAccountId: text("stripe_account_id").notNull(),

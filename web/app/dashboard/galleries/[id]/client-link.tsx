@@ -9,12 +9,15 @@ export function ClientLink({
   galleryId,
   url,
   submitted,
+  canReopen,
   selectedNames,
   freeLimit,
 }: {
   galleryId: string;
   url: string;
   submitted: boolean;
+  // Any stage after proofing: submitted, delivered, completed, or expired.
+  canReopen: boolean;
   selectedNames: string[];
   freeLimit: number;
 }) {
@@ -64,17 +67,19 @@ export function ClientLink({
               {copied === "names" ? "Copied!" : "Copy file names"}
             </button>
           )}
-          {submitted && (
+          {canReopen && (
             <button
               type="button"
               disabled={reopening}
               onClick={() =>
-                confirm("Reopen proofing so the client can change their picks?") &&
+                confirm(
+                  "Reopen selections so the client can change their picks? If the gallery was delivered, their link goes back to proofing until you deliver again. Picks and finals are kept.",
+                ) &&
                 startReopen(() => reopenProofing(galleryId))
               }
               className="btn-secondary"
             >
-              {reopening ? "Reopening…" : "Reopen proofing"}
+              {reopening ? "Reopening…" : "Reopen selections"}
             </button>
           )}
         </div>

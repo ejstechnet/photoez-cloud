@@ -24,7 +24,7 @@ export async function generateMetadata({ params }: PageProps<"/g/[token]">): Pro
 
 export default async function ClientGalleryPage({ params, searchParams }: PageProps<"/g/[token]">) {
   const { token } = await params;
-  const { preview } = await searchParams;
+  const { preview, paid, payment } = await searchParams;
   const gallery = await findGalleryByToken(token);
   if (!gallery) notFound();
 
@@ -159,15 +159,28 @@ export default async function ClientGalleryPage({ params, searchParams }: PagePr
             {studio} is still getting your gallery ready. Check back soon.
           </Notice>
         ) : (
+          <>
+          {paid === "1" && (
+            <p className="mb-6 rounded-2xl bg-lime/20 px-5 py-4 font-semibold">
+              Thank you! Your payment went through and your selections are in.
+            </p>
+          )}
+          {payment === "cancelled" && gallery.status === "pending" && (
+            <p className="mb-6 rounded-2xl bg-sun/30 px-5 py-4 font-semibold">
+              Your payment was cancelled, so nothing was submitted. Your picks are saved: adjust them or submit again.
+            </p>
+          )}
           <ProofingGallery
             token={token}
             tiles={tiles}
             freeLimit={gallery.freeLimit}
+            extraPriceCents={gallery.extraPriceCents}
             locked={gallery.status !== "pending"}
             preview={isPreview}
             studio={studio}
             clientFirstName={gallery.clientName?.split(" ")[0] ?? null}
           />
+          </>
         )}
       </main>
 

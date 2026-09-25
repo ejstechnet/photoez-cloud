@@ -271,3 +271,20 @@ export async function saveFaqs(_prev: FaqFormState, formData: FormData): Promise
   revalidatePath("/studio/[slug]", "layout");
   return { saved: true };
 }
+
+// ---- Plan & gallery extras ----
+
+export type ExtrasFormState = { message?: string; saved?: boolean };
+
+// The studio's price per extra photo (PhotoEZ's global extra price).
+export async function saveExtraPhotoPrice(_prev: ExtrasFormState, formData: FormData): Promise<ExtrasFormState> {
+  const photographer = await requirePhotographer();
+  const value = String(formData.get("extraPhotoPrice") ?? "").trim().replace(/[$,]/g, "");
+  if (!/^\d{1,5}(\.\d{1,2})?$/.test(value)) return { message: "Enter a price like 10 or 10.00." };
+  await db
+    .update(photographers)
+    .set({ extraPhotoPriceCents: Math.round(Number(value) * 100) })
+    .where(eq(photographers.id, photographer.id));
+  revalidatePath("/dashboard", "layout");
+  return { saved: true };
+}

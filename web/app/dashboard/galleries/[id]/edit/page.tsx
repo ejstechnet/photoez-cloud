@@ -4,6 +4,7 @@ import { z } from "zod";
 import { db } from "@/db";
 import { clients, galleries } from "@/db/schema";
 import { requirePhotographer } from "@/lib/session";
+import { studioPlan } from "@/lib/studio-plan";
 import { galleryHeaderSourceKey, headerSourceVersion, signedViewUrl } from "@/lib/storage";
 import { HeaderPhoto } from "./header-photo";
 import { prepareGalleryHeaderUpload, removeGalleryHeader, saveGalleryHeader, updateGallery } from "../../actions";
@@ -22,10 +23,12 @@ export default async function EditGalleryPage({ params }: PageProps<"/dashboard/
       clientId: galleries.clientId,
       freeLimit: galleries.freeLimit,
       headerImageKey: galleries.headerImageKey,
+      extraPhotoPriceCents: galleries.extraPhotoPriceCents,
     })
     .from(galleries)
     .where(and(eq(galleries.id, id), eq(galleries.photographerId, user.id)));
   if (!gallery) notFound();
+  const plan = await studioPlan(user.id);
   // Banners saved with an original can be re-cropped.
   const headerSource = gallery.headerImageKey ? headerSourceVersion(gallery.headerImageKey) : null;
 
@@ -55,6 +58,7 @@ export default async function EditGalleryPage({ params }: PageProps<"/dashboard/
           defaultValues={gallery}
           submitLabel="Save changes"
           cancelHref={`/dashboard/galleries/${gallery.id}`}
+          extras={plan.upsells ? { studioPriceCents: plan.extraPhotoPriceCents } : null}
         />
       </div>
       <div className="mt-8 flex flex-col gap-4 rounded-3xl border-2 border-dashed border-danger/30 p-6 sm:flex-row sm:items-center sm:justify-between">

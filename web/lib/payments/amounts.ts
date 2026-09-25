@@ -5,7 +5,7 @@
 import { depositCents } from "../booking/format.ts";
 
 export type Priced = { priceCents: number; addonsCents: number; depositPercent: number };
-export type Paid = { kind: "deposit" | "balance"; amountCents: number; status: "pending" | "paid" | "expired" };
+export type Paid = { kind: "deposit" | "balance" | "gallery_extras"; amountCents: number; status: "pending" | "paid" | "expired" };
 
 export function bookingTotal(b: Priced) {
   return b.priceCents + b.addonsCents;

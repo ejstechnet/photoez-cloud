@@ -1,7 +1,7 @@
-import { and, asc, eq, lt } from "drizzle-orm";
+import { and, asc, eq, lt, sql } from "drizzle-orm";
 import type Stripe from "stripe";
 import { db } from "@/db";
-import { bookings, payments, photographers } from "@/db/schema";
+import { bookings, galleries, payments, photographers } from "@/db/schema";
 import { PAYMENT_HOLD_MINUTES } from "@/lib/booking/status";
 import { siteUrl } from "@/lib/site";
 import { stripe, stripeConfigured } from "@/lib/stripe";
@@ -85,8 +85,8 @@ export async function startCheckout(booking: BookingForCheckout, studioName: str
 }
 
 // Records what Stripe says about a Checkout session. Paid: the payment is
-// marked paid and a held booking is confirmed. Expired: a held booking is
-// released so the time opens up again.
+// marked paid, and a held booking is confirmed or a gallery's selections are
+// submitted as paid. Expired: a held booking is released so the time opens up.
 export async function applyCheckoutSession(session: Stripe.Checkout.Session) {
   const [payment] = await db.select().from(payments).where(eq(payments.stripeCheckoutSessionId, session.id));
   if (!payment) return null;
@@ -101,14 +101,29 @@ export async function applyCheckoutSession(session: Stripe.Checkout.Session) {
           stripePaymentIntentId: typeof session.payment_intent === "string" ? session.payment_intent : null,
         })
         .where(eq(payments.id, payment.id));
-      await tx
-        .update(bookings)
-        .set({ status: "confirmed", holdExpiresAt: null })
-        .where(and(eq(bookings.id, payment.bookingId), eq(bookings.status, "pending_payment")));
+      if (payment.bookingId) {
+        await tx
+          .update(bookings)
+          .set({ status: "confirmed", holdExpiresAt: null })
+          .where(and(eq(bookings.id, payment.bookingId), eq(bookings.status, "pending_payment")));
+      }
+      if (payment.galleryId) {
+        // The client paid for their extra photos: their selections are in.
+        await tx
+          .update(galleries)
+          .set({
+            status: "paid_and_submitted",
+            submittedAt: new Date(),
+            // Everything paid for extras so far, including before a reopen.
+            extrasCount: sql`(select coalesce(sum(quantity), 0) from payments where gallery_id = ${payment.galleryId} and status = 'paid')`,
+            extrasCents: sql`(select coalesce(sum(amount_cents), 0) from payments where gallery_id = ${payment.galleryId} and status = 'paid')`,
+          })
+          .where(and(eq(galleries.id, payment.galleryId), eq(galleries.status, "pending")));
+      }
     });
   } else if (session.status === "expired" && payment.status === "pending") {
     await db.update(payments).set({ status: "expired" }).where(eq(payments.id, payment.id));
-    await releaseHold(payment.bookingId);
+    if (payment.bookingId) await releaseHold(payment.bookingId);
   }
   return payment;
 }

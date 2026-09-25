@@ -12,8 +12,11 @@ import { StatusPill } from "../status-pill";
 import { ClientLink } from "./client-link";
 import { GearIcon } from "@/components/icons";
 import { DeliverPanel } from "./deliver-panel";
+import { DeleteAllButton } from "./delete-all-button";
 import { GalleryTitle } from "./gallery-title";
+import { StatusPanel } from "./status-panel";
 import { describeDownloads, downloadSummaries } from "@/lib/downloads";
+import { formatPrice } from "@/lib/booking/format";
 import { PhotoGrid } from "./photo-grid";
 import { ProofRefresher } from "./proof-refresher";
 import { Uploader } from "./uploader";
@@ -31,7 +34,10 @@ export default async function GalleryPage({ params }: PageProps<"/dashboard/gall
       freeLimit: galleries.freeLimit,
       shareToken: galleries.shareToken,
       deliveredAt: galleries.deliveredAt,
+      extrasCount: galleries.extrasCount,
+      extrasCents: galleries.extrasCents,
       clientName: clients.name,
+      clientEmail: clients.email,
     })
     .from(galleries)
     .leftJoin(clients, eq(clients.id, galleries.clientId))
@@ -89,11 +95,20 @@ export default async function GalleryPage({ params }: PageProps<"/dashboard/gall
       </Link>
       <div className="mt-3 flex flex-wrap items-end justify-between gap-4">
         <div className="min-w-0">
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
             <StatusPill status={gallery.status} />
             <span className="text-sm font-semibold text-muted">
-              {gallery.clientName ?? "No client"} · {gallery.freeLimit} free{" "}
-              {gallery.freeLimit === 1 ? "pick" : "picks"}
+              {gallery.clientName ?? "No client"}
+              {gallery.clientEmail && (
+                <>
+                  {" · "}
+                  <a href={`mailto:${gallery.clientEmail}`} className="link">
+                    {gallery.clientEmail}
+                  </a>
+                </>
+              )}
+              {" · "}
+              {gallery.freeLimit} free {gallery.freeLimit === 1 ? "pick" : "picks"}
             </span>
           </div>
           <GalleryTitle galleryId={gallery.id} title={gallery.title} />
@@ -109,18 +124,39 @@ export default async function GalleryPage({ params }: PageProps<"/dashboard/gall
       </div>
 
       <div className="mt-8">
+        <StatusPanel key={gallery.status} galleryId={gallery.id} status={gallery.status} />
+      </div>
+
+      <div className="mt-6">
         <ClientLink
           galleryId={gallery.id}
           url={`${siteUrl}/g/${gallery.shareToken}`}
           submitted={gallery.status === "submitted" || gallery.status === "paid_and_submitted"}
+          canReopen={gallery.status !== "pending"}
           selectedNames={proofs.filter((tile) => tile.selected).map((tile) => tile.name)}
           freeLimit={gallery.freeLimit}
         />
       </div>
 
+      {gallery.extrasCount > 0 && (
+        <p
+          className={`mt-4 rounded-2xl px-5 py-3 text-sm font-semibold ${
+            gallery.status === "paid_and_submitted" ? "bg-lime/20" : "bg-sun/30"
+          }`}
+        >
+          Your client chose {gallery.extrasCount} extra {gallery.extrasCount === 1 ? "photo" : "photos"}:{" "}
+          {formatPrice(gallery.extrasCents)}{" "}
+          {gallery.status === "paid_and_submitted"
+            ? "paid through Stripe."
+            : "owed. Stripe wasn't connected, so collect it your own way."}
+        </p>
+      )}
+
       {/* Step 1: proofs the client chooses from (watermarked for them). */}
       <section className="mt-12">
-        <SectionHeading step={1} title="Proofs" note="Your client picks favorites from these." />
+        <SectionHeading step={1} title="Proofs" note="Your client picks favorites from these.">
+          {proofs.length > 0 && <DeleteAllButton galleryId={gallery.id} kind="proof" count={proofs.length} />}
+        </SectionHeading>
         <div className="mt-5 space-y-4">
           {watermarkForBrowser && staleCount > 0 && (
             <ProofRefresher galleryId={gallery.id} watermark={watermarkForBrowser} staleCount={staleCount} />
@@ -140,7 +176,9 @@ export default async function GalleryPage({ params }: PageProps<"/dashboard/gall
 
       {/* Step 2: the edited finals, delivered clean and full resolution. */}
       <section className="mt-14">
-        <SectionHeading step={2} title="Finals" note="Edited photos your client downloads, never watermarked." />
+        <SectionHeading step={2} title="Finals" note="Edited photos your client downloads, never watermarked.">
+          {finals.length > 0 && <DeleteAllButton galleryId={gallery.id} kind="final" count={finals.length} />}
+        </SectionHeading>
         <div className="mt-5 space-y-4">
           <DeliverPanel
             galleryId={gallery.id}
@@ -165,14 +203,25 @@ function Counter({ value, label, ring }: { value: number; label: string; ring: s
   );
 }
 
-function SectionHeading({ step, title, note }: { step: number; title: string; note: string }) {
+function SectionHeading({
+  step,
+  title,
+  note,
+  children,
+}: {
+  step: number;
+  title: string;
+  note: string;
+  children?: React.ReactNode;
+}) {
   return (
-    <div className="flex items-center gap-3 border-b border-border pb-3">
+    <div className="flex flex-wrap items-center gap-3 border-b border-border pb-3">
       <span className="grid size-8 place-items-center rounded-full bg-lime font-bold text-brand-deep">{step}</span>
-      <div>
+      <div className="flex-1">
         <h2 className="font-display text-2xl font-bold">{title}</h2>
         <p className="text-sm text-muted">{note}</p>
       </div>
+      {children}
     </div>
   );
 }
