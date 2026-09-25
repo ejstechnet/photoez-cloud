@@ -5,7 +5,7 @@ import { z } from "zod";
 import { db } from "@/db";
 import { inquiries } from "@/db/schema";
 import { requirePhotographer } from "@/lib/session";
-import { SESSION_LABELS, STATUS_STYLES, URGENCY_STYLES, formatBudget, formatEventDate } from "../labels";
+import { SESSION_LABELS, STATUS_STYLES, URGENCY_STYLES, formatBudget, formatEventDate, handoffBadge } from "../labels";
 import { DraftReply } from "./draft-reply";
 import { InquiryActions } from "./inquiry-actions";
 
@@ -23,6 +23,7 @@ export default async function InquiryPage({ params }: PageProps<"/dashboard/inqu
   const t = inquiry.triage;
   const status = STATUS_STYLES[inquiry.status];
   const contact = t?.email ?? inquiry.fromEmail;
+  const handoff = t ? handoffBadge(t) : null;
 
   return (
     <>
@@ -36,6 +37,11 @@ export default async function InquiryPage({ params }: PageProps<"/dashboard/inqu
             <span className={`rounded-full px-2.5 py-1 text-[11px] font-bold tracking-wider uppercase ${status.className}`}>
               {status.label}
             </span>
+            {handoff && (
+              <span className={`rounded-full px-2.5 py-1 text-[11px] font-bold tracking-wider uppercase ${handoff.className}`}>
+                {handoff.label}
+              </span>
+            )}
             {t && (
               <span className={`rounded-full px-2.5 py-1 text-[11px] font-bold tracking-wider uppercase ${URGENCY_STYLES[t.urgency]}`}>
                 {t.urgency} urgency
@@ -46,6 +52,9 @@ export default async function InquiryPage({ params }: PageProps<"/dashboard/inqu
             {t?.clientName ?? inquiry.fromName ?? "New inquiry"}
           </h1>
           {t && <p className="mt-2 text-lg text-muted">{t.summary}</p>}
+          {handoff?.note && (
+            <p className="mt-3 rounded-xl bg-sun/25 px-4 py-2.5 text-sm font-semibold">{handoff.note}</p>
+          )}
         </div>
       </div>
 

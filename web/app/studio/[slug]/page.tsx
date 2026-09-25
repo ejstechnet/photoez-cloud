@@ -5,7 +5,7 @@ import { notFound } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { and, asc, eq } from "drizzle-orm";
 import { db } from "@/db";
-import { bookingHours, photographers, sessionTypes } from "@/db/schema";
+import { bookingHours, photographers, sessionTypes, studioFaqs } from "@/db/schema";
 import { PhotoEZCloudMark } from "@/components/brand";
 import { formatDuration, formatPrice } from "@/lib/booking/format";
 import { LOCATION_LABELS, OFFERABLE_TYPES, SESSION_LABELS, type ShootLocation } from "@/lib/session-types";
@@ -60,7 +60,7 @@ export default async function StudioPage({ params }: PageProps<"/studio/[slug]">
   }));
 
   // Sessions clients can book online (booking needs weekly hours set too).
-  const [bookable, [hours]] = await Promise.all([
+  const [bookable, [hours], faqs] = await Promise.all([
     db
       .select({
         id: sessionTypes.id,
@@ -73,6 +73,11 @@ export default async function StudioPage({ params }: PageProps<"/studio/[slug]">
       .where(and(eq(sessionTypes.photographerId, studio.id), eq(sessionTypes.hidden, false)))
       .orderBy(asc(sessionTypes.sortOrder), asc(sessionTypes.createdAt)),
     db.select({ id: bookingHours.id }).from(bookingHours).where(eq(bookingHours.photographerId, studio.id)).limit(1),
+    db
+      .select({ id: studioFaqs.id, question: studioFaqs.question, answer: studioFaqs.answer })
+      .from(studioFaqs)
+      .where(eq(studioFaqs.photographerId, studio.id))
+      .orderBy(asc(studioFaqs.sortOrder)),
   ]);
   const bookingOpen = bookable.length > 0 && Boolean(hours);
   const bookHref = `/studio/${slug.toLowerCase()}/book`;
@@ -86,6 +91,7 @@ export default async function StudioPage({ params }: PageProps<"/studio/[slug]">
     studio.bio && { href: "#about", label: "About" },
     sessions.length > 0 && { href: "#sessions", label: "Sessions" },
     studio.shootLocations.length > 0 && { href: "#where", label: "Where we shoot" },
+    faqs.length > 0 && { href: "#faq", label: "FAQ" },
   ].filter((link): link is { href: string; label: string } => Boolean(link));
 
   return (
@@ -230,6 +236,24 @@ export default async function StudioPage({ params }: PageProps<"/studio/[slug]">
               <p className="mt-3 text-muted">
                 {studio.shootLocations.map((place) => LOCATION_LABELS[place as ShootLocation]).join(" · ")}
               </p>
+            </div>
+          )}
+          {faqs.length > 0 && (
+            <div id="faq" className="scroll-mt-24">
+              <h2 className="font-display text-2xl font-bold">Questions &amp; answers</h2>
+              <div className="mt-3 divide-y divide-border rounded-2xl border-2 border-border bg-surface">
+                {faqs.map((faq) => (
+                  <details key={faq.id} className="group px-4 py-3">
+                    <summary className="flex cursor-pointer list-none items-center justify-between gap-3 font-semibold">
+                      {faq.question}
+                      <span className="text-lime-ink transition group-open:rotate-45" aria-hidden="true">
+                        +
+                      </span>
+                    </summary>
+                    <p className="mt-2 whitespace-pre-line text-muted">{faq.answer}</p>
+                  </details>
+                ))}
+              </div>
             </div>
           )}
         </section>

@@ -4,9 +4,9 @@
 //   node evals/triage/check-grader.mjs
 
 import { readFileSync } from "node:fs";
-import { checkFields } from "./grader.mjs";
+import { checkFields, routesCorrectly } from "./grader.mjs";
 
-const { cases } = JSON.parse(readFileSync(new URL("./cases.json", import.meta.url), "utf8"));
+const { cases, photographer } = JSON.parse(readFileSync(new URL("./cases.json", import.meta.url), "utf8"));
 const first = (v) => (Array.isArray(v) ? v[0] : v);
 
 function oracle(e) {
@@ -52,3 +52,13 @@ for (const c of cases) {
 console.log(`perfect answers: details right ${mean(oracleFields)}%, details found ${mean(oracleFound)}% (both must be 100%)`);
 console.log(`blank answers:   details right ${mean(blankFields)}%, details found ${mean(blankFound)}% (found must be 0%)`);
 console.log(`"details found" applies to ${oracleFound.length} of ${cases.length} cases (the rest give no details to find)`);
+
+// Routing: a reply that links the booking page exactly when it should must pass
+// every case; a reply that never links it must fail the bookable ones.
+const { profile } = photographer;
+const routed = cases.filter((c) => c.expected.route != null);
+const right = routed.filter((c) =>
+  routesCorrectly(c.expected.route === "book" ? `Book here: ${profile.bookingUrl}` : "I'll send a quote.", c.expected.route, profile),
+);
+const unlinked = routed.filter((c) => routesCorrectly("I'll follow up soon.", c.expected.route, profile));
+console.log(`routing: correct replies pass ${right.length}/${routed.length} (must be all); replies with no link pass ${unlinked.length}/${routed.length} (only the quote cases)`);

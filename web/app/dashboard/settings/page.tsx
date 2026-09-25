@@ -1,10 +1,12 @@
-import { eq } from "drizzle-orm";
+import { asc, eq } from "drizzle-orm";
 import { db } from "@/db";
-import { photographers } from "@/db/schema";
+import { photographers, studioFaqs } from "@/db/schema";
+import { SUGGESTED_FAQ_QUESTIONS } from "@/lib/faq";
 import { requirePhotographer } from "@/lib/session";
 import { siteUrl } from "@/lib/site";
 import { richTextHtml } from "@/lib/rich-text";
 import { signedViewUrl } from "@/lib/storage";
+import { FaqForm } from "./faq-form";
 import { StudioForm } from "./studio-form";
 import { StudioLogo } from "./studio-logo";
 import { WatermarkForm } from "./watermark-form";
@@ -29,6 +31,14 @@ export default async function SettingsPage() {
     })
     .from(photographers)
     .where(eq(photographers.id, user.id));
+
+  const faqs = await db
+    .select({ question: studioFaqs.question, answer: studioFaqs.answer })
+    .from(studioFaqs)
+    .where(eq(studioFaqs.photographerId, user.id))
+    .orderBy(asc(studioFaqs.sortOrder));
+  const askedAlready = new Set(faqs.map((faq) => faq.question.trim().toLowerCase()));
+  const suggestions = SUGGESTED_FAQ_QUESTIONS.filter((q) => !askedAlready.has(q.toLowerCase()));
 
   return (
     <div className="max-w-3xl">
@@ -61,6 +71,17 @@ export default async function SettingsPage() {
               quoteOnlyTypes: settings.quoteOnlyTypes,
             }}
           />
+        </div>
+      </section>
+
+      <section id="faq" className="card mt-8 scroll-mt-8 p-6 sm:p-8">
+        <h2 className="font-display text-2xl font-bold">Client FAQ</h2>
+        <p className="mt-1 text-sm text-muted">
+          Answer once, and clients find it themselves: your answers appear on your studio page, and the AI uses them to
+          reply to inquiries without you. Skip any question by leaving it blank.
+        </p>
+        <div className="mt-6">
+          <FaqForm saved={faqs} suggestions={suggestions} />
         </div>
       </section>
 

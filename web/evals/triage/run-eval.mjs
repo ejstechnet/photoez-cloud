@@ -58,6 +58,8 @@ async function runCase(input, ctx) {
       message: input.message,
       photographerName: caseFile.photographer.name,
       studioName: caseFile.photographer.studio,
+      // The studio profile and booking page (added for triage v1).
+      studio: caseFile.photographer.profile,
       today: new Date(`${caseFile.today}T12:00:00Z`),
       model: ctx.model,
     });
