@@ -6,7 +6,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { db } from "@/db";
-import { blackoutDates, bookingHours, bookings, photographers, sessionTypes } from "@/db/schema";
+import { blackoutDates, bookingHours, bookings, contractTemplates, photographers, sessionTypes } from "@/db/schema";
 import { isOverlapError } from "@/lib/booking/availability";
 import { isValidTimeZone } from "@/lib/booking/time";
 import { cleanRichTextInput, richTextToPlain } from "@/lib/rich-text";
@@ -84,6 +84,8 @@ const sessionTypeSchema = z.object({
     .refine((value) => value === "" || /^\d{1,4}$/.test(value), "Enter a number of photos, or leave it blank.")
     .transform((value) => (value === "" ? null : Number(value))),
   hidden: z.boolean(),
+  // "default", "none", or one of the studio's contract template ids.
+  contract: z.string().refine((v) => v === "default" || v === "none" || isUuid(v), "Pick a contract."),
 })
   .refine((v) => v.salePrice === null || v.salePrice < v.price, {
     path: ["salePrice"],
@@ -110,7 +112,19 @@ function parseSessionType(formData: FormData) {
     location: text(formData, "location"),
     photosIncluded: text(formData, "photosIncluded"),
     hidden: formData.get("hidden") === "on",
+    contract: text(formData, "contract"),
   });
+}
+
+// The session's contract: the studio default, none, or one of its own templates.
+async function resolveContract(photographerId: string, choice: string) {
+  if (choice === "default") return { contractTemplateId: null, noContract: false };
+  if (choice === "none") return { contractTemplateId: null, noContract: true };
+  const [owned] = await db
+    .select({ id: contractTemplates.id })
+    .from(contractTemplates)
+    .where(and(eq(contractTemplates.id, choice), eq(contractTemplates.photographerId, photographerId)));
+  return owned ? { contractTemplateId: owned.id, noContract: false } : null;
 }
 
 function sessionTypeErrors(error: z.ZodError): SessionTypeFormState {
@@ -124,7 +138,9 @@ export async function addSessionType(_prev: SessionTypeFormState, formData: Form
   const parsed = parseSessionType(formData);
   if (!parsed.success) return sessionTypeErrors(parsed.error);
 
-  const { price, salePrice, ...values } = parsed.data;
+  const { price, salePrice, contract, ...values } = parsed.data;
+  const contractChoice = await resolveContract(photographer.id, contract);
+  if (!contractChoice) return { errors: { contract: "Pick a contract from the list." } };
   const existing = await db
     .select({ id: sessionTypes.id })
     .from(sessionTypes)
@@ -135,6 +151,7 @@ export async function addSessionType(_prev: SessionTypeFormState, formData: Form
       ...values,
       priceCents: price,
       salePriceCents: salePrice,
+      ...contractChoice,
       photographerId: photographer.id,
       sortOrder: existing.length,
     })
@@ -153,10 +170,12 @@ export async function updateSessionType(
   const parsed = parseSessionType(formData);
   if (!parsed.success) return sessionTypeErrors(parsed.error);
 
-  const { price, salePrice, ...values } = parsed.data;
+  const { price, salePrice, contract, ...values } = parsed.data;
+  const contractChoice = await resolveContract(photographer.id, contract);
+  if (!contractChoice) return { errors: { contract: "Pick a contract from the list." } };
   const updated = await db
     .update(sessionTypes)
-    .set({ ...values, priceCents: price, salePriceCents: salePrice })
+    .set({ ...values, priceCents: price, salePriceCents: salePrice, ...contractChoice })
     .where(and(eq(sessionTypes.id, sessionTypeId), eq(sessionTypes.photographerId, photographer.id)))
     .returning({ id: sessionTypes.id });
   if (updated.length === 0) return { message: "That session could not be found." };

@@ -10,6 +10,7 @@ import { photoKey, signedViewUrl } from "@/lib/storage";
 import { z } from "zod";
 import { StatusPill } from "../status-pill";
 import { ClientLink } from "./client-link";
+import { GearIcon } from "@/components/icons";
 import { DeliverPanel } from "./deliver-panel";
 import { GalleryTitle } from "./gallery-title";
 import { describeDownloads, downloadSummaries } from "@/lib/downloads";
@@ -102,7 +103,7 @@ export default async function GalleryPage({ params }: PageProps<"/dashboard/gall
           <Counter value={proofs.length} label="proofs" ring="ring-sky/40" />
           <Counter value={finals.length} label="finals" ring="ring-lime/50" />
           <Link href={`/dashboard/galleries/${gallery.id}/edit`} className="btn-secondary">
-            Settings
+            <GearIcon size={17} strokeWidth={2.25} /> Settings
           </Link>
         </div>
       </div>

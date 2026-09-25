@@ -228,6 +228,24 @@ export const studioFaqs = pgTable(
   (t) => [index("studio_faqs_photographer_idx").on(t.photographerId, t.sortOrder)],
 );
 
+// Contract templates (like PhotoEZ Photography Contracts): formatted text with
+// {{PLACEHOLDERS}} filled from the booking. One is the studio default.
+export const contractTemplates = pgTable(
+  "contract_templates",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    photographerId: uuid("photographer_id")
+      .notNull()
+      .references(() => photographers.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    content: text("content").notNull(),
+    isDefault: boolean("is_default").notNull().default(false),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("contract_templates_photographer_idx").on(t.photographerId)],
+);
+
 // ---- Booking (modeled on PhotoEZ Booking for WordPress) ----
 // One photographer per studio for now. Extra photographers may come later as
 // a paid add-on; these tables would then gain a photographer/member column.
@@ -256,6 +274,10 @@ export const sessionTypes = pgTable(
     photosIncluded: integer("photos_included"),
     // Photo shown above the session on the booking page (a storage key).
     imageKey: text("image_key"),
+    // Contract signed after booking: the studio's default (null), a chosen
+    // template, or none at all (noContract).
+    contractTemplateId: uuid("contract_template_id").references(() => contractTemplates.id, { onDelete: "set null" }),
+    noContract: boolean("no_contract").notNull().default(false),
     hidden: boolean("hidden").notNull().default(false),
     sortOrder: integer("sort_order").notNull().default(0),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
@@ -396,6 +418,27 @@ export const bookingFields = pgTable(
   },
   (t) => [index("booking_fields_photographer_idx").on(t.photographerId, t.sortOrder)],
 );
+
+// A signed contract: an exact copy of what the client saw, with their
+// signature and when/where they signed, kept even if the template changes.
+export const signedContracts = pgTable("signed_contracts", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  bookingId: uuid("booking_id")
+    .notNull()
+    .unique()
+    .references(() => bookings.id, { onDelete: "cascade" }),
+  templateId: uuid("template_id").references(() => contractTemplates.id, { onDelete: "set null" }),
+  title: text("title").notNull(),
+  // The contract with every placeholder filled in, as signed.
+  content: text("content").notNull(),
+  signerName: text("signer_name").notNull(),
+  signatureType: text("signature_type", { enum: ["draw", "type"] }).notNull(),
+  // A PNG data URL for a drawn signature; the typed name for a typed one.
+  signatureData: text("signature_data").notNull(),
+  signedAt: timestamp("signed_at", { withTimezone: true }).notNull().defaultNow(),
+  clientIp: text("client_ip"),
+  userAgent: text("user_agent"),
+});
 
 // Inspiration photos a client uploaded with their booking (storage keys).
 export const bookingInspoPhotos = pgTable(

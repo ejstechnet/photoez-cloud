@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { asc, eq } from "drizzle-orm";
 import { db } from "@/db";
-import { addons, bookingFields, photographers, sessionTypes } from "@/db/schema";
+import { addons, bookingFields, contractTemplates, photographers, sessionTypes } from "@/db/schema";
 import { FIELD_TYPE_LABELS } from "@/lib/booking/fields";
 import { ArrowRightIcon, PlusIcon } from "@/components/icons";
 import { loadRules, upcomingTimeOff } from "@/lib/booking/availability";
@@ -14,6 +14,7 @@ import { siteUrl } from "@/lib/site";
 import { signedViewUrl } from "@/lib/storage";
 import { moveAddon } from "../addon-actions";
 import { moveField } from "../field-actions";
+import { startFromDefault } from "../contract-actions";
 import { InspoMode } from "./inspo-mode";
 import { deleteTimeOff, moveSessionType } from "../actions";
 import { MoveButtons } from "../move-buttons";
@@ -37,7 +38,7 @@ function formatDay(date: string) {
 
 export default async function BookingSetupPage() {
   const user = await requirePhotographer();
-  const [rules, sessions, [studio], addonList, fields] = await Promise.all([
+  const [rules, sessions, [studio], addonList, fields, contracts] = await Promise.all([
     loadRules(user.id),
     db
       .select()
@@ -65,6 +66,11 @@ export default async function BookingSetupPage() {
       .from(bookingFields)
       .where(eq(bookingFields.photographerId, user.id))
       .orderBy(asc(bookingFields.sortOrder), asc(bookingFields.createdAt)),
+    db
+      .select({ id: contractTemplates.id, title: contractTemplates.title, isDefault: contractTemplates.isDefault })
+      .from(contractTemplates)
+      .where(eq(contractTemplates.photographerId, user.id))
+      .orderBy(asc(contractTemplates.createdAt)),
   ]);
   const sessionName = new Map(sessions.map((s) => [s.id, s.name]));
   const today = localDateOf(new Date(), rules.timeZone);
@@ -281,6 +287,51 @@ export default async function BookingSetupPage() {
         <div className="mt-6 border-t border-border pt-6">
           <InspoMode mode={studio.inspoMode} />
         </div>
+      </section>
+
+      <section id="contracts" className="card mt-8 scroll-mt-8 p-6 sm:p-8">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <h2 className="font-display text-2xl font-bold">Contracts</h2>
+            <p className="mt-1 text-sm text-muted">
+              Clients sign right after booking. Each session uses your default unless you choose otherwise on the session.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <form action={startFromDefault}>
+              <button type="submit" className="btn-primary">
+                <PlusIcon size={18} /> Start from PhotoEZ contract
+              </button>
+            </form>
+            <Link href="/dashboard/bookings/contracts/new" className="btn-secondary">
+              Blank contract
+            </Link>
+          </div>
+        </div>
+        {contracts.length === 0 ? (
+          <p className="mt-6 rounded-2xl border-2 border-dashed border-border px-5 py-6 text-center text-sm text-muted">
+            No contracts yet. Start from the PhotoEZ contract: it&apos;s the one from your WordPress plugin, ready to edit.
+          </p>
+        ) : (
+          <ul className="mt-6 grid gap-3">
+            {contracts.map((c) => (
+              <li key={c.id}>
+                <Link
+                  href={`/dashboard/bookings/contracts/${c.id}`}
+                  className="group flex items-center gap-4 rounded-2xl border-2 border-border px-5 py-4 transition hover:border-lime"
+                >
+                  <p className="min-w-0 flex-1 truncate font-semibold">{c.title}</p>
+                  {c.isDefault && (
+                    <span className="rounded-full bg-lime px-2.5 py-0.5 text-[11px] font-bold tracking-wider text-brand-deep uppercase">
+                      Default
+                    </span>
+                  )}
+                  <ArrowRightIcon size={18} className="shrink-0 text-muted transition group-hover:translate-x-1" />
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
       </section>
 
       <section className="card mt-8 p-6 sm:p-8">
