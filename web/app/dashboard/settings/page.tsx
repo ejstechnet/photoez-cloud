@@ -6,7 +6,10 @@ import { requirePhotographer } from "@/lib/session";
 import { siteUrl } from "@/lib/site";
 import { richTextHtml } from "@/lib/rich-text";
 import { signedViewUrl } from "@/lib/storage";
+import { syncStripeStatus } from "@/lib/payments/connect";
+import { stripeConfigured } from "@/lib/stripe";
 import { FaqForm } from "./faq-form";
+import { PaymentsCard } from "./payments-card";
 import { StudioForm } from "./studio-form";
 import { StudioLogo } from "./studio-logo";
 import { WatermarkForm } from "./watermark-form";
@@ -28,6 +31,8 @@ export default async function SettingsPage() {
       offeredTypes: photographers.offeredTypes,
       shootLocations: photographers.shootLocations,
       quoteOnlyTypes: photographers.quoteOnlyTypes,
+      stripeAccountId: photographers.stripeAccountId,
+      stripeReady: photographers.stripeChargesEnabled,
     })
     .from(photographers)
     .where(eq(photographers.id, user.id));
@@ -39,6 +44,12 @@ export default async function SettingsPage() {
     .orderBy(asc(studioFaqs.sortOrder));
   const askedAlready = new Set(faqs.map((faq) => faq.question.trim().toLowerCase()));
   const suggestions = SUGGESTED_FAQ_QUESTIONS.filter((q) => !askedAlready.has(q.toLowerCase()));
+
+  // Still waiting on Stripe's approval? Ask Stripe now instead of relying on its webhook.
+  let stripeReady = settings.stripeReady;
+  if (!stripeReady && settings.stripeAccountId && stripeConfigured()) {
+    stripeReady = await syncStripeStatus(user.id, settings.stripeAccountId).catch(() => false);
+  }
 
   return (
     <div>
@@ -92,6 +103,7 @@ export default async function SettingsPage() {
           </section>
         </div>
         <div className="space-y-8">
+          <PaymentsCard configured={stripeConfigured()} accountId={settings.stripeAccountId} ready={stripeReady} />
           <section id="faq" className="card scroll-mt-8 p-6 sm:p-8">
             <h2 className="font-display text-2xl font-bold">Client FAQ</h2>
             <p className="mt-1 text-sm text-muted">

@@ -1,5 +1,5 @@
 
-import { and, asc, eq, gt, gte, lt, ne } from "drizzle-orm";
+import { and, asc, eq, gt, gte, lt, ne, or } from "drizzle-orm";
 import { db } from "@/db";
 import { blackoutDates, bookingHours, bookings, photographers } from "@/db/schema";
 import { availableSlots, type Blackout, type WeeklyHours } from "./slots";
@@ -50,6 +50,8 @@ async function busyBetween(photographerId: string, from: Date, to: Date, ignoreB
       and(
         eq(bookings.photographerId, photographerId),
         ne(bookings.status, "cancelled"),
+        // A booking waiting for its deposit only holds the time until its hold ends.
+        or(ne(bookings.status, "pending_payment"), gt(bookings.holdExpiresAt, new Date())),
         lt(bookings.startsAt, to),
         gt(bookings.endsAt, from),
         ignoreBookingId ? ne(bookings.id, ignoreBookingId) : undefined,

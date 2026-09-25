@@ -139,6 +139,11 @@ export default async function BookPage({ params, searchParams }: PageProps<"/stu
       <main className={`mx-auto w-full flex-1 px-4 py-10 ${session ? "max-w-3xl" : "max-w-5xl"}`}>
         <p className="text-sm font-bold tracking-wider text-lime-ink uppercase">{name}</p>
         <h1 className="mt-1 font-display text-4xl font-bold tracking-tight sm:text-5xl">Book a session</h1>
+        {one(query.payment) === "cancelled" && (
+          <p className="mt-4 rounded-2xl bg-sun/30 px-5 py-4 font-semibold">
+            Your payment was cancelled, so that time wasn&apos;t booked. You can pick a time again below.
+          </p>
+        )}
 
         {!bookingOpen ? (
           <div className="card mt-8 p-8 text-center">

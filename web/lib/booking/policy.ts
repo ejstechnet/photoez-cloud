@@ -1,3 +1,5 @@
+import type { BookingStatus } from "./status.ts";
+
 // What a client may change from their booking link, under the studio's rules.
 // Pure logic (no database), tested in policy.test.ts.
 
@@ -10,7 +12,7 @@ export type ChangePolicy = {
 };
 
 export type ClientBooking = {
-  status: "confirmed" | "completed" | "cancelled";
+  status: BookingStatus;
   startsAt: Date;
   rescheduleCount: number;
   depositPercent: number;

@@ -7,6 +7,8 @@ import { bookingInspoPhotos, bookings, photographers } from "@/db/schema";
 import { depositCents, formatDuration, formatPrice } from "@/lib/booking/format";
 import { formatDate, formatTime } from "@/lib/booking/time";
 import { bookingExtras } from "@/lib/booking/session-addons";
+import { amountPaid, balanceDue } from "@/lib/payments/amounts";
+import { bookingPayments } from "@/lib/payments/checkout";
 import { contractTemplateFor, signedContractFor } from "@/lib/contracts/for-booking";
 import { requirePhotographer } from "@/lib/session";
 import { siteUrl } from "@/lib/site";
@@ -33,6 +35,8 @@ export default async function BookingPage({ params }: PageProps<"/dashboard/book
   const minutes = Math.round((booking.endsAt.getTime() - booking.startsAt.getTime()) / 60_000);
   const isPast = booking.endsAt < new Date();
   const extras = await bookingExtras(booking.id);
+  const paymentRows = await bookingPayments(booking.id);
+  const paidCents = amountPaid(paymentRows);
   const signedContract = await signedContractFor(booking.id);
   const contractNeeded = !signedContract && booking.status !== "cancelled" && (await contractTemplateFor(booking)) !== null;
   const inspoRows = await db
@@ -65,8 +69,12 @@ export default async function BookingPage({ params }: PageProps<"/dashboard/book
       "Deposit",
       booking.depositPercent === 0
         ? "None"
-        : `${formatPrice(depositCents(totalCents, booking.depositPercent))} (${booking.depositPercent}%, not collected yet)`,
+        : `${formatPrice(depositCents(totalCents, booking.depositPercent))} (${booking.depositPercent}%)`,
     ],
+    ["Paid", paidCents > 0 ? <strong key="p">{formatPrice(paidCents)}</strong> : "Nothing yet"],
+    ...(booking.status !== "cancelled" && paidCents < totalCents
+      ? [["Balance due", formatPrice(balanceDue(booking, paymentRows))] as [string, React.ReactNode]]
+      : []),
     ["Email", <a key="e" href={`mailto:${booking.clientEmail}`} className="link">{booking.clientEmail}</a>],
     ["Phone", booking.clientPhone ?? "Not given"],
     ["Booked", formatDate(booking.createdAt, tz, "short")],
@@ -136,6 +144,25 @@ export default async function BookingPage({ params }: PageProps<"/dashboard/book
           </a>
         )}
       </div>
+
+      {paymentRows.some((p) => p.status === "paid") && (
+        <section className="card mt-6 p-6 sm:p-8">
+          <h2 className="font-display text-xl font-bold">Payments</h2>
+          <ul className="mt-3 divide-y divide-border">
+            {paymentRows
+              .filter((p) => p.status === "paid")
+              .map((p) => (
+                <li key={p.id} className="flex flex-wrap items-center justify-between gap-2 py-2.5 text-sm">
+                  <span className="font-semibold capitalize">{p.kind}</span>
+                  <span>
+                    {formatPrice(p.amountCents)} · {p.paidAt ? formatDate(p.paidAt, tz, "short") : ""}
+                  </span>
+                </li>
+              ))}
+          </ul>
+          <p className="mt-3 text-xs text-muted">Paid by card through Stripe, into your own Stripe account.</p>
+        </section>
+      )}
 
       {inspo.length > 0 && (
         <section className="card mt-6 p-6 sm:p-8">

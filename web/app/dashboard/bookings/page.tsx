@@ -5,6 +5,7 @@ import { bookings, photographers, sessionTypes } from "@/db/schema";
 import { ArrowRightIcon } from "@/components/icons";
 import { formatPrice } from "@/lib/booking/format";
 import { formatDate, formatTime } from "@/lib/booking/time";
+import { releaseExpiredHolds } from "@/lib/payments/checkout";
 import { requirePhotographer } from "@/lib/session";
 import { BookingStatusPill } from "./status-pill";
 
@@ -19,6 +20,8 @@ export default async function BookingsPage({ searchParams }: PageProps<"/dashboa
   const user = await requirePhotographer();
   const { view: rawView } = await searchParams;
   const view: View = rawView === "past" || rawView === "cancelled" ? rawView : "upcoming";
+  // Checkouts abandoned past their 30-minute hold free their times first.
+  await releaseExpiredHolds(user.id);
   const now = new Date();
 
   const where = {
