@@ -3,11 +3,13 @@ import Link from "next/link";
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import { auth } from "@/lib/auth";
-import { eq } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 import { db } from "@/db";
-import { photographers } from "@/db/schema";
+import { bookingHours, photographers, sessionTypes } from "@/db/schema";
 import { PhotoEZCloudMark } from "@/components/brand";
+import { formatDuration, formatPrice } from "@/lib/booking/format";
 import { LOCATION_LABELS, OFFERABLE_TYPES, SESSION_LABELS, type ShootLocation } from "@/lib/session-types";
+import { richTextHtml } from "@/lib/rich-text";
 import { signedViewUrl } from "@/lib/storage";
 import { InquiryForm } from "./inquiry-form";
 import { NavBrand } from "./nav-brand";
@@ -57,11 +59,30 @@ export default async function StudioPage({ params }: PageProps<"/studio/[slug]">
     quote: studio.quoteOnlyTypes.includes(type),
   }));
 
+  // Sessions clients can book online (booking needs weekly hours set too).
+  const [bookable, [hours]] = await Promise.all([
+    db
+      .select({
+        id: sessionTypes.id,
+        name: sessionTypes.name,
+        shortDescription: sessionTypes.shortDescription,
+        durationMinutes: sessionTypes.durationMinutes,
+        priceCents: sessionTypes.priceCents,
+      })
+      .from(sessionTypes)
+      .where(and(eq(sessionTypes.photographerId, studio.id), eq(sessionTypes.hidden, false)))
+      .orderBy(asc(sessionTypes.sortOrder), asc(sessionTypes.createdAt)),
+    db.select({ id: bookingHours.id }).from(bookingHours).where(eq(bookingHours.photographerId, studio.id)).limit(1),
+  ]);
+  const bookingOpen = bookable.length > 0 && Boolean(hours);
+  const bookHref = `/studio/${slug.toLowerCase()}/book`;
+
   // The owner viewing their own page gets a shortcut to edit it.
   const session = await auth.api.getSession({ headers: await headers() });
   const isOwner = session?.user.id === studio.id;
 
   const links = [
+    bookingOpen && { href: "#book", label: "Book" },
     studio.bio && { href: "#about", label: "About" },
     sessions.length > 0 && { href: "#sessions", label: "Sessions" },
     studio.shootLocations.length > 0 && { href: "#where", label: "Where we shoot" },
@@ -101,12 +122,21 @@ export default async function StudioPage({ params }: PageProps<"/studio/[slug]">
                 Edit page
               </Link>
             )}
-            <a
-              href="#contact"
-              className="ml-1 rounded-full bg-lime px-4 py-2 text-xs font-bold tracking-wider whitespace-nowrap text-brand-deep uppercase transition hover:-translate-y-0.5"
-            >
-              Get in touch
-            </a>
+            {bookingOpen ? (
+              <Link
+                href={bookHref}
+                className="ml-1 rounded-full bg-lime px-4 py-2 text-xs font-bold tracking-wider whitespace-nowrap text-brand-deep uppercase transition hover:-translate-y-0.5"
+              >
+                Book now
+              </Link>
+            ) : (
+              <a
+                href="#contact"
+                className="ml-1 rounded-full bg-lime px-4 py-2 text-xs font-bold tracking-wider whitespace-nowrap text-brand-deep uppercase transition hover:-translate-y-0.5"
+              >
+                Get in touch
+              </a>
+            )}
           </div>
         </div>
       </nav>
@@ -140,10 +170,40 @@ export default async function StudioPage({ params }: PageProps<"/studio/[slug]">
 
       <main className="mx-auto grid w-full max-w-5xl flex-1 gap-8 px-4 py-12 lg:grid-cols-[1fr_1.15fr]">
         <section className="space-y-8">
+          {bookingOpen && (
+            <div id="book" className="scroll-mt-24">
+              <h2 className="font-display text-2xl font-bold">Book a session</h2>
+              <ul className="mt-3 grid gap-2">
+                {bookable.map((s) => (
+                  <li key={s.id}>
+                    <Link
+                      href={`${bookHref}?session=${s.id}`}
+                      className="group flex items-center gap-4 rounded-2xl border-2 border-border bg-surface px-4 py-3 transition hover:-translate-y-0.5 hover:border-lime hover:shadow-lg"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <p className="font-semibold">{s.name}</p>
+                        <p className="text-sm text-muted">
+                          {s.shortDescription ?? formatDuration(s.durationMinutes)}
+                        </p>
+                      </div>
+                      <span className="font-bold text-lime-ink">{formatPrice(s.priceCents)}</span>
+                      <span className="rounded-full bg-lime px-3 py-1 text-[11px] font-bold tracking-wider text-brand-deep uppercase">
+                        Book
+                      </span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
           {studio.bio && (
             <div id="about" className="scroll-mt-24">
               <h2 className="font-display text-2xl font-bold">About</h2>
-              <p className="mt-3 leading-relaxed whitespace-pre-line text-muted">{studio.bio}</p>
+              <div
+                className="rich-text mt-3 text-muted"
+                // Cleaned by richTextHtml (lib/rich-text.ts) to simple formatting only.
+                dangerouslySetInnerHTML={{ __html: richTextHtml(studio.bio) }}
+              />
             </div>
           )}
           {sessions.length > 0 && (

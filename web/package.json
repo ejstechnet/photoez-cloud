@@ -8,12 +8,16 @@
     "start": "next start",
     "lint": "eslint",
     "eval:triage": "node --env-file=.env --no-warnings evals/triage/run-eval.mjs --flow .claude/hillclimb/triage --model claude-opus-5 --reps 2",
-    "eval:triage:check": "node evals/triage/check-grader.mjs"
+    "eval:triage:check": "node evals/triage/check-grader.mjs",
+    "test": "node --test --no-warnings \"lib/**/*.test.ts\""
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.128.0",
     "@aws-sdk/client-s3": "^3.1139.0",
     "@aws-sdk/s3-request-presigner": "^3.1139.0",
+    "@tiptap/pm": "^3.31.3",
+    "@tiptap/react": "^3.31.3",
+    "@tiptap/starter-kit": "^3.31.3",
     "better-auth": "^1.7.5",
     "client-zip": "^2.5.1",
     "dotenv": "^18.0.3",
@@ -22,6 +26,7 @@
     "pg": "^8.23.0",
     "react": "19.2.8",
     "react-dom": "19.2.8",
+    "sanitize-html": "^2.17.7",
     "zod": "^4.6.5"
   },
   "devDependencies": {
@@ -30,6 +35,7 @@
     "@types/pg": "^8.23.1",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@types/sanitize-html": "^2.16.1",
     "drizzle-kit": "^0.31.11",
     "eslint": "^9",
     "eslint-config-next": "16.3.6",

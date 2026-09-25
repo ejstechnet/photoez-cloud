@@ -1,7 +1,8 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { Field, FieldMessage, SubmitButton, TextAreaField } from "@/components/form";
+import { Field, FieldMessage, SubmitButton } from "@/components/form";
+import { RichTextField } from "@/components/rich-text-editor";
 import { LOCATION_LABELS, OFFERABLE_TYPES, SESSION_LABELS, SHOOT_LOCATIONS } from "@/lib/session-types";
 import { suggestSlug } from "@/lib/studio";
 import { saveStudioProfile, type StudioFormState } from "./actions";
@@ -60,10 +61,9 @@ export function StudioForm({ profile, siteUrl }: { profile: Profile; siteUrl: st
         error={errors.studioTagline}
         hint="Optional. One line under your studio name."
       />
-      <TextAreaField
+      <RichTextField
         label="About the studio"
         name="studioBio"
-        rows={4}
         defaultValue={profile.studioBio}
         error={errors.studioBio}
         hint="Optional. A few sentences about you and your style."

@@ -13,9 +13,10 @@ export default async function DashboardLayout({ children }: LayoutProps<"/dashbo
       <header className="bg-brand text-white">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-x-6 gap-y-3 px-4 py-4">
           <Logo />
-          <nav className="order-last flex w-full gap-1 sm:order-none sm:w-auto">
+          <nav className="order-last -mx-1 flex w-full gap-1 overflow-x-auto px-1 sm:order-none sm:mx-0 sm:w-auto sm:px-0">
             <NavLink href="/dashboard">Overview</NavLink>
             <NavLink href="/dashboard/inquiries">Inquiries</NavLink>
+            <NavLink href="/dashboard/bookings">Bookings</NavLink>
             <NavLink href="/dashboard/galleries">Galleries</NavLink>
             <NavLink href="/dashboard/clients">Clients</NavLink>
             <NavLink href="/dashboard/settings">Settings</NavLink>

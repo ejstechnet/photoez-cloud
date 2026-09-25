@@ -8,6 +8,7 @@ import {
   index,
   jsonb,
   unique,
+  date,
 } from "drizzle-orm/pg-core";
 import type { TriageResult } from "../lib/ai/triage";
 import { GALLERY_STATUSES } from "../lib/gallery-status";
@@ -44,6 +45,9 @@ export const photographers = pgTable("photographers", {
   shootLocations: jsonb("shoot_locations").$type<string[]>().notNull().default([]),
   // Services that need a quote instead of regular booking (e.g. events, product work).
   quoteOnlyTypes: jsonb("quote_only_types").$type<string[]>().notNull().default([]),
+  // Booking settings. Weekly hours are wall-clock times in this time zone.
+  timeZone: text("time_zone").notNull().default("America/Los_Angeles"),
+  minNoticeDays: integer("min_notice_days").notNull().default(1),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
@@ -178,6 +182,98 @@ export const photos = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index("photos_gallery_idx").on(t.galleryId, t.kind, t.position)],
+);
+
+// ---- Booking (modeled on PhotoEZ Booking for WordPress) ----
+// One photographer per studio for now. Extra photographers may come later as
+// a paid add-on; these tables would then gain a photographer/member column.
+
+// A bookable session the studio offers, e.g. "Mini maternity session".
+export const sessionTypes = pgTable(
+  "session_types",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    photographerId: uuid("photographer_id")
+      .notNull()
+      .references(() => photographers.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    shortDescription: text("short_description"),
+    description: text("description"),
+    durationMinutes: integer("duration_minutes").notNull(),
+    // Money is stored in cents, so $150.00 is 15000, avoiding rounding errors.
+    priceCents: integer("price_cents").notNull(),
+    // Share of the price due at booking (collected once deposits arrive in phase 2).
+    depositPercent: integer("deposit_percent").notNull().default(100),
+    location: text("location"),
+    photosIncluded: integer("photos_included"),
+    hidden: boolean("hidden").notNull().default(false),
+    sortOrder: integer("sort_order").notNull().default(0),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("session_types_photographer_idx").on(t.photographerId, t.sortOrder)],
+);
+
+// Weekly working hours: one window per day of the week (0 = Sunday), like the plugin.
+export const bookingHours = pgTable(
+  "booking_hours",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    photographerId: uuid("photographer_id")
+      .notNull()
+      .references(() => photographers.id, { onDelete: "cascade" }),
+    dayOfWeek: integer("day_of_week").notNull(),
+    startTime: text("start_time").notNull(), // "09:00"
+    endTime: text("end_time").notNull(), // "17:00"
+    bufferMinutes: integer("buffer_minutes").notNull().default(15),
+  },
+  (t) => [unique("booking_hours_day_unique").on(t.photographerId, t.dayOfWeek)],
+);
+
+// Days off: a single day or a range (vacations, holidays).
+export const blackoutDates = pgTable(
+  "blackout_dates",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    photographerId: uuid("photographer_id")
+      .notNull()
+      .references(() => photographers.id, { onDelete: "cascade" }),
+    startDate: date("start_date").notNull(),
+    endDate: date("end_date").notNull(),
+    note: text("note"),
+  },
+  (t) => [index("blackout_dates_photographer_idx").on(t.photographerId, t.startDate)],
+);
+
+// A booked session. Times are exact instants; the session's name, price, and
+// deposit are copied in so later edits to the session type don't rewrite history.
+// Migration 0009 adds a database rule that no two active bookings overlap.
+export const bookings = pgTable(
+  "bookings",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    photographerId: uuid("photographer_id")
+      .notNull()
+      .references(() => photographers.id, { onDelete: "cascade" }),
+    sessionTypeId: uuid("session_type_id").references(() => sessionTypes.id, { onDelete: "set null" }),
+    clientId: uuid("client_id").references(() => clients.id, { onDelete: "set null" }),
+    sessionName: text("session_name").notNull(),
+    priceCents: integer("price_cents").notNull(),
+    depositPercent: integer("deposit_percent").notNull(),
+    startsAt: timestamp("starts_at", { withTimezone: true }).notNull(),
+    endsAt: timestamp("ends_at", { withTimezone: true }).notNull(),
+    status: text("status", { enum: ["confirmed", "completed", "cancelled"] })
+      .notNull()
+      .default("confirmed"),
+    clientName: text("client_name").notNull(),
+    clientEmail: text("client_email").notNull(),
+    clientPhone: text("client_phone"),
+    notes: text("notes"),
+    // Private link for the client to view their booking.
+    manageToken: text("manage_token").notNull().unique(),
+    cancelledAt: timestamp("cancelled_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("bookings_photographer_idx").on(t.photographerId, t.startsAt)],
 );
 
 // A new-client inquiry (email or contact-form message) and what the AI
