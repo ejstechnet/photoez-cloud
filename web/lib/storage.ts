@@ -58,6 +58,23 @@ export function galleryPrefix(photographerId: string, galleryId: string) {
   return `photographers/${photographerId}/galleries/${galleryId}/`;
 }
 
+// The large banner across the top of the client's gallery page, cropped from
+// a kept original so it can be re-cropped later (like PhotoEZ for WordPress).
+// Both live in the gallery's folder, so deleting the gallery deletes them too.
+// Names: header-<source>-<crop>.jpg (the banner) and header-<source>-source.jpg.
+export function galleryHeaderKey(photographerId: string, galleryId: string, source: string, crop: string) {
+  return `${galleryPrefix(photographerId, galleryId)}header-${source}-${crop}.jpg`;
+}
+
+export function galleryHeaderSourceKey(photographerId: string, galleryId: string, source: string) {
+  return `${galleryPrefix(photographerId, galleryId)}header-${source}-source.jpg`;
+}
+
+// The original's version from a banner key; null for banners saved before cropping existed.
+export function headerSourceVersion(headerKey: string) {
+  return /\/header-([a-f0-9]{12})-[a-f0-9]{12}\.jpg$/.exec(headerKey)?.[1] ?? null;
+}
+
 export function photoKey(prefix: string, variant: PhotoVariant) {
   return variant === "original" ? `${prefix}/original` : `${prefix}/${variant}.jpg`;
 }

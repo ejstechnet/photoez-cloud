@@ -17,9 +17,13 @@ export async function findGalleryByToken(token: string) {
       status: galleries.status,
       freeLimit: galleries.freeLimit,
       shareToken: galleries.shareToken,
+      headerImageKey: galleries.headerImageKey,
       clientName: clients.name,
       studioName: photographers.businessName,
       photographerName: photographers.name,
+      studioSlug: photographers.studioSlug,
+      logoKey: photographers.studioLogoKey,
+      logoBg: photographers.studioLogoBg,
       // Only watermarked proofs are shown when the photographer has a watermark.
       hasWatermark: sql<boolean>`${photographers.watermarkKey} is not null`,
     })

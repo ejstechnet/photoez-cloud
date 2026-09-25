@@ -6,7 +6,7 @@ import { ImagesIcon } from "@/components/icons";
 import { renderJpeg } from "@/lib/proof-maker";
 
 // Long side of the stored photo: sharp on public pages, still quick to load.
-const MAX_EDGE = 1600;
+const DEFAULT_MAX_EDGE = 1600;
 
 type Saved = { ok: true } | { error: string };
 
@@ -18,6 +18,7 @@ export function PhotoUpload({
   label,
   hint,
   aspect,
+  maxEdge = DEFAULT_MAX_EDGE,
   currentUrl,
   prepare,
   save,
@@ -26,6 +27,8 @@ export function PhotoUpload({
   label: string;
   hint: string;
   aspect: "portrait" | "square";
+  // Long side in pixels; larger for full-width images like a gallery header.
+  maxEdge?: number;
   currentUrl: string | null;
   prepare: (size: number) => Promise<{ version: string; url: string } | { error: string }>;
   save: (version: string) => Promise<Saved>;
@@ -44,7 +47,7 @@ export function PhotoUpload({
     startTransition(async () => {
       try {
         const bitmap = await createImageBitmap(file);
-        const jpeg = await renderJpeg(bitmap, MAX_EDGE, 0.85);
+        const jpeg = await renderJpeg(bitmap, maxEdge, 0.85);
         bitmap.close();
         const prepared = await prepare(jpeg.size);
         if ("error" in prepared) throw new Error(prepared.error);
@@ -65,8 +68,8 @@ export function PhotoUpload({
       <span className="text-sm font-semibold">{label}</span>
       <div className="mt-1.5 grid gap-4 sm:grid-cols-[10rem_1fr] sm:items-center">
         <div
-          className={`grid w-40 place-items-center overflow-hidden rounded-2xl border-2 border-border bg-background ${
-            aspect === "portrait" ? "aspect-[2/3]" : "aspect-square"
+          className={`grid place-items-center overflow-hidden rounded-2xl border-2 border-border bg-background ${
+            aspect === "portrait" ? "aspect-[2/3] w-40" : "aspect-square w-40"
           }`}
         >
           {shown ? (

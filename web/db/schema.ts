@@ -154,12 +154,30 @@ export const galleries = pgTable(
     submittedAt: timestamp("submitted_at", { withTimezone: true }),
     deliveredAt: timestamp("delivered_at", { withTimezone: true }),
     expiresAt: timestamp("expires_at", { withTimezone: true }),
+    // Large photo across the top of the client's gallery page (a storage key).
+    headerImageKey: text("header_image_key"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
     index("galleries_photographer_idx").on(t.photographerId),
     index("galleries_client_idx").on(t.clientId),
   ],
+);
+
+// Each time a client downloads from their delivery page: the whole ZIP
+// ("all") or one photo. Photographer previews aren't recorded.
+export const galleryDownloads = pgTable(
+  "gallery_downloads",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    galleryId: uuid("gallery_id")
+      .notNull()
+      .references(() => galleries.id, { onDelete: "cascade" }),
+    kind: text("kind", { enum: ["all", "photo"] }).notNull(),
+    photoId: uuid("photo_id"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("gallery_downloads_gallery_idx").on(t.galleryId, t.createdAt)],
 );
 
 // One uploaded photo. The image files live in R2 storage (see lib/storage.ts);
@@ -227,6 +245,10 @@ export const sessionTypes = pgTable(
     priceCents: integer("price_cents").notNull(),
     // Share of the price due at booking (collected once deposits arrive in phase 2).
     depositPercent: integer("deposit_percent").notNull().default(100),
+    // Special price: shown with the regular price struck through, until the
+    // end date (studio's own calendar day, inclusive) or forever if none.
+    salePriceCents: integer("sale_price_cents"),
+    saleEndsOn: date("sale_ends_on"),
     location: text("location"),
     photosIncluded: integer("photos_included"),
     // Photo shown above the session on the booking page (a storage key).

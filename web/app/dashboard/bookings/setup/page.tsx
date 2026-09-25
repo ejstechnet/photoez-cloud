@@ -5,6 +5,7 @@ import { addons, photographers, sessionTypes } from "@/db/schema";
 import { ArrowRightIcon, PlusIcon } from "@/components/icons";
 import { loadRules, upcomingTimeOff } from "@/lib/booking/availability";
 import { formatDuration, formatPrice } from "@/lib/booking/format";
+import { currentPrice } from "@/lib/booking/pricing";
 import { localDateOf } from "@/lib/booking/time";
 import { requirePhotographer } from "@/lib/session";
 import { LOCATION_LABELS, type ShootLocation } from "@/lib/session-types";
@@ -149,7 +150,9 @@ export default async function BookingSetupPage() {
                     <p className="text-sm text-muted">
                       {[
                         formatDuration(s.durationMinutes),
-                        formatPrice(s.priceCents),
+                        s.salePriceCents !== null && currentPrice(s, today).wasCents !== null
+                          ? `${formatPrice(s.salePriceCents)} sale (was ${formatPrice(s.priceCents)})`
+                          : formatPrice(s.priceCents),
                         s.depositPercent < 100 ? `${s.depositPercent}% deposit` : null,
                         s.location ? LOCATION_LABELS[s.location as ShootLocation] : null,
                       ]

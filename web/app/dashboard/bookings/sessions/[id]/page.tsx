@@ -48,8 +48,10 @@ export default async function EditSessionTypePage({ params, searchParams }: Page
 
   return (
     <div className="max-w-2xl">
-      <p className="text-sm font-bold tracking-wider text-violet uppercase">Booking setup</p>
-      <h1 className="mt-1 font-display text-4xl font-bold tracking-tight">{sessionType.name}</h1>
+      <Link href="/dashboard/bookings/setup" className="text-xs font-bold tracking-wider text-muted uppercase hover:text-foreground">
+        ← Back to sessions
+      </Link>
+      <h1 className="mt-2 font-display text-4xl font-bold tracking-tight">{sessionType.name}</h1>
       {added === "1" && (
         <p className="mt-6 rounded-2xl bg-lime/20 px-5 py-4 font-semibold">
           Session added! Give it a photo below, or head back to{" "}

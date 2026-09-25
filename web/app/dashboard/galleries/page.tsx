@@ -6,6 +6,7 @@ import { ArrowRightIcon, ImagesIcon, PlusIcon } from "@/components/icons";
 import { requirePhotographer } from "@/lib/session";
 import { photoKey, signedViewUrl } from "@/lib/storage";
 import { StatusPill } from "./status-pill";
+import { downloadSummaries } from "@/lib/downloads";
 
 const coverTints = ["from-coral to-sun", "from-violet to-pink", "from-lime to-sun", "from-pink to-coral"];
 
@@ -26,6 +27,7 @@ export default async function GalleriesPage() {
     .where(eq(galleries.photographerId, user.id))
     .groupBy(galleries.id, clients.name)
     .orderBy(desc(galleries.createdAt));
+  const downloads = await downloadSummaries(rows.map((g) => g.id));
 
   // Cover photo = the first proof in each gallery (or the first final).
   const covers =
@@ -106,6 +108,15 @@ export default async function GalleriesPage() {
                       {gallery.clientName ?? "No client"} · {gallery.photoCount}{" "}
                       {gallery.photoCount === 1 ? "photo" : "photos"}
                     </p>
+                    {gallery.status === "delivered" && (
+                      <p
+                        className={`mt-2 inline-block rounded-full px-2.5 py-0.5 text-[11px] font-bold tracking-wider uppercase ${
+                          downloads.has(gallery.id) ? "bg-lime/25 text-lime-ink" : "bg-sun/30 text-brand-deep"
+                        }`}
+                      >
+                        {downloads.has(gallery.id) ? "✓ Downloaded" : "Not downloaded yet"}
+                      </p>
+                    )}
                   </div>
                 </Link>
               </li>

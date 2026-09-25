@@ -11,6 +11,8 @@ import { z } from "zod";
 import { StatusPill } from "../status-pill";
 import { ClientLink } from "./client-link";
 import { DeliverPanel } from "./deliver-panel";
+import { GalleryTitle } from "./gallery-title";
+import { describeDownloads, downloadSummaries } from "@/lib/downloads";
 import { PhotoGrid } from "./photo-grid";
 import { ProofRefresher } from "./proof-refresher";
 import { Uploader } from "./uploader";
@@ -72,6 +74,7 @@ export default async function GalleryPage({ params }: PageProps<"/dashboard/gall
       previewUrl: await signedViewUrl(photoKey(photo.fileKey, "preview")),
     })),
   );
+  const downloads = await downloadSummaries([gallery.id]);
   const proofs = tiles.filter((tile) => tile.kind === "proof");
   const finals = tiles.filter((tile) => tile.kind === "final");
 
@@ -92,9 +95,7 @@ export default async function GalleryPage({ params }: PageProps<"/dashboard/gall
               {gallery.freeLimit === 1 ? "pick" : "picks"}
             </span>
           </div>
-          <h1 className="mt-2 font-display text-4xl font-bold tracking-tight break-words sm:text-5xl">
-            {gallery.title}
-          </h1>
+          <GalleryTitle galleryId={gallery.id} title={gallery.title} />
         </div>
         <div className="flex items-center gap-4">
           {/* PhotoEZ-style round counters */}
@@ -144,6 +145,7 @@ export default async function GalleryPage({ params }: PageProps<"/dashboard/gall
             galleryId={gallery.id}
             finalsCount={finals.length}
             deliveredAt={gallery.deliveredAt?.toISOString() ?? null}
+            downloads={{ text: describeDownloads(downloads.get(gallery.id)), any: downloads.has(gallery.id) }}
           />
           <Uploader galleryId={gallery.id} kind="final" watermark={null} />
           {finals.length > 0 && <PhotoGrid galleryId={gallery.id} photos={finals} />}

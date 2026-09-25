@@ -1,4 +1,6 @@
 import { downloadZip } from "client-zip";
+import { db } from "@/db";
+import { galleryDownloads } from "@/db/schema";
 import { clientFinals, findGalleryByToken, isDelivered } from "@/lib/client-gallery";
 import { uniqueFileNames } from "@/lib/format";
 import { photoKey, signedViewUrl } from "@/lib/storage";
@@ -7,7 +9,7 @@ import { photoKey, signedViewUrl } from "@/lib/storage";
 // client downloads it. Nothing is built ahead of time or held in memory, so a
 // multi-gigabyte wedding gallery works the same as a small one. Photos are
 // already compressed, so the ZIP stores them as-is.
-export async function GET(_request: Request, { params }: RouteContext<"/g/[token]/download">) {
+export async function GET(request: Request, { params }: RouteContext<"/g/[token]/download">) {
   const { token } = await params;
   const gallery = await findGalleryByToken(token);
   if (!gallery || !isDelivered(gallery)) return new Response("Not found", { status: 404 });
@@ -15,6 +17,11 @@ export async function GET(_request: Request, { params }: RouteContext<"/g/[token
   const finals = await clientFinals(gallery);
   if (finals.length === 0) return new Response("Not found", { status: 404 });
   const names = uniqueFileNames(finals.map((photo) => photo.originalName));
+
+  // Recorded for the photographer's Deliveries view; their own previews (?preview=1) aren't.
+  if (new URL(request.url).searchParams.get("preview") !== "1") {
+    await db.insert(galleryDownloads).values({ galleryId: gallery.id, kind: "all" });
+  }
 
   async function* files() {
     for (const [i, photo] of finals.entries()) {
