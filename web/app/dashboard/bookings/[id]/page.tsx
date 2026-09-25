@@ -7,6 +7,7 @@ import { bookingInspoPhotos, bookings, photographers } from "@/db/schema";
 import { depositCents, formatDuration, formatPrice } from "@/lib/booking/format";
 import { formatDate, formatTime } from "@/lib/booking/time";
 import { bookingExtras } from "@/lib/booking/session-addons";
+import { contractTemplateFor, signedContractFor } from "@/lib/contracts/for-booking";
 import { requirePhotographer } from "@/lib/session";
 import { siteUrl } from "@/lib/site";
 import { signedViewUrl } from "@/lib/storage";
@@ -32,6 +33,8 @@ export default async function BookingPage({ params }: PageProps<"/dashboard/book
   const minutes = Math.round((booking.endsAt.getTime() - booking.startsAt.getTime()) / 60_000);
   const isPast = booking.endsAt < new Date();
   const extras = await bookingExtras(booking.id);
+  const signedContract = await signedContractFor(booking.id);
+  const contractNeeded = !signedContract && booking.status !== "cancelled" && (await contractTemplateFor(booking)) !== null;
   const inspoRows = await db
     .select({ id: bookingInspoPhotos.id, fileKey: bookingInspoPhotos.fileKey })
     .from(bookingInspoPhotos)
@@ -113,6 +116,26 @@ export default async function BookingPage({ params }: PageProps<"/dashboard/book
           </div>
         ))}
       </dl>
+
+      <div
+        className={`mt-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl px-5 py-4 ${
+          signedContract ? "bg-lime/15" : contractNeeded ? "bg-sun/30" : "bg-background"
+        }`}
+      >
+        <p className="text-sm">
+          <span className="font-semibold">Contract: </span>
+          {signedContract
+            ? `Signed by ${signedContract.signerName}, ${formatDate(signedContract.signedAt, tz, "short")}`
+            : contractNeeded
+              ? "Not signed yet. The client can sign from their booking link."
+              : "None for this session."}
+        </p>
+        {signedContract && (
+          <a href={`${siteUrl}/booking/${booking.manageToken}/contract`} target="_blank" className="btn-secondary">
+            View signed contract
+          </a>
+        )}
+      </div>
 
       {inspo.length > 0 && (
         <section className="card mt-6 p-6 sm:p-8">

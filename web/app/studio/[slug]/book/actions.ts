@@ -19,6 +19,7 @@ import { pickAddons } from "@/lib/booking/addons";
 import { isOverlapError, loadRules, slotsForDate } from "@/lib/booking/availability";
 import { MAX_INSPO_PHOTOS, checkAnswers, fieldsForSession } from "@/lib/booking/fields";
 import { currentPrice } from "@/lib/booking/pricing";
+import { contractTemplateFor } from "@/lib/contracts/for-booking";
 import { offeredAddons } from "@/lib/booking/session-addons";
 import { localDateOf } from "@/lib/booking/time";
 import { inspoKey, signedUploadUrl, storedSize } from "@/lib/storage";
@@ -245,5 +246,8 @@ export async function createBooking(
   }
 
   revalidatePath("/dashboard", "layout");
-  redirect(`/booking/${manageToken}?new=1`);
+  // Straight to signing when this session has a contract, like PhotoEZ Contracts.
+  const [saved] = await db.select().from(bookings).where(eq(bookings.manageToken, manageToken));
+  const needsContract = saved ? (await contractTemplateFor(saved)) !== null : false;
+  redirect(needsContract ? `/booking/${manageToken}/contract?new=1` : `/booking/${manageToken}?new=1`);
 }

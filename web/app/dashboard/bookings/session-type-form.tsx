@@ -19,6 +19,8 @@ export type SessionTypeValues = {
   location: string | null;
   photosIncluded: number | null;
   hidden: boolean;
+  contractTemplateId: string | null;
+  noContract: boolean;
 };
 
 // Add/edit form for a bookable session. `action` is addSessionType, or
@@ -27,10 +29,13 @@ export function SessionTypeForm({
   action,
   defaultValues,
   submitLabel,
+  contracts,
 }: {
   action: (state: SessionTypeFormState, formData: FormData) => Promise<SessionTypeFormState>;
   defaultValues?: SessionTypeValues;
   submitLabel: string;
+  // The studio's contract templates, for the "Contract" choice.
+  contracts: { id: string; title: string; isDefault: boolean }[];
 }) {
   const [state, formAction, pending] = useActionState(action, {});
   const errors = state.errors ?? {};
@@ -134,6 +139,25 @@ export function SessionTypeForm({
           hint="Optional"
         />
       </div>
+      <SelectField
+        label="Contract"
+        name="contract"
+        defaultValue={
+          defaultValues?.noContract ? "none" : (defaultValues?.contractTemplateId ?? "default")
+        }
+        error={errors.contract}
+        hint="Signed by the client right after they book."
+      >
+        <option value="default">
+          My default contract{contracts.find((c) => c.isDefault) ? ` (${contracts.find((c) => c.isDefault)!.title})` : " (none set yet)"}
+        </option>
+        {contracts.map((c) => (
+          <option key={c.id} value={c.id}>
+            {c.title}
+          </option>
+        ))}
+        <option value="none">No contract</option>
+      </SelectField>
       <label className="flex items-start gap-3 rounded-xl border-2 border-border px-3.5 py-3">
         <input
           type="checkbox"

@@ -133,7 +133,7 @@ export default async function StudioPage({ params }: PageProps<"/studio/[slug]">
                 href="/dashboard/settings#studio"
                 className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold tracking-wider text-sun uppercase hover:bg-white/10"
               >
-                <GearIcon size={14} /> Settings
+                <GearIcon size={17} strokeWidth={2.25} /> Settings
               </Link>
             )}
             {bookingOpen ? (

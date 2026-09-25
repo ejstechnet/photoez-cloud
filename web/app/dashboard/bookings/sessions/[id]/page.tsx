@@ -5,6 +5,7 @@ import { z } from "zod";
 import { db } from "@/db";
 import { addons, sessionTypeAddons, sessionTypes } from "@/db/schema";
 import { formatPrice } from "@/lib/booking/format";
+import { contractChoices } from "@/lib/contracts/templates";
 import { richTextHtml } from "@/lib/rich-text";
 import { requirePhotographer } from "@/lib/session";
 import { signedViewUrl } from "@/lib/storage";
@@ -77,6 +78,7 @@ export default async function EditSessionTypePage({ params, searchParams }: Page
           action={updateSessionType.bind(null, sessionType.id)}
           defaultValues={{ ...sessionType, description: richTextHtml(sessionType.description) }}
           submitLabel="Save changes"
+          contracts={await contractChoices(user.id)}
         />
       </div>
       <section id="addons" className="card mt-6 scroll-mt-8 p-6 sm:p-8">

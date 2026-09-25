@@ -1,5 +1,6 @@
 import { Logo } from "@/components/brand";
 import { requirePhotographer } from "@/lib/session";
+import { GearIcon } from "@/components/icons";
 import { NavLink } from "./nav-link";
 import { SignOutButton } from "./sign-out-button";
 
@@ -19,7 +20,9 @@ export default async function DashboardLayout({ children }: LayoutProps<"/dashbo
             <NavLink href="/dashboard/bookings">Bookings</NavLink>
             <NavLink href="/dashboard/galleries">Galleries</NavLink>
             <NavLink href="/dashboard/clients">Clients</NavLink>
-            <NavLink href="/dashboard/settings">Settings</NavLink>
+            <NavLink href="/dashboard/settings">
+              <GearIcon size={15} strokeWidth={2.25} /> Settings
+            </NavLink>
           </nav>
           <SignOutButton />
         </div>

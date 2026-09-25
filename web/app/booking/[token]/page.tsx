@@ -5,6 +5,7 @@ import { describePolicy, findClientBooking } from "@/lib/booking/client-booking"
 import { depositCents, formatDuration, formatPrice } from "@/lib/booking/format";
 import { clientOptions, type Blocked } from "@/lib/booking/policy";
 import { bookingExtras } from "@/lib/booking/session-addons";
+import { contractTemplateFor, signedContractFor } from "@/lib/contracts/for-booking";
 import { formatDate, formatTime, zoneLabel } from "@/lib/booking/time";
 import { LOCATION_LABELS, type ShootLocation } from "@/lib/session-types";
 import { signedViewUrl } from "@/lib/storage";
@@ -47,6 +48,13 @@ export default async function ClientBookingPage({ params, searchParams }: PagePr
     : "";
 
   const extras = await bookingExtras(booking.id);
+  // Contract: signed (with the date) or waiting; none when the session has no contract.
+  const signedContract = await signedContractFor(booking.id);
+  const contract = signedContract
+    ? { signed: formatDate(signedContract.signedAt, tz, "short") }
+    : !cancelled && (await contractTemplateFor(booking))
+      ? { signed: null }
+      : null;
   const totalCents = booking.priceCents + booking.addonsCents;
   const details: [string, React.ReactNode][] = [
     ["Session", booking.sessionName],
@@ -120,6 +128,21 @@ export default async function ClientBookingPage({ params, searchParams }: PagePr
         )}
         {booking.status === "completed" && (
           <p className="mt-6 rounded-2xl bg-lime/15 px-5 py-4 font-semibold">This session is complete. Thank you!</p>
+        )}
+
+        {contract && (
+          <div
+            className={`mt-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl px-5 py-4 ${
+              contract.signed ? "bg-lime/15" : "bg-sun/30"
+            }`}
+          >
+            <p className="font-semibold">
+              {contract.signed ? `✓ Contract signed ${contract.signed}` : "Your contract is waiting for your signature."}
+            </p>
+            <Link href={`/booking/${token}/contract`} className={contract.signed ? "btn-secondary" : "btn-primary"}>
+              {contract.signed ? "View contract" : "Read & sign"}
+            </Link>
+          </div>
         )}
 
         <dl className="card mt-8 divide-y divide-border px-6 sm:px-8">
