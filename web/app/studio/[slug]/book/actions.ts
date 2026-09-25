@@ -6,12 +6,22 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { db } from "@/db";
-import { bookingAddons, bookings, clients, photographers, sessionTypes } from "@/db/schema";
+import {
+  bookingAddons,
+  bookingFields,
+  bookingInspoPhotos,
+  bookings,
+  clients,
+  photographers,
+  sessionTypes,
+} from "@/db/schema";
 import { pickAddons } from "@/lib/booking/addons";
 import { isOverlapError, loadRules, slotsForDate } from "@/lib/booking/availability";
+import { MAX_INSPO_PHOTOS, checkAnswers, fieldsForSession } from "@/lib/booking/fields";
 import { currentPrice } from "@/lib/booking/pricing";
 import { offeredAddons } from "@/lib/booking/session-addons";
 import { localDateOf } from "@/lib/booking/time";
+import { inspoKey, signedUploadUrl, storedSize } from "@/lib/storage";
 
 // The public "Book" button. Anyone can call this, so it re-checks everything
 // the page showed: the session is bookable, the time is still open, and the
@@ -40,7 +50,37 @@ export type BookingFormState = {
   message?: string;
   // The chosen time is gone: send the client back to pick another.
   taken?: boolean;
+  // Answers to the studio's own questions, by question id.
+  fieldErrors?: Record<string, string>;
+  inspoError?: string;
 };
+
+// ---- Inspiration photos ----
+// The browser resizes each photo and uploads it straight to storage with a
+// one-time link. Nothing is linked to a booking until createBooking checks
+// the files arrived.
+
+const MAX_INSPO_BYTES = 3 * 1024 * 1024;
+const INSPO_TOKEN = /^([a-f0-9]{16}):(\d)$/;
+
+export async function prepareInspoUploads(
+  slug: string,
+  count: number,
+): Promise<{ batch: string; urls: string[] } | { error: string }> {
+  if (!Number.isInteger(count) || count < 1 || count > MAX_INSPO_PHOTOS) {
+    return { error: `You can add up to ${MAX_INSPO_PHOTOS} photos.` };
+  }
+  const [studio] = await db
+    .select({ id: photographers.id, inspoMode: photographers.inspoMode })
+    .from(photographers)
+    .where(eq(photographers.studioSlug, slug));
+  if (!studio || studio.inspoMode === "off") return { error: "Photo uploads aren't available here." };
+  const batch = randomBytes(8).toString("hex");
+  const urls = await Promise.all(
+    Array.from({ length: count }, (_, i) => signedUploadUrl(inspoKey(studio.id, batch, i), "image/jpeg")),
+  );
+  return { batch, urls };
+}
 
 export async function createBooking(
   slug: string,
@@ -67,7 +107,7 @@ export async function createBooking(
   const data = parsed.data;
 
   const [studio] = await db
-    .select({ id: photographers.id })
+    .select({ id: photographers.id, inspoMode: photographers.inspoMode })
     .from(photographers)
     .where(eq(photographers.studioSlug, slug));
   if (!studio || !z.uuid().safeParse(sessionTypeId).success) return { message: "This session can't be booked anymore." };
@@ -83,6 +123,35 @@ export async function createBooking(
       ),
     );
   if (!session) return { message: "This session can't be booked anymore." };
+
+  // The studio's own questions for this session.
+  const allFields = await db
+    .select()
+    .from(bookingFields)
+    .where(eq(bookingFields.photographerId, studio.id))
+    .orderBy(bookingFields.sortOrder, bookingFields.createdAt);
+  const raw: Record<string, string> = {};
+  for (const [key, value] of formData.entries()) {
+    if (key.startsWith("field.")) raw[key.slice("field.".length)] = String(value);
+  }
+  const checked = checkAnswers(fieldsForSession(allFields, session.id), raw);
+  if (!checked.ok) return { fieldErrors: checked.errors, message: "Please check the highlighted questions." };
+
+  // Inspiration photos: only files this studio's upload links created, and that arrived.
+  const inspoKeys: string[] = [];
+  if (studio.inspoMode !== "off") {
+    const tokens = [...new Set(formData.getAll("inspo").map(String))].slice(0, MAX_INSPO_PHOTOS);
+    for (const token of tokens) {
+      const match = INSPO_TOKEN.exec(token);
+      if (!match) continue;
+      const key = inspoKey(studio.id, match[1], Number(match[2]));
+      const size = await storedSize(key);
+      if (size !== null && size <= MAX_INSPO_BYTES) inspoKeys.push(key);
+    }
+    if (studio.inspoMode === "required" && inspoKeys.length === 0) {
+      return { inspoError: "Please add at least one inspiration photo.", message: "Please add an inspiration photo." };
+    }
+  }
 
   // Only times the calendar would offer right now are accepted.
   const startsAt = new Date(startsAtIso);
@@ -148,7 +217,14 @@ export async function createBooking(
         notes: data.notes,
         manageToken,
         addonsCents: extras.addonsCents,
+        answers: checked.answers,
       }).returning({ id: bookings.id });
+
+      if (inspoKeys.length > 0) {
+        await tx
+          .insert(bookingInspoPhotos)
+          .values(inspoKeys.map((fileKey, position) => ({ bookingId: booking.id, fileKey, position })));
+      }
 
       if (extras.lines.length > 0) {
         await tx.insert(bookingAddons).values(

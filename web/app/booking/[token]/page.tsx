@@ -129,6 +129,12 @@ export default async function ClientBookingPage({ params, searchParams }: PagePr
               <dd className={cancelled ? "line-through decoration-muted/60" : undefined}>{value}</dd>
             </div>
           ))}
+          {booking.answers.map((a, i) => (
+            <div key={`answer-${i}`} className="grid gap-1 py-3.5 sm:grid-cols-[7rem_1fr]">
+              <dt className="text-sm font-semibold text-muted">{a.label}</dt>
+              <dd className="whitespace-pre-line">{a.value}</dd>
+            </div>
+          ))}
         </dl>
 
         {booking.status === "confirmed" && booking.endsAt > new Date() && (
