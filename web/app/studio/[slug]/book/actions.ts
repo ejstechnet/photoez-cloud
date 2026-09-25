@@ -19,6 +19,9 @@ import { pickAddons } from "@/lib/booking/addons";
 import { isOverlapError, loadRules, slotsForDate } from "@/lib/booking/availability";
 import { MAX_INSPO_PHOTOS, checkAnswers, fieldsForSession } from "@/lib/booking/fields";
 import { currentPrice } from "@/lib/booking/pricing";
+import { depositCents } from "@/lib/booking/format";
+import { PAYMENT_HOLD_MINUTES } from "@/lib/booking/status";
+import { paymentAccount, releaseExpiredHolds, releaseHold, startCheckout } from "@/lib/payments/checkout";
 import { contractTemplateFor } from "@/lib/contracts/for-booking";
 import { offeredAddons } from "@/lib/booking/session-addons";
 import { localDateOf } from "@/lib/booking/time";
@@ -108,7 +111,12 @@ export async function createBooking(
   const data = parsed.data;
 
   const [studio] = await db
-    .select({ id: photographers.id, inspoMode: photographers.inspoMode })
+    .select({
+      id: photographers.id,
+      inspoMode: photographers.inspoMode,
+      name: photographers.name,
+      businessName: photographers.businessName,
+    })
     .from(photographers)
     .where(eq(photographers.studioSlug, slug));
   if (!studio || !z.uuid().safeParse(sessionTypeId).success) return { message: "This session can't be booked anymore." };
@@ -183,6 +191,14 @@ export async function createBooking(
   }
   const extras = pickAddons(await offeredAddons(session.id), picked);
   if (!extras.ok) return { message: extras.message };
+  const currentPriceCents = currentPrice(session, localDateOf(new Date(), rules.timeZone)).priceCents;
+
+  // With the studio's Stripe connected and a deposit to pay, the booking is
+  // held while the client pays; otherwise it's confirmed right away.
+  const takesDeposit =
+    (await paymentAccount(studio.id)) !== null &&
+    depositCents(currentPriceCents + extras.addonsCents, session.depositPercent) > 0;
+  await releaseExpiredHolds(studio.id);
 
   const manageToken = randomBytes(24).toString("base64url");
   try {
@@ -208,7 +224,10 @@ export async function createBooking(
         clientId,
         sessionName: session.name,
         // The special price, if one applies today in the studio's time zone.
-        priceCents: currentPrice(session, localDateOf(new Date(), rules.timeZone)).priceCents,
+        priceCents: currentPriceCents,
+        ...(takesDeposit
+          ? { status: "pending_payment" as const, holdExpiresAt: new Date(Date.now() + PAYMENT_HOLD_MINUTES * 60_000) }
+          : {}),
         depositPercent: session.depositPercent,
         startsAt,
         endsAt: new Date(startsAt.getTime() + session.durationMinutes * 60_000),
@@ -246,8 +265,24 @@ export async function createBooking(
   }
 
   revalidatePath("/dashboard", "layout");
-  // Straight to signing when this session has a contract, like PhotoEZ Contracts.
   const [saved] = await db.select().from(bookings).where(eq(bookings.manageToken, manageToken));
+
+  // Deposit first: off to Stripe's secure checkout, back here when paid.
+  if (takesDeposit) {
+    let checkoutUrl: string | null = null;
+    try {
+      checkoutUrl = await startCheckout(saved, studio.businessName ?? studio.name);
+    } catch (error) {
+      console.error("Stripe Checkout failed", error);
+    }
+    if (!checkoutUrl) {
+      await releaseHold(saved.id);
+      return { message: "Online payment isn't available right now. Please try again in a minute." };
+    }
+    redirect(checkoutUrl);
+  }
+
+  // Straight to signing when this session has a contract, like PhotoEZ Contracts.
   const needsContract = saved ? (await contractTemplateFor(saved)) !== null : false;
   redirect(needsContract ? `/booking/${manageToken}/contract?new=1` : `/booking/${manageToken}?new=1`);
 }

@@ -2,9 +2,11 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { describePolicy, findClientBooking } from "@/lib/booking/client-booking";
-import { depositCents, formatDuration, formatPrice } from "@/lib/booking/format";
+import { formatDuration, formatPrice } from "@/lib/booking/format";
 import { clientOptions, type Blocked } from "@/lib/booking/policy";
 import { bookingExtras } from "@/lib/booking/session-addons";
+import { amountPaid, balanceDue, nextPayment } from "@/lib/payments/amounts";
+import { bookingPayments, paymentAccount, settleHold } from "@/lib/payments/checkout";
 import { contractTemplateFor, signedContractFor } from "@/lib/contracts/for-booking";
 import { formatDate, formatTime, zoneLabel } from "@/lib/booking/time";
 import { LOCATION_LABELS, type ShootLocation } from "@/lib/session-types";
@@ -31,7 +33,9 @@ export default async function ClientBookingPage({ params, searchParams }: PagePr
   const row = await findClientBooking(token);
   if (!row) notFound();
 
-  const { booking, timeZone: tz, name } = row;
+  const { timeZone: tz, name } = row;
+  // A deposit hold that ran out is released now, so the page tells the truth.
+  const booking = await settleHold(row.booking);
   const logoUrl = row.logoKey ? await signedViewUrl(row.logoKey) : null;
   const minutes = Math.round((booking.endsAt.getTime() - booking.startsAt.getTime()) / 60_000);
   const cancelled = booking.status === "cancelled";
@@ -48,6 +52,11 @@ export default async function ClientBookingPage({ params, searchParams }: PagePr
     : "";
 
   const extras = await bookingExtras(booking.id);
+  const paymentRows = await bookingPayments(booking.id);
+  const paidCents = amountPaid(paymentRows);
+  // What's owed next, and whether it can be paid online right now.
+  const due = nextPayment(booking, paymentRows);
+  const canPay = due !== null && (await paymentAccount(booking.photographerId)) !== null;
   // Contract: signed (with the date) or waiting; none when the session has no contract.
   const signedContract = await signedContractFor(booking.id);
   const contract = signedContract
@@ -80,8 +89,9 @@ export default async function ClientBookingPage({ params, searchParams }: PagePr
           ["Total", <strong key="t">{formatPrice(totalCents)}</strong>] as [string, React.ReactNode],
         ]
       : []),
-    ...(booking.depositPercent > 0 && booking.depositPercent < 100
-      ? [["Deposit", `${formatPrice(depositCents(totalCents, booking.depositPercent))} (the studio will let you know how to pay)`] as [string, string]]
+    ...(paidCents > 0 ? [["Paid", formatPrice(paidCents)] as [string, string]] : []),
+    ...(!cancelled && due
+      ? [["Balance due", formatPrice(balanceDue(booking, paymentRows))] as [string, string]]
       : []),
     ["Name", booking.clientName],
     ["Email", booking.clientEmail],
@@ -113,6 +123,30 @@ export default async function ClientBookingPage({ params, searchParams }: PagePr
           </>
         )}
 
+        {booking.status === "pending_payment" && (
+          <div className="mt-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-sun/30 px-5 py-4">
+            <p className="font-semibold">
+              Your time is held until {formatTime(booking.holdExpiresAt!, tz)} while you pay the deposit
+              {due ? ` (${formatPrice(due.amountCents)})` : ""}.
+            </p>
+            <a href={`/booking/${token}/pay`} className="btn-primary">
+              Pay deposit
+            </a>
+          </div>
+        )}
+        {booking.status === "confirmed" && canPay && due && (
+          <div className="mt-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-sky-light/40 px-5 py-4">
+            <p className="font-semibold">
+              {due.kind === "deposit" ? "Deposit" : "Balance"} due: {formatPrice(due.amountCents)}
+            </p>
+            <a href={`/booking/${token}/pay`} className="btn-primary">
+              Pay {due.kind === "deposit" ? "deposit" : "balance"}
+            </a>
+          </div>
+        )}
+        {changed === "paid" && (
+          <p className="mt-6 rounded-2xl bg-lime/20 px-5 py-4 font-semibold">Thank you! Your payment went through.</p>
+        )}
         {changed === "rescheduled" && !cancelled && (
           <p className="mt-6 rounded-2xl bg-lime/20 px-5 py-4 font-semibold">
             Your session has been moved. The new time is below.

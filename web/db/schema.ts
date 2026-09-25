@@ -12,6 +12,7 @@ import {
 } from "drizzle-orm/pg-core";
 import type { TriageResult } from "../lib/ai/triage";
 import { BOOKING_FIELD_TYPES, type BookingAnswer } from "../lib/booking/fields";
+import { BOOKING_STATUSES } from "../lib/booking/status";
 import { GALLERY_STATUSES } from "../lib/gallery-status";
 import { PHOTO_KINDS } from "../lib/photo-limits";
 import { WATERMARK_POSITIONS } from "../lib/watermark";
@@ -57,6 +58,10 @@ export const photographers = pgTable("photographers", {
   cancelNoticeHours: integer("cancel_notice_hours").notNull().default(72),
   // Inspiration photos on the booking form: off, optional, or required.
   inspoMode: text("inspo_mode", { enum: ["off", "optional", "required"] }).notNull().default("optional"),
+  // The photographer's own Stripe account (Stripe Connect). Client payments
+  // go straight to it; chargesEnabled is Stripe's "ready to take payments".
+  stripeAccountId: text("stripe_account_id"),
+  stripeChargesEnabled: boolean("stripe_charges_enabled").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
@@ -372,7 +377,8 @@ export const bookings = pgTable(
     depositPercent: integer("deposit_percent").notNull(),
     startsAt: timestamp("starts_at", { withTimezone: true }).notNull(),
     endsAt: timestamp("ends_at", { withTimezone: true }).notNull(),
-    status: text("status", { enum: ["confirmed", "completed", "cancelled"] })
+    // pending_payment: held while the client pays the deposit (see holdExpiresAt).
+    status: text("status", { enum: BOOKING_STATUSES })
       .notNull()
       .default("confirmed"),
     clientName: text("client_name").notNull(),
@@ -386,6 +392,8 @@ export const bookings = pgTable(
     cancelledBy: text("cancelled_by", { enum: ["client", "studio"] }),
     // The client cancelled early enough that their deposit becomes a credit.
     creditDue: boolean("credit_due").notNull().default(false),
+    // A pending_payment booking frees its time after this.
+    holdExpiresAt: timestamp("hold_expires_at", { withTimezone: true }),
     // Total of the extras the client added; the booking total is priceCents + addonsCents.
     addonsCents: integer("addons_cents").notNull().default(0),
     // The client's answers to the studio's custom booking questions, copied
@@ -439,6 +447,27 @@ export const signedContracts = pgTable("signed_contracts", {
   clientIp: text("client_ip"),
   userAgent: text("user_agent"),
 });
+
+// Payments on a booking through Stripe Checkout, on the photographer's own
+// Stripe account: the deposit at booking, then the balance.
+export const payments = pgTable(
+  "payments",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    bookingId: uuid("booking_id")
+      .notNull()
+      .references(() => bookings.id, { onDelete: "cascade" }),
+    kind: text("kind", { enum: ["deposit", "balance"] }).notNull(),
+    amountCents: integer("amount_cents").notNull(),
+    status: text("status", { enum: ["pending", "paid", "expired"] }).notNull().default("pending"),
+    stripeAccountId: text("stripe_account_id").notNull(),
+    stripeCheckoutSessionId: text("stripe_checkout_session_id").notNull().unique(),
+    stripePaymentIntentId: text("stripe_payment_intent_id"),
+    paidAt: timestamp("paid_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("payments_booking_idx").on(t.bookingId)],
+);
 
 // Inspiration photos a client uploaded with their booking (storage keys).
 export const bookingInspoPhotos = pgTable(
