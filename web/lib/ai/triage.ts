@@ -85,6 +85,10 @@ export type TriageRun = {
   model: string;
   inputTokens: number;
   outputTokens: number;
+  stopReason: string | null;
+  // The exact prompt sent, so evals can save a full transcript.
+  system: string;
+  userMessage: string;
 };
 
 export async function triageInquiry(input: {
@@ -94,6 +98,8 @@ export async function triageInquiry(input: {
   photographerName: string;
   studioName: string | null;
   today: Date;
+  // Evals can try other models; the app always uses TRIAGE_MODEL.
+  model?: string;
 }): Promise<TriageRun> {
   const client = new Anthropic();
 
@@ -106,21 +112,17 @@ export async function triageInquiry(input: {
   ]
     .filter(Boolean)
     .join("\n");
+  const userMessage = `${details}\n\n<inquiry>\n${input.message}\n</inquiry>`;
 
   const response = await client.beta.messages.parse({
-    model: TRIAGE_MODEL,
+    model: input.model ?? TRIAGE_MODEL,
     max_tokens: 16000,
     // If the model ever declines, the API retries on Anthropic's recommended
     // fallback model inside the same request instead of failing.
     betas: ["server-side-fallback-2026-07-01"],
     fallbacks: "default",
     system: SYSTEM_PROMPT,
-    messages: [
-      {
-        role: "user",
-        content: `${details}\n\n<inquiry>\n${input.message}\n</inquiry>`,
-      },
-    ],
+    messages: [{ role: "user", content: userMessage }],
     output_config: { format: betaZodOutputFormat(triageSchema) },
   });
 
@@ -136,5 +138,8 @@ export async function triageInquiry(input: {
     model: response.model,
     inputTokens: response.usage.input_tokens,
     outputTokens: response.usage.output_tokens,
+    stopReason: response.stop_reason,
+    system: SYSTEM_PROMPT,
+    userMessage,
   };
 }

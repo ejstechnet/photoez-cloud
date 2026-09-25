@@ -40,3 +40,11 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# eval outputs that are re-created on every run (keep _state.json and results.jsonl)
+.claude/hillclimb/**/traces/
+.claude/hillclimb/**/ref/
+.claude/hillclimb/**/report.html
+.claude/hillclimb/**/trajectory/
+.claude/hillclimb/**/progress.txt
+.claude/hillclimb/**/state.json

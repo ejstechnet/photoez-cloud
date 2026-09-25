@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "eval:triage": "node --env-file=.env --no-warnings evals/triage/run-eval.mjs --flow .claude/hillclimb/triage --model claude-opus-5 --reps 2",
+    "eval:triage:check": "node evals/triage/check-grader.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.128.0",
