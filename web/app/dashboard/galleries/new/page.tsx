@@ -2,11 +2,13 @@ import { asc, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { clients } from "@/db/schema";
 import { requirePhotographer } from "@/lib/session";
+import { studioPlan } from "@/lib/studio-plan";
 import { createGallery } from "../actions";
 import { GalleryForm } from "../gallery-form";
 
 export default async function NewGalleryPage() {
   const user = await requirePhotographer();
+  const plan = await studioPlan(user.id);
   const clientOptions = await db
     .select({ id: clients.id, name: clients.name })
     .from(clients)
@@ -23,6 +25,7 @@ export default async function NewGalleryPage() {
           clients={clientOptions}
           submitLabel="Create gallery"
           cancelHref="/dashboard/galleries"
+          extras={plan.upsells ? { studioPriceCents: plan.extraPhotoPriceCents } : null}
         />
       </div>
     </div>

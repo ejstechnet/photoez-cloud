@@ -4,16 +4,20 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowRightIcon, HeartIcon } from "@/components/icons";
 import { Lightbox } from "@/components/lightbox";
+import { formatPrice } from "@/lib/booking/format";
+import { extrasFor } from "@/lib/gallery-extras";
 import { submitSelections, toggleFavorite } from "./actions";
 
 export type Tile = { id: string; number: number; url: string; aspect: number; selected: boolean };
 
 // The PhotoEZ proofing experience: numbered proofs, hearts to choose
-// favorites up to the free limit, and a sticky bar to submit selections.
+// favorites up to the free limit (or past it, for a price per extra photo,
+// when the studio offers extras), and a sticky bar to submit selections.
 export function ProofingGallery({
   token,
   tiles,
   freeLimit,
+  extraPriceCents,
   locked,
   preview,
   studio,
@@ -22,6 +26,8 @@ export function ProofingGallery({
   token: string;
   tiles: Tile[];
   freeLimit: number;
+  // Price per photo past freeLimit; null means clients are capped at freeLimit.
+  extraPriceCents: number | null;
   locked: boolean;
   preview: boolean;
   studio: string;
@@ -36,6 +42,7 @@ export function ProofingGallery({
 
   const canSelect = !locked && !preview;
   const limitText = freeLimit > 0 ? `${selected.size} of ${freeLimit}` : `${selected.size}`;
+  const extras = extrasFor(selected.size, freeLimit, extraPriceCents);
   const shown = onlySelected ? tiles.filter((tile) => selected.has(tile.id)) : tiles;
 
   async function toggle(photoId: string) {
@@ -46,7 +53,7 @@ export function ProofingGallery({
     if (!canSelect) return;
     setMessage(null);
     const wasSelected = selected.has(photoId);
-    if (!wasSelected && freeLimit > 0 && selected.size >= freeLimit) {
+    if (!wasSelected && extraPriceCents === null && freeLimit > 0 && selected.size >= freeLimit) {
       setMessage(`You can choose up to ${freeLimit} photos. Unselect one to pick another.`);
       return;
     }
@@ -68,10 +75,18 @@ export function ProofingGallery({
 
   function submit() {
     const noun = selected.size === 1 ? "photo" : "photos";
-    if (!confirm(`Submit your ${selected.size} ${noun}? You won't be able to change your picks after this.`)) return;
+    const extraLine =
+      extras.count > 0
+        ? `
+
+That includes ${extras.count} extra ${extras.count === 1 ? "photo" : "photos"} for ${formatPrice(extras.cents)}.`
+        : "";
+    if (!confirm(`Submit your ${selected.size} ${noun}? You won't be able to change your picks after this.${extraLine}`)) return;
     startSubmit(async () => {
       const result = await submitSelections(token);
       if ("error" in result) setMessage(result.error);
+      // Extra photos are paid on Stripe's secure page first.
+      else if ("checkoutUrl" in result) window.location.assign(result.checkoutUrl);
       else router.refresh();
     });
   }
@@ -102,7 +117,18 @@ export function ProofingGallery({
         <p className="mt-6 rounded-2xl bg-sky-light/50 px-5 py-3 text-sm">
           {freeLimit > 0 ? (
             <>
-              Choose up to <strong>{freeLimit} photos</strong> from your session of <strong>{tiles.length} images</strong>.
+              {extraPriceCents !== null ? (
+                <>
+                  Your session includes <strong>{freeLimit} photos</strong> from <strong>{tiles.length} images</strong>.
+                  Love more? Pick as many as you like: each extra photo is{" "}
+                  <strong>{formatPrice(extraPriceCents)}</strong>.
+                </>
+              ) : (
+                <>
+                  Choose up to <strong>{freeLimit} photos</strong> from your session of{" "}
+                  <strong>{tiles.length} images</strong>.
+                </>
+              )}
             </>
           ) : (
             <>
@@ -187,7 +213,11 @@ export function ProofingGallery({
         <div className="fixed inset-x-0 bottom-0 z-20 border-t border-border bg-surface/95 backdrop-blur">
           <div className="mx-auto flex max-w-6xl flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="text-sm">
-              <span className="font-semibold">{limitText} photos selected</span>
+              <span className="font-semibold">
+                {extras.count > 0
+                  ? `${selected.size} selected: ${freeLimit} included + ${extras.count} extra × ${formatPrice(extraPriceCents!)} = ${formatPrice(extras.cents)}`
+                  : `${limitText} photos selected`}
+              </span>
               {message && <span className="mt-0.5 block font-medium text-danger">{message}</span>}
             </div>
             <button
@@ -196,7 +226,12 @@ export function ProofingGallery({
               disabled={preview || selected.size === 0 || submitting}
               className="btn-primary"
             >
-              {submitting ? "Submitting…" : "Submit my selections"} <ArrowRightIcon size={18} />
+              {submitting
+                ? "Submitting…"
+                : extras.count > 0
+                  ? `Pay ${formatPrice(extras.cents)} & submit`
+                  : "Submit my selections"}{" "}
+              <ArrowRightIcon size={18} />
             </button>
           </div>
         </div>

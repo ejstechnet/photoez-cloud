@@ -1,6 +1,8 @@
 import { and, asc, eq, isNotNull, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { clients, favorites, galleries, photographers, photos } from "@/db/schema";
+import { extraPhotoPrice } from "@/lib/gallery-extras";
+import { hasFeature } from "@/lib/plans";
 
 // The client side of a gallery, reached only through its private share link.
 // There's no login: the unguessable token *is* the key, so every lookup starts
@@ -18,6 +20,12 @@ export async function findGalleryByToken(token: string) {
       freeLimit: galleries.freeLimit,
       shareToken: galleries.shareToken,
       headerImageKey: galleries.headerImageKey,
+      photographerId: galleries.photographerId,
+      galleryExtraPrice: galleries.extraPhotoPriceCents,
+      studioExtraPrice: photographers.extraPhotoPriceCents,
+      plan: photographers.plan,
+      extrasCount: galleries.extrasCount,
+      extrasCents: galleries.extrasCents,
       clientName: clients.name,
       studioName: photographers.businessName,
       photographerName: photographers.name,
@@ -31,7 +39,16 @@ export async function findGalleryByToken(token: string) {
     .innerJoin(photographers, eq(photographers.id, galleries.photographerId))
     .leftJoin(clients, eq(clients.id, galleries.clientId))
     .where(eq(galleries.shareToken, token));
-  return gallery ?? null;
+  if (!gallery) return null;
+  // What each photo past the included number costs, or null when the client
+  // is simply capped (the photographer's plan decides; see lib/plans.ts).
+  const extraPriceCents = extraPhotoPrice({
+    planAllows: hasFeature(gallery.plan, "galleryUpsells"),
+    freeLimit: gallery.freeLimit,
+    galleryPriceCents: gallery.galleryExtraPrice,
+    studioPriceCents: gallery.studioExtraPrice,
+  });
+  return { ...gallery, extraPriceCents };
 }
 
 export type ClientGallery = NonNullable<Awaited<ReturnType<typeof findGalleryByToken>>>;
@@ -91,4 +108,6 @@ export async function clientFinals(gallery: ClientGallery) {
 export const isDelivered = (gallery: ClientGallery) => gallery.status === "delivered" || gallery.status === "completed";
 
 // "0" free picks means no limit.
-export const isOverLimit = (count: number, freeLimit: number) => freeLimit > 0 && count >= freeLimit;
+// Whether one more pick goes past the included number when extras can't be bought.
+export const isOverLimit = (count: number, freeLimit: number, extraPriceCents: number | null = null) =>
+  extraPriceCents === null && freeLimit > 0 && count >= freeLimit;

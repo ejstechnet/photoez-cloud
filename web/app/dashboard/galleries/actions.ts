@@ -1,7 +1,7 @@
 "use server";
 
 import { randomBytes, randomUUID } from "node:crypto";
-import { and, count, eq, inArray, max, sql } from "drizzle-orm";
+import { and, count, eq, inArray, max, ne, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
@@ -9,7 +9,9 @@ import { db } from "@/db";
 import { clients, galleries, photographers, photos } from "@/db/schema";
 import { MAX_PHOTO_BYTES, MAX_PHOTOS_PER_BATCH, PHOTO_KINDS, PHOTO_TYPES } from "@/lib/photo-limits";
 import { staleProof } from "@/lib/proofs";
+import { GALLERY_STATUSES, type GalleryStatus } from "@/lib/gallery-status";
 import { requirePhotographer } from "@/lib/session";
+import { studioPlan } from "@/lib/studio-plan";
 import {
   deletePrefix,
   galleryHeaderKey,
@@ -51,6 +53,13 @@ const gallerySchema = z.object({
     .trim()
     .refine((value) => value === "" || isUuid(value), "Choose a client from the list.")
     .transform((value) => value || null),
+  // Dollars; blank = the studio's price per extra photo.
+  extraPhotoPrice: z
+    .string()
+    .trim()
+    .transform((value) => value.replace(/[$,]/g, ""))
+    .refine((value) => value === "" || /^\d{1,5}(\.\d{1,2})?$/.test(value), "Enter a price like 10 or 10.00, or leave it blank.")
+    .transform((value) => (value === "" ? null : Math.round(Number(value) * 100))),
 });
 
 export type GalleryFormState = {
@@ -59,7 +68,7 @@ export type GalleryFormState = {
 };
 
 type ParsedGallery =
-  | { ok: true; data: z.output<typeof gallerySchema> }
+  | { ok: true; data: Omit<z.output<typeof gallerySchema>, "extraPhotoPrice"> & { extraPhotoPriceCents?: number | null } }
   | { ok: false; state: GalleryFormState };
 
 async function parseGallery(formData: FormData, photographerId: string): Promise<ParsedGallery> {
@@ -67,6 +76,7 @@ async function parseGallery(formData: FormData, photographerId: string): Promise
     title: String(formData.get("title") ?? ""),
     freeLimit: formData.get("freeLimit") ?? "",
     clientId: String(formData.get("clientId") ?? ""),
+    extraPhotoPrice: String(formData.get("extraPhotoPrice") ?? ""),
   });
   if (!parsed.success) {
     const errors: GalleryFormState["errors"] = {};
@@ -84,7 +94,10 @@ async function parseGallery(formData: FormData, photographerId: string): Promise
       .where(and(eq(clients.id, parsed.data.clientId), eq(clients.photographerId, photographerId)));
     if (!client) return { ok: false, state: { errors: { clientId: "Choose a client from the list." } } };
   }
-  return { ok: true, data: parsed.data };
+  // Only plans with gallery upsells can set a gallery's extra photo price.
+  const { extraPhotoPrice, ...rest } = parsed.data;
+  const { upsells } = await studioPlan(photographerId);
+  return { ok: true, data: { ...rest, ...(upsells ? { extraPhotoPriceCents: extraPhotoPrice } : {}) } };
 }
 
 export async function createGallery(_prev: GalleryFormState, formData: FormData): Promise<GalleryFormState> {
@@ -136,15 +149,69 @@ export async function deleteGallery(galleryId: string): Promise<void> {
 }
 
 // Let the client change their picks again after submitting.
+// Opens selections back up from any later stage (submitted, delivered,
+// completed, expired), like PhotoEZ for WordPress. A delivered gallery's link
+// goes back to proofing until it's delivered again; picks and finals are kept.
 export async function reopenProofing(galleryId: string): Promise<void> {
   const photographer = await requirePhotographer();
   if (await findOwnedGallery(galleryId, photographer.id)) {
     await db
       .update(galleries)
-      .set({ status: "pending", submittedAt: null })
-      .where(and(eq(galleries.id, galleryId), inArray(galleries.status, ["submitted", "paid_and_submitted"])));
+      .set({ status: "pending", submittedAt: null, deliveredAt: null })
+      .where(and(eq(galleries.id, galleryId), ne(galleries.status, "pending")));
   }
-  revalidatePath(`/dashboard/galleries/${galleryId}`);
+  revalidatePath("/dashboard", "layout");
+  revalidatePath("/g/[token]", "page");
+}
+
+// Sets a gallery's status by hand, like PhotoEZ for WordPress's status
+// dropdown. The dates that go with each stage are kept consistent.
+export async function setGalleryStatus(galleryId: string, status: string): Promise<{ ok: true } | { error: string }> {
+  const photographer = await requirePhotographer();
+  if (!(await findOwnedGallery(galleryId, photographer.id))) return { error: "That gallery could not be found." };
+  if (!(GALLERY_STATUSES as readonly string[]).includes(status)) return { error: "Pick a status from the list." };
+  const next = status as GalleryStatus;
+
+  if (next === "delivered" || next === "completed") {
+    const [{ finals }] = await db
+      .select({ finals: count() })
+      .from(photos)
+      .where(and(eq(photos.galleryId, galleryId), eq(photos.kind, "final")));
+    if (finals === 0) return { error: "Upload final photos before marking the gallery delivered." };
+  }
+
+  const now = new Date();
+  const dates =
+    next === "pending"
+      ? { submittedAt: null, deliveredAt: null }
+      : next === "submitted" || next === "paid_and_submitted"
+        ? { submittedAt: sql`coalesce(${galleries.submittedAt}, ${now})`, deliveredAt: null }
+        : next === "delivered" || next === "completed"
+          ? { deliveredAt: sql`coalesce(${galleries.deliveredAt}, ${now})` }
+          : {};
+  await db.update(galleries).set({ status: next, ...dates }).where(eq(galleries.id, galleryId));
+  revalidatePath("/dashboard", "layout");
+  revalidatePath("/g/[token]", "page");
+  return { ok: true };
+}
+
+// "Delete all" for a gallery's proofs or finals: every file in storage and
+// every photo row (the client's hearts on proofs go with them).
+export async function deleteAllPhotos(galleryId: string, kind: "proof" | "final"): Promise<void> {
+  const photographer = await requirePhotographer();
+  if (!(await findOwnedGallery(galleryId, photographer.id))) return;
+  if (kind !== "proof" && kind !== "final") return;
+
+  const rows = await db
+    .select({ id: photos.id, fileKey: photos.fileKey })
+    .from(photos)
+    .where(and(eq(photos.galleryId, galleryId), eq(photos.kind, kind)));
+  for (const photo of rows) await deletePrefix(`${photo.fileKey}/`);
+  if (rows.length > 0) {
+    await db.delete(photos).where(and(eq(photos.galleryId, galleryId), eq(photos.kind, kind)));
+  }
+  revalidatePath("/dashboard", "layout");
+  revalidatePath("/g/[token]", "page");
 }
 
 // Send the finals to the client: their link switches to the delivery page.
