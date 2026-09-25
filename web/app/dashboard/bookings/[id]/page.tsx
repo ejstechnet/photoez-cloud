@@ -6,6 +6,7 @@ import { db } from "@/db";
 import { bookings, photographers } from "@/db/schema";
 import { depositCents, formatDuration, formatPrice } from "@/lib/booking/format";
 import { formatDate, formatTime } from "@/lib/booking/time";
+import { bookingExtras } from "@/lib/booking/session-addons";
 import { requirePhotographer } from "@/lib/session";
 import { siteUrl } from "@/lib/site";
 import { setBookingStatus } from "../actions";
@@ -29,15 +30,32 @@ export default async function BookingPage({ params }: PageProps<"/dashboard/book
   const tz = studio.timeZone;
   const minutes = Math.round((booking.endsAt.getTime() - booking.startsAt.getTime()) / 60_000);
   const isPast = booking.endsAt < new Date();
+  const extras = await bookingExtras(booking.id);
+  const totalCents = booking.priceCents + booking.addonsCents;
   const details: [string, React.ReactNode][] = [
     ["When", `${formatDate(booking.startsAt, tz)}, ${formatTime(booking.startsAt, tz)} – ${formatTime(booking.endsAt, tz)}`],
     ["Length", formatDuration(minutes)],
     ["Price", formatPrice(booking.priceCents)],
+    ...(extras.length > 0
+      ? [
+          [
+            "Extras",
+            <ul key="x" className="space-y-0.5">
+              {extras.map((x) => (
+                <li key={x.id}>
+                  {x.quantity} × {x.name} · {formatPrice(x.quantity * x.priceCents)}
+                </li>
+              ))}
+            </ul>,
+          ] as [string, React.ReactNode],
+          ["Total", <strong key="t">{formatPrice(totalCents)}</strong>] as [string, React.ReactNode],
+        ]
+      : []),
     [
       "Deposit",
       booking.depositPercent === 0
         ? "None"
-        : `${formatPrice(depositCents(booking.priceCents, booking.depositPercent))} (${booking.depositPercent}%, not collected yet)`,
+        : `${formatPrice(depositCents(totalCents, booking.depositPercent))} (${booking.depositPercent}%, not collected yet)`,
     ],
     ["Email", <a key="e" href={`mailto:${booking.clientEmail}`} className="link">{booking.clientEmail}</a>],
     ["Phone", booking.clientPhone ?? "Not given"],

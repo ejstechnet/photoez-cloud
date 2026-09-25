@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { asc, eq } from "drizzle-orm";
 import { db } from "@/db";
-import { photographers, sessionTypes } from "@/db/schema";
+import { addons, photographers, sessionTypes } from "@/db/schema";
 import { ArrowRightIcon, PlusIcon } from "@/components/icons";
 import { loadRules, upcomingTimeOff } from "@/lib/booking/availability";
 import { formatDuration, formatPrice } from "@/lib/booking/format";
@@ -31,7 +31,7 @@ function formatDay(date: string) {
 
 export default async function BookingSetupPage() {
   const user = await requirePhotographer();
-  const [rules, sessions, [studio]] = await Promise.all([
+  const [rules, sessions, [studio], addonList] = await Promise.all([
     loadRules(user.id),
     db
       .select()
@@ -48,11 +48,18 @@ export default async function BookingSetupPage() {
       })
       .from(photographers)
       .where(eq(photographers.id, user.id)),
+    db
+      .select()
+      .from(addons)
+      .where(eq(addons.photographerId, user.id))
+      .orderBy(asc(addons.sortOrder), asc(addons.createdAt)),
   ]);
   const today = localDateOf(new Date(), rules.timeZone);
   const thumbs = new Map(
     await Promise.all(
-      sessions.filter((s) => s.imageKey).map(async (s) => [s.id, await signedViewUrl(s.imageKey!)] as const),
+      [...sessions, ...addonList]
+        .filter((s) => s.imageKey)
+        .map(async (s) => [s.id, await signedViewUrl(s.imageKey!)] as const),
     ),
   );
   const timeOff = await upcomingTimeOff(user.id, today);
@@ -139,6 +146,50 @@ export default async function BookingSetupPage() {
                       ]
                         .filter(Boolean)
                         .join(" · ")}
+                    </p>
+                  </div>
+                  <ArrowRightIcon size={18} className="shrink-0 text-muted transition group-hover:translate-x-1" />
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      <section id="addons" className="card mt-8 scroll-mt-8 p-6 sm:p-8">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <h2 className="font-display text-2xl font-bold">Add-ons</h2>
+            <p className="mt-1 text-sm text-muted">Extras clients can add when they book. Choose which sessions offer each one.</p>
+          </div>
+          <Link href="/dashboard/bookings/addons/new" className="btn-primary">
+            <PlusIcon size={18} /> Add add-on
+          </Link>
+        </div>
+        {addonList.length === 0 ? (
+          <p className="mt-6 rounded-2xl border-2 border-dashed border-border px-5 py-8 text-center text-muted">
+            No add-ons yet, like extra edited photos or prints.
+          </p>
+        ) : (
+          <ul className="mt-6 grid gap-3">
+            {addonList.map((a) => (
+              <li key={a.id}>
+                <Link
+                  href={`/dashboard/bookings/addons/${a.id}`}
+                  className="group flex items-center gap-4 rounded-2xl border-2 border-border px-5 py-4 transition hover:border-lime"
+                >
+                  {thumbs.has(a.id) ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={thumbs.get(a.id)} alt="" className="size-12 shrink-0 rounded-lg object-cover" />
+                  ) : (
+                    <span className="grid size-12 shrink-0 place-items-center rounded-lg bg-background text-center text-[10px] leading-tight font-semibold text-muted">
+                      No photo
+                    </span>
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate font-semibold">{a.name}</p>
+                    <p className="text-sm text-muted">
+                      {formatPrice(a.priceCents)} each · up to {a.maxQuantity}
                     </p>
                   </div>
                   <ArrowRightIcon size={18} className="shrink-0 text-muted transition group-hover:translate-x-1" />

@@ -4,8 +4,9 @@ import { notFound } from "next/navigation";
 import { and, asc, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { photographers, sessionTypes } from "@/db/schema";
+import { addonsForSession } from "@/lib/booking/session-addons";
 import { loadRules, openDatesInMonth, slotsForDate } from "@/lib/booking/availability";
-import { depositCents, formatDuration, formatPrice } from "@/lib/booking/format";
+import { formatDuration, formatPrice } from "@/lib/booking/format";
 import { addMonths, formatDate, formatTime, localDateOf, zoneLabel } from "@/lib/booking/time";
 import { LOCATION_LABELS, type ShootLocation } from "@/lib/session-types";
 import { richTextHtml, richTextToPlain } from "@/lib/rich-text";
@@ -98,6 +99,7 @@ export default async function BookPage({ params, searchParams }: PageProps<"/stu
   const slots = session && date && openDates.includes(date) ? await slotsForDate(rules, session.durationMinutes, date, now) : [];
   const timeParam = one(query.time);
   const time = slots.find((slot) => slot.toISOString() === timeParam) ?? null;
+  const sessionAddons = session && time ? await addonsForSession(session.id) : [];
 
   const href = (params: { session?: string; month?: string; date?: string; time?: string }) => {
     const search = new URLSearchParams(Object.entries(params).filter((e): e is [string, string] => Boolean(e[1])));
@@ -218,32 +220,28 @@ export default async function BookPage({ params, searchParams }: PageProps<"/stu
               </section>
             )}
 
-            {/* Step 3: details */}
+            {/* Steps 3–4: extras (when the session has any) and the client's details */}
             {session && time && (
-              <section className="card relative p-6 sm:p-8">
-                <StepTitle n={3} done={false}>
-                  Your details
-                </StepTitle>
-                <div className="mt-4 rounded-2xl bg-sky-light/40 px-5 py-4">
-                  <p className="font-semibold">
-                    {session.name} · {formatDate(time, tz)}
-                  </p>
-                  <p className="text-sm text-muted">
-                    {formatTime(time, tz)} – {formatTime(new Date(time.getTime() + session.durationMinutes * 60_000), tz)}{" "}
-                    {zoneLabel(time, tz)} · {formatPrice(session.priceCents)}
-                    {session.depositPercent > 0 && session.depositPercent < 100 &&
-                      ` · ${formatPrice(depositCents(session.priceCents, session.depositPercent))} deposit`}
-                  </p>
-                </div>
-                <div className="mt-6">
-                  <BookingForm
-                    slug={slug}
-                    sessionTypeId={session.id}
-                    startsAt={time.toISOString()}
-                    backHref={href({ session: session.id, month })}
-                  />
-                </div>
-              </section>
+              <BookingForm
+                slug={slug}
+                sessionTypeId={session.id}
+                startsAt={time.toISOString()}
+                backHref={href({ session: session.id, month })}
+                priceCents={session.priceCents}
+                depositPercent={session.depositPercent}
+                addons={sessionAddons}
+                summary={
+                  <>
+                    <p className="font-semibold">
+                      {session.name} · {formatDate(time, tz)}
+                    </p>
+                    <p className="text-sm text-muted">
+                      {formatTime(time, tz)} –{" "}
+                      {formatTime(new Date(time.getTime() + session.durationMinutes * 60_000), tz)} {zoneLabel(time, tz)}
+                    </p>
+                  </>
+                }
+              />
             )}
           </div>
         )}

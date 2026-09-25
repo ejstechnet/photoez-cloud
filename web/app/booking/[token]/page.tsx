@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { describePolicy, findClientBooking } from "@/lib/booking/client-booking";
 import { depositCents, formatDuration, formatPrice } from "@/lib/booking/format";
 import { clientOptions, type Blocked } from "@/lib/booking/policy";
+import { bookingExtras } from "@/lib/booking/session-addons";
 import { formatDate, formatTime, zoneLabel } from "@/lib/booking/time";
 import { LOCATION_LABELS, type ShootLocation } from "@/lib/session-types";
 import { signedViewUrl } from "@/lib/storage";
@@ -45,7 +46,9 @@ export default async function ClientBookingPage({ params, searchParams }: PagePr
         : `It's within ${row.policy.cancelNoticeHours} hours of your session, so your deposit is non-refundable.`
     : "";
 
-  const details: [string, string][] = [
+  const extras = await bookingExtras(booking.id);
+  const totalCents = booking.priceCents + booking.addonsCents;
+  const details: [string, React.ReactNode][] = [
     ["Session", booking.sessionName],
     ["Date", formatDate(booking.startsAt, tz)],
     [
@@ -54,8 +57,23 @@ export default async function ClientBookingPage({ params, searchParams }: PagePr
     ],
     ...(row.location ? [["Where", LOCATION_LABELS[row.location as ShootLocation]] as [string, string]] : []),
     ["Price", formatPrice(booking.priceCents)],
+    ...(extras.length > 0
+      ? [
+          [
+            "Extras",
+            <ul key="x" className="space-y-0.5">
+              {extras.map((x) => (
+                <li key={x.id}>
+                  {x.quantity} × {x.name} · {formatPrice(x.quantity * x.priceCents)}
+                </li>
+              ))}
+            </ul>,
+          ] as [string, React.ReactNode],
+          ["Total", <strong key="t">{formatPrice(totalCents)}</strong>] as [string, React.ReactNode],
+        ]
+      : []),
     ...(booking.depositPercent > 0 && booking.depositPercent < 100
-      ? [["Deposit", `${formatPrice(depositCents(booking.priceCents, booking.depositPercent))} (the studio will let you know how to pay)`] as [string, string]]
+      ? [["Deposit", `${formatPrice(depositCents(totalCents, booking.depositPercent))} (the studio will let you know how to pay)`] as [string, string]]
       : []),
     ["Name", booking.clientName],
     ["Email", booking.clientEmail],
