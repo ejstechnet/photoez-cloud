@@ -42,6 +42,19 @@ export default async function BookingPage({ params }: PageProps<"/dashboard/book
     ["Email", <a key="e" href={`mailto:${booking.clientEmail}`} className="link">{booking.clientEmail}</a>],
     ["Phone", booking.clientPhone ?? "Not given"],
     ["Booked", formatDate(booking.createdAt, tz, "short")],
+    ...(booking.rescheduleCount > 0
+      ? [["Rescheduled", booking.rescheduleCount === 1 ? "Once, by the client" : `${booking.rescheduleCount} times, by the client`] as [string, string]]
+      : []),
+    ...(booking.status === "cancelled" && booking.cancelledBy
+      ? [
+          [
+            "Cancelled",
+            `By ${booking.cancelledBy === "client" ? "the client" : "you"}${
+              booking.cancelledAt ? `, ${formatDate(booking.cancelledAt, tz, "short")}` : ""
+            }${booking.creditDue ? ". Deposit credit owed." : ""}`,
+          ] as [string, string],
+        ]
+      : []),
   ];
 
   return (

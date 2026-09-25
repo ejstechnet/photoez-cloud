@@ -6,12 +6,14 @@ import { db } from "@/db";
 import { photographers, sessionTypes } from "@/db/schema";
 import { loadRules, openDatesInMonth, slotsForDate } from "@/lib/booking/availability";
 import { depositCents, formatDuration, formatPrice } from "@/lib/booking/format";
-import { addMonths, dayOfWeek, formatDate, formatTime, localDateOf, zoneLabel } from "@/lib/booking/time";
+import { addMonths, formatDate, formatTime, localDateOf, zoneLabel } from "@/lib/booking/time";
 import { LOCATION_LABELS, type ShootLocation } from "@/lib/session-types";
-import { richTextHtml } from "@/lib/rich-text";
+import { richTextHtml, richTextToPlain } from "@/lib/rich-text";
 import { signedViewUrl } from "@/lib/storage";
 import { StudioBar, StudioFooter } from "../studio-bar";
 import { BookingForm } from "./booking-form";
+import { Calendar } from "./calendar";
+import { SessionPicker } from "./session-picker";
 
 // Public booking page: pick a session, a day, and a time, then enter your
 // details. Each choice is a link that adds to the URL
@@ -65,6 +67,13 @@ export default async function BookPage({ params, searchParams }: PageProps<"/stu
   const lastMonth = addMonths(thisMonth, MONTHS_AHEAD);
 
   const session = sessions.find((s) => s.id === one(query.session)) ?? null;
+  const photoUrls = new Map(
+    await Promise.all(
+      sessions
+        .filter((s) => s.imageKey)
+        .map(async (s) => [s.id, await signedViewUrl(s.imageKey!)] as const),
+    ),
+  );
 
   // The month on show: from the chosen date, the URL, or the first month with openings.
   const dateParam = one(query.date);
@@ -101,7 +110,7 @@ export default async function BookPage({ params, searchParams }: PageProps<"/stu
     <div className="flex flex-1 flex-col">
       <StudioBar slug={slug} name={name} logoUrl={logoUrl} logoBg={studio.logoBg} />
 
-      <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-10">
+      <main className={`mx-auto w-full flex-1 px-4 py-10 ${session ? "max-w-3xl" : "max-w-5xl"}`}>
         <p className="text-sm font-bold tracking-wider text-lime-ink uppercase">{name}</p>
         <h1 className="mt-1 font-display text-4xl font-bold tracking-tight sm:text-5xl">Book a session</h1>
 
@@ -131,31 +140,27 @@ export default async function BookPage({ params, searchParams }: PageProps<"/stu
                   </Link>
                 </div>
               ) : (
-                <ul className="mt-4 grid gap-3">
-                  {sessions.map((s) => (
-                    <li key={s.id}>
-                      <Link
-                        href={href({ session: s.id })}
-                        scroll={false}
-                        className="group block rounded-2xl border-2 border-border px-5 py-4 transition hover:-translate-y-0.5 hover:border-lime hover:shadow-lg"
-                      >
-                        <div className="flex flex-wrap items-baseline justify-between gap-x-4">
-                          <p className="font-display text-xl font-bold">{s.name}</p>
-                          <p className="font-bold text-lime-ink">{formatPrice(s.priceCents)}</p>
-                        </div>
-                        <p className="mt-1 text-sm text-muted">{sessionFacts(s)}</p>
-                        {s.shortDescription && <p className="mt-2">{s.shortDescription}</p>}
-                        {s.description && (
-                          <div
-                            className="rich-text mt-2 text-sm text-muted"
-                            // Cleaned by richTextHtml (lib/rich-text.ts) to simple formatting only.
-                            dangerouslySetInnerHTML={{ __html: richTextHtml(s.description) }}
-                          />
-                        )}
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
+                <div className="mt-6">
+                  <SessionPicker
+                    sessions={sessions.map((s) => ({
+                      id: s.id,
+                      name: s.name,
+                      // The short description, or the start of the full one.
+                      summary: s.shortDescription ?? (s.description ? richTextToPlain(s.description).slice(0, 200) : null),
+                      facts: [
+                        formatDuration(s.durationMinutes),
+                        s.location ? LOCATION_LABELS[s.location as ShootLocation] : null,
+                        s.photosIncluded ? `${s.photosIncluded} edited photos` : null,
+                      ]
+                        .filter(Boolean)
+                        .join(" · "),
+                      price: formatPrice(s.priceCents),
+                      photoUrl: photoUrls.get(s.id) ?? null,
+                      descriptionHtml: richTextHtml(s.description),
+                      href: href({ session: s.id }),
+                    }))}
+                  />
+                </div>
               )}
             </section>
 
@@ -272,95 +277,5 @@ function StepTitle({ n, done, children }: { n: number; done: boolean; children: 
       </span>
       {children}
     </h2>
-  );
-}
-
-const WEEKDAYS = ["S", "M", "T", "W", "T", "F", "S"];
-
-function Calendar({
-  month,
-  openDates,
-  selected,
-  prevHref,
-  nextHref,
-  dayHref,
-}: {
-  month: string;
-  openDates: string[];
-  selected: string | null;
-  prevHref: string | null;
-  nextHref: string | null;
-  dayHref: (date: string) => string;
-}) {
-  const first = `${month}-01`;
-  const [y, m] = month.split("-").map(Number);
-  const daysInMonth = new Date(Date.UTC(y, m, 0)).getUTCDate();
-  const cells: (string | null)[] = [
-    ...Array<null>(dayOfWeek(first)).fill(null),
-    ...Array.from({ length: daysInMonth }, (_, i) => `${month}-${String(i + 1).padStart(2, "0")}`),
-  ];
-  const label = new Date(Date.UTC(y, m - 1, 1)).toLocaleDateString("en-US", {
-    timeZone: "UTC",
-    month: "long",
-    year: "numeric",
-  });
-  const arrow = "grid size-9 place-items-center rounded-full border-2 border-border font-bold transition";
-
-  return (
-    <div>
-      <div className="flex items-center justify-between">
-        {prevHref ? (
-          <Link href={prevHref} scroll={false} className={`${arrow} hover:border-lime-ink`} aria-label="Previous month">
-            ‹
-          </Link>
-        ) : (
-          <span className={`${arrow} opacity-30`} aria-hidden="true">
-            ‹
-          </span>
-        )}
-        <p className="font-display text-lg font-bold">{label}</p>
-        {nextHref ? (
-          <Link href={nextHref} scroll={false} className={`${arrow} hover:border-lime-ink`} aria-label="Next month">
-            ›
-          </Link>
-        ) : (
-          <span className={`${arrow} opacity-30`} aria-hidden="true">
-            ›
-          </span>
-        )}
-      </div>
-      <div className="mt-3 grid grid-cols-7 gap-1 text-center">
-        {WEEKDAYS.map((d, i) => (
-          <span key={i} className="py-1 text-xs font-bold text-muted">
-            {d}
-          </span>
-        ))}
-        {cells.map((d, i) => {
-          if (!d) return <span key={`blank-${i}`} />;
-          const day = Number(d.slice(8));
-          if (!openDates.includes(d)) {
-            return (
-              <span key={d} className="grid aspect-square place-items-center rounded-full text-sm text-muted/50">
-                {day}
-              </span>
-            );
-          }
-          const isSelected = d === selected;
-          return (
-            <Link
-              key={d}
-              href={dayHref(d)}
-              scroll={false}
-              aria-current={isSelected ? "date" : undefined}
-              className={`grid aspect-square place-items-center rounded-full text-sm font-bold transition ${
-                isSelected ? "bg-brand text-white" : "bg-lime/20 text-lime-ink hover:bg-lime hover:text-brand-deep"
-              }`}
-            >
-              {day}
-            </Link>
-          );
-        })}
-      </div>
-    </div>
   );
 }

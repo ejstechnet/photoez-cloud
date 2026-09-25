@@ -78,6 +78,20 @@
       "when": 1790355901925,
       "tag": "0010_boring_randall_flagg",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1790360412589,
+      "tag": "0011_overjoyed_klaw",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1790361206825,
+      "tag": "0012_flowery_green_goblin",
+      "breakpoints": true
     }
   ]
 }

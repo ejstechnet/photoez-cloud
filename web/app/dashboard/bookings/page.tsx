@@ -101,6 +101,9 @@ export default async function BookingsPage({ searchParams }: PageProps<"/dashboa
                   <p className="truncate text-sm text-muted">
                     {b.sessionName} · {formatDate(b.startsAt, tz, "short")} · {formatTime(b.startsAt, tz)} ·{" "}
                     {formatPrice(b.priceCents)}
+                    {b.status === "cancelled" && b.cancelledBy === "client" && " · Cancelled by client"}
+                    {b.creditDue && " · Credit owed"}
+                    {b.status !== "cancelled" && b.rescheduleCount > 0 && " · Rescheduled"}
                   </p>
                 </div>
                 <BookingStatusPill status={b.status} />

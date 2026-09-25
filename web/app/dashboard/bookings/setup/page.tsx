@@ -9,9 +9,11 @@ import { localDateOf } from "@/lib/booking/time";
 import { requirePhotographer } from "@/lib/session";
 import { LOCATION_LABELS, type ShootLocation } from "@/lib/session-types";
 import { siteUrl } from "@/lib/site";
+import { signedViewUrl } from "@/lib/storage";
 import { deleteTimeOff } from "../actions";
 import { ConfirmButton } from "../confirm-button";
 import { AvailabilityForm } from "./availability-form";
+import { ClientChangesForm } from "./client-changes-form";
 import { TimeOffForm } from "./time-off-form";
 
 const NEW_STUDIO_HOURS = { start: "09:00", end: "17:00" };
@@ -36,9 +38,23 @@ export default async function BookingSetupPage() {
       .from(sessionTypes)
       .where(eq(sessionTypes.photographerId, user.id))
       .orderBy(asc(sessionTypes.sortOrder), asc(sessionTypes.createdAt)),
-    db.select({ slug: photographers.studioSlug }).from(photographers).where(eq(photographers.id, user.id)),
+    db
+      .select({
+        slug: photographers.studioSlug,
+        clientChangesEnabled: photographers.clientChangesEnabled,
+        rescheduleNoticeHours: photographers.rescheduleNoticeHours,
+        freeReschedules: photographers.freeReschedules,
+        cancelNoticeHours: photographers.cancelNoticeHours,
+      })
+      .from(photographers)
+      .where(eq(photographers.id, user.id)),
   ]);
   const today = localDateOf(new Date(), rules.timeZone);
+  const thumbs = new Map(
+    await Promise.all(
+      sessions.filter((s) => s.imageKey).map(async (s) => [s.id, await signedViewUrl(s.imageKey!)] as const),
+    ),
+  );
   const timeOff = await upcomingTimeOff(user.id, today);
 
   // A studio that hasn't saved hours yet starts from Monday–Friday, 9 to 5.
@@ -97,6 +113,14 @@ export default async function BookingSetupPage() {
                   href={`/dashboard/bookings/sessions/${s.id}`}
                   className="group flex items-center gap-4 rounded-2xl border-2 border-border px-5 py-4 transition hover:border-lime"
                 >
+                  {thumbs.has(s.id) ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={thumbs.get(s.id)} alt="" className="aspect-[2/3] w-12 shrink-0 rounded-lg object-cover" />
+                  ) : (
+                    <span className="grid aspect-[2/3] w-12 shrink-0 place-items-center rounded-lg bg-background text-center text-[10px] leading-tight font-semibold text-muted">
+                      No photo
+                    </span>
+                  )}
                   <div className="min-w-0 flex-1">
                     <p className="flex flex-wrap items-center gap-2 font-semibold">
                       {s.name}
@@ -142,6 +166,21 @@ export default async function BookingSetupPage() {
             bufferMinutes={rules.hours[0]?.bufferMinutes ?? 15}
             days={days}
             allZones={Intl.supportedValuesOf("timeZone")}
+          />
+        </div>
+      </section>
+
+      <section className="card mt-8 p-6 sm:p-8">
+        <h2 className="font-display text-2xl font-bold">Client changes</h2>
+        <p className="mt-1 text-sm text-muted">
+          Clients can move or cancel their own booking from their private link, following these rules.
+        </p>
+        <div className="mt-6">
+          <ClientChangesForm
+            enabled={studio.clientChangesEnabled}
+            rescheduleNoticeHours={studio.rescheduleNoticeHours}
+            freeReschedules={studio.freeReschedules}
+            cancelNoticeHours={studio.cancelNoticeHours}
           />
         </div>
       </section>
