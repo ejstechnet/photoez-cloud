@@ -17,7 +17,13 @@ export function GalleryForm({
 }: {
   action: (state: GalleryFormState, formData: FormData) => Promise<GalleryFormState>;
   clients: { id: string; name: string }[];
-  defaultValues?: { title: string; clientId: string | null; freeLimit: number; extraPhotoPriceCents?: number | null };
+  defaultValues?: {
+    title: string;
+    clientId: string | null;
+    freeLimit: number;
+    extraPhotoPriceCents?: number | null;
+    notesEnabled?: boolean | null;
+  };
   submitLabel: string;
   cancelHref: string;
   // Set when the photographer's plan includes selling extra photos.
@@ -73,6 +79,16 @@ export function GalleryForm({
           hint={`Clients can pick more than their free picks for this much each. Blank uses your studio price (${formatPrice(extras.studioPriceCents)}); 0 turns extras off for this gallery.`}
         />
       )}
+      <SelectField
+        label="Client notes on picks"
+        name="notes"
+        defaultValue={defaultValues?.notesEnabled == null ? "default" : defaultValues.notesEnabled ? "on" : "off"}
+        hint="Clients can add a note (like an editing request) to each photo they pick."
+      >
+        <option value="default">Use my studio setting</option>
+        <option value="on">On for this gallery</option>
+        <option value="off">Off for this gallery</option>
+      </SelectField>
       <FormError message={state.message} />
       <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center">
         <SubmitButton pending={pending} fullWidth={false}>

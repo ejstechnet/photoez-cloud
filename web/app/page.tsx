@@ -39,8 +39,8 @@ export default function Home() {
         <Image
           src="/home/hero.webp"
           alt="A smiling photographer shooting with her camera, surrounded by PhotoEZ Cloud cards: a new inquiry sorted by AI, photos found, a gallery delivered, a client gallery, and a booking confirmed."
-          width={2000}
-          height={1333}
+          width={2800}
+          height={1867}
           priority
           // Starts right after the text column and fits the whole image (cards included) in what's left.
           className="pointer-events-none absolute inset-y-0 right-0 hidden h-full w-[min(68%,calc(100%_-_440px))] object-contain object-right lg:block"
@@ -98,8 +98,8 @@ export default function Home() {
           <Image
             src="/home/hero.webp"
             alt=""
-            width={2000}
-            height={1333}
+            width={2800}
+            height={1867}
             className="mx-auto mt-10 w-full max-w-2xl lg:hidden"
             style={{
               maskImage: "radial-gradient(ellipse 50% 50% at 50% 50%, black 70%, transparent 100%)",

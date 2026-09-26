@@ -10,6 +10,7 @@ import { syncStripeStatus } from "@/lib/payments/connect";
 import { stripeConfigured } from "@/lib/stripe";
 import { FaqForm } from "./faq-form";
 import { PaymentsCard } from "./payments-card";
+import { NotesToggle } from "./notes-toggle";
 import { PlanCard } from "./plan-card";
 import { PLAN_LABELS, planFor } from "@/lib/plans";
 import { studioPlan } from "@/lib/studio-plan";
@@ -36,6 +37,7 @@ export default async function SettingsPage() {
       quoteOnlyTypes: photographers.quoteOnlyTypes,
       stripeAccountId: photographers.stripeAccountId,
       stripeReady: photographers.stripeChargesEnabled,
+      photoNotesEnabled: photographers.photoNotesEnabled,
     })
     .from(photographers)
     .where(eq(photographers.id, user.id));
@@ -93,9 +95,10 @@ export default async function SettingsPage() {
           </section>
 
           <section className="card p-6 sm:p-8">
-            <h2 className="font-display text-2xl font-bold">Proof watermark</h2>
+            <h2 className="font-display text-2xl font-bold">Proofing</h2>
             <p className="mt-1 text-sm text-muted">
-              Stamped on every proof your clients see while they choose favorites. Final downloads are always clean.
+              Your watermark is stamped on every proof clients see while they choose favorites. Final downloads are
+              always clean.
             </p>
             <div className="mt-6">
               <WatermarkForm
@@ -103,6 +106,7 @@ export default async function SettingsPage() {
                 opacity={settings.opacity}
                 position={settings.position}
               />
+            <NotesToggle enabled={settings.photoNotesEnabled} />
             </div>
           </section>
         </div>

@@ -24,6 +24,7 @@ export default async function EditGalleryPage({ params }: PageProps<"/dashboard/
       freeLimit: galleries.freeLimit,
       headerImageKey: galleries.headerImageKey,
       extraPhotoPriceCents: galleries.extraPhotoPriceCents,
+      notesEnabled: galleries.notesEnabled,
     })
     .from(galleries)
     .where(and(eq(galleries.id, id), eq(galleries.photographerId, user.id)));

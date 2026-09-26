@@ -26,6 +26,8 @@ export async function findGalleryByToken(token: string) {
       plan: photographers.plan,
       extrasCount: galleries.extrasCount,
       extrasCents: galleries.extrasCents,
+      galleryNotes: galleries.notesEnabled,
+      studioNotes: photographers.photoNotesEnabled,
       clientName: clients.name,
       studioName: photographers.businessName,
       photographerName: photographers.name,
@@ -48,7 +50,9 @@ export async function findGalleryByToken(token: string) {
     galleryPriceCents: gallery.galleryExtraPrice,
     studioPriceCents: gallery.studioExtraPrice,
   });
-  return { ...gallery, extraPriceCents };
+  // Client notes on picks: the gallery's own setting, or the studio's.
+  const notesEnabled = gallery.galleryNotes ?? gallery.studioNotes;
+  return { ...gallery, extraPriceCents, notesEnabled };
 }
 
 export type ClientGallery = NonNullable<Awaited<ReturnType<typeof findGalleryByToken>>>;
@@ -61,10 +65,12 @@ export async function clientPhotos(gallery: ClientGallery) {
     .select({
       id: photos.id,
       fileKey: photos.fileKey,
+      originalName: photos.originalName,
       width: photos.width,
       height: photos.height,
       proofMadeAt: photos.proofMadeAt,
       favoriteId: favorites.id,
+      note: favorites.note,
     })
     .from(photos)
     .leftJoin(favorites, eq(favorites.photoId, photos.id))
@@ -80,9 +86,12 @@ export async function clientPhotos(gallery: ClientGallery) {
   return rows.map((row) => ({
     id: row.id,
     fileKey: row.fileKey,
+    // The photographer's real file name, so clients can ask about a specific photo.
+    name: row.originalName,
     aspect: row.width && row.height ? row.width / row.height : 2 / 3,
     variant: gallery.hasWatermark ? ("proof" as const) : ("preview" as const),
     selected: row.favoriteId !== null,
+    note: row.note ?? "",
   }));
 }
 

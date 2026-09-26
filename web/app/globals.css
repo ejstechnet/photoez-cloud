@@ -3,11 +3,11 @@
 /* PhotoEZ palette: navy + lime green (Seahawks colors), the sky blue from
    the PhotoEZ Cloud logo, and a creative-studio set of supporting accents. */
 :root {
-  --background: #f4f4f8;
+  --background: #eceff5;
   --foreground: #17171d;
   --surface: #ffffff;
   --muted: #5b6477;
-  --border: #e2e8f0;
+  --border: #d8dee8;
 
   --brand: #1a3a6b;
   --brand-deep: #0f2548;
@@ -93,8 +93,10 @@ body {
   .btn-secondary {
     @apply inline-flex items-center justify-center gap-2 rounded-full border-2 border-border bg-surface px-5 py-2.5 text-sm font-bold tracking-wider uppercase transition hover:border-brand;
   }
+  /* White panels with a clear edge and a soft shadow, so each section stands
+     apart from the page background and from its neighbors. */
   .card {
-    @apply rounded-3xl border border-border bg-surface;
+    @apply rounded-3xl border border-border bg-surface shadow-[0_1px_2px_rgb(15_37_72/0.06),0_6px_20px_-8px_rgb(15_37_72/0.14)];
   }
   .link {
     @apply font-semibold text-link underline decoration-2 decoration-lime underline-offset-4 hover:decoration-coral;

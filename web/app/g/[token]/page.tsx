@@ -54,9 +54,13 @@ export default async function ClientGalleryPage({ params, searchParams }: PagePr
     photos.map(async (photo, i) => ({
       id: photo.id,
       number: i + 1,
+      name: photo.name,
+      // Shown in the lightbox next to the photo number.
+      caption: photo.name,
       aspect: photo.aspect,
       url: await signedViewUrl(photoKey(photo.fileKey, photo.variant)),
       selected: photo.selected,
+      note: photo.note,
     })),
   );
 
@@ -175,6 +179,7 @@ export default async function ClientGalleryPage({ params, searchParams }: PagePr
             tiles={tiles}
             freeLimit={gallery.freeLimit}
             extraPriceCents={gallery.extraPriceCents}
+            notesEnabled={gallery.notesEnabled}
             locked={gallery.status !== "pending"}
             preview={isPreview}
             studio={studio}

@@ -9,6 +9,8 @@ export type GridPhoto = {
   name: string;
   aspect: number;
   selected: boolean;
+  // The client's note on this pick, if any.
+  note?: string | null;
   thumbUrl: string;
   previewUrl: string;
 };
@@ -36,6 +38,13 @@ export function PhotoGrid({ galleryId, photos }: { galleryId: string; photos: Gr
           onClose={() => setOpen(null)}
           selected={new Set(photos.filter((photo) => photo.selected).map((photo) => photo.id))}
           badge="Client's pick"
+          extra={
+            photos[Math.min(open, photos.length - 1)].note ? (
+              <p className="max-w-md rounded-xl bg-sun px-4 py-2 text-sm font-medium text-brand-deep">
+                <span className="font-bold">Client&apos;s note:</span> {photos[Math.min(open, photos.length - 1)].note}
+              </p>
+            ) : null
+          }
         />
       )}
     </>

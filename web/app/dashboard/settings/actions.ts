@@ -288,3 +288,10 @@ export async function saveExtraPhotoPrice(_prev: ExtrasFormState, formData: Form
   revalidatePath("/dashboard", "layout");
   return { saved: true };
 }
+
+// Clients can leave a note on each photo they pick (galleries can override).
+export async function savePhotoNotes(enabled: boolean): Promise<void> {
+  const photographer = await requirePhotographer();
+  await db.update(photographers).set({ photoNotesEnabled: enabled }).where(eq(photographers.id, photographer.id));
+  revalidatePath("/dashboard", "layout");
+}

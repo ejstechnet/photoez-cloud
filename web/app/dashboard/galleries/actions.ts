@@ -53,6 +53,11 @@ const gallerySchema = z.object({
     .trim()
     .refine((value) => value === "" || isUuid(value), "Choose a client from the list.")
     .transform((value) => value || null),
+  // Client notes on picks: the studio setting, or on/off for this gallery.
+  notes: z
+    .enum(["default", "on", "off"])
+    .catch("default")
+    .transform((v) => (v === "default" ? null : v === "on")),
   // Dollars; blank = the studio's price per extra photo.
   extraPhotoPrice: z
     .string()
@@ -68,7 +73,13 @@ export type GalleryFormState = {
 };
 
 type ParsedGallery =
-  | { ok: true; data: Omit<z.output<typeof gallerySchema>, "extraPhotoPrice"> & { extraPhotoPriceCents?: number | null } }
+  | {
+      ok: true;
+      data: Omit<z.output<typeof gallerySchema>, "extraPhotoPrice" | "notes"> & {
+        extraPhotoPriceCents?: number | null;
+        notesEnabled: boolean | null;
+      };
+    }
   | { ok: false; state: GalleryFormState };
 
 async function parseGallery(formData: FormData, photographerId: string): Promise<ParsedGallery> {
@@ -77,6 +88,7 @@ async function parseGallery(formData: FormData, photographerId: string): Promise
     freeLimit: formData.get("freeLimit") ?? "",
     clientId: String(formData.get("clientId") ?? ""),
     extraPhotoPrice: String(formData.get("extraPhotoPrice") ?? ""),
+    notes: String(formData.get("notes") ?? "default"),
   });
   if (!parsed.success) {
     const errors: GalleryFormState["errors"] = {};
@@ -95,9 +107,12 @@ async function parseGallery(formData: FormData, photographerId: string): Promise
     if (!client) return { ok: false, state: { errors: { clientId: "Choose a client from the list." } } };
   }
   // Only plans with gallery upsells can set a gallery's extra photo price.
-  const { extraPhotoPrice, ...rest } = parsed.data;
+  const { extraPhotoPrice, notes, ...rest } = parsed.data;
   const { upsells } = await studioPlan(photographerId);
-  return { ok: true, data: { ...rest, ...(upsells ? { extraPhotoPriceCents: extraPhotoPrice } : {}) } };
+  return {
+    ok: true,
+    data: { ...rest, notesEnabled: notes, ...(upsells ? { extraPhotoPriceCents: extraPhotoPrice } : {}) },
+  };
 }
 
 export async function createGallery(_prev: GalleryFormState, formData: FormData): Promise<GalleryFormState> {
@@ -240,7 +255,13 @@ export async function undoDelivery(galleryId: string): Promise<void> {
     await db
       .update(galleries)
       .set({
-        status: sql`case when ${galleries.submittedAt} is null then 'pending' else 'submitted' end`,
+        // Back to where it was before delivery, including Paid & submitted when
+        // the client paid for extra photos.
+        status: sql`case
+          when ${galleries.submittedAt} is null then 'pending'
+          when exists (select 1 from payments where payments.gallery_id = ${galleries.id} and payments.status = 'paid')
+            then 'paid_and_submitted'
+          else 'submitted' end`,
         deliveredAt: null,
       })
       .where(and(eq(galleries.id, galleryId), eq(galleries.status, "delivered")));

@@ -16,6 +16,7 @@ import { DeleteAllButton } from "./delete-all-button";
 import { GalleryTitle } from "./gallery-title";
 import { StatusPanel } from "./status-panel";
 import { describeDownloads, downloadSummaries } from "@/lib/downloads";
+import { paidGalleryExtras } from "@/lib/payments/gallery-checkout";
 import { formatPrice } from "@/lib/booking/format";
 import { PhotoGrid } from "./photo-grid";
 import { ProofRefresher } from "./proof-refresher";
@@ -53,6 +54,7 @@ export default async function GalleryPage({ params }: PageProps<"/dashboard/gall
       width: photos.width,
       height: photos.height,
       favoriteId: favorites.id,
+      note: favorites.note,
     })
     .from(photos)
     .leftJoin(favorites, eq(favorites.photoId, photos.id))
@@ -77,11 +79,14 @@ export default async function GalleryPage({ params }: PageProps<"/dashboard/gall
       name: photo.originalName,
       aspect: photo.width && photo.height ? photo.width / photo.height : 2 / 3,
       selected: photo.favoriteId !== null,
+      note: photo.note,
       thumbUrl: await signedViewUrl(photoKey(photo.fileKey, "thumb")),
       previewUrl: await signedViewUrl(photoKey(photo.fileKey, "preview")),
     })),
   );
   const downloads = await downloadSummaries([gallery.id]);
+  const paidExtras = await paidGalleryExtras(gallery.id);
+  const extrasOwedCents = Math.max(0, gallery.extrasCents - paidExtras.cents);
   const proofs = tiles.filter((tile) => tile.kind === "proof");
   const finals = tiles.filter((tile) => tile.kind === "final");
 
@@ -134,21 +139,27 @@ export default async function GalleryPage({ params }: PageProps<"/dashboard/gall
           submitted={gallery.status === "submitted" || gallery.status === "paid_and_submitted"}
           canReopen={gallery.status !== "pending"}
           selectedNames={proofs.filter((tile) => tile.selected).map((tile) => tile.name)}
+          notes={proofs
+            .filter((tile) => tile.selected && tile.note)
+            .map((tile) => ({ name: tile.name, note: tile.note! }))}
           freeLimit={gallery.freeLimit}
         />
       </div>
 
       {gallery.extrasCount > 0 && (
+        // Paid or owed comes from the actual Stripe payments, not the status,
+        // which moves on to Delivered and Completed.
         <p
           className={`mt-4 rounded-2xl px-5 py-3 text-sm font-semibold ${
-            gallery.status === "paid_and_submitted" ? "bg-lime/20" : "bg-sun/30"
+            extrasOwedCents === 0 ? "bg-lime/20" : "bg-sun/30"
           }`}
         >
           Your client chose {gallery.extrasCount} extra {gallery.extrasCount === 1 ? "photo" : "photos"}:{" "}
-          {formatPrice(gallery.extrasCents)}{" "}
-          {gallery.status === "paid_and_submitted"
-            ? "paid through Stripe."
-            : "owed. Stripe wasn't connected, so collect it your own way."}
+          {extrasOwedCents === 0
+            ? `${formatPrice(paidExtras.cents)} paid through Stripe.`
+            : paidExtras.cents > 0
+              ? `${formatPrice(paidExtras.cents)} paid through Stripe, ${formatPrice(extrasOwedCents)} owed. Collect the rest your own way.`
+              : `${formatPrice(extrasOwedCents)} owed. Stripe wasn't connected, so collect it your own way.`}
         </p>
       )}
 
