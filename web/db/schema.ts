@@ -68,6 +68,8 @@ export const photographers = pgTable("photographers", {
   // Price per photo a client selects beyond a gallery's included number
   // (PhotoEZ's "global extra price"; galleries can override it).
   extraPhotoPriceCents: integer("extra_photo_price_cents").notNull().default(1000),
+  // Clients can leave a note on each photo they pick (galleries can override).
+  photoNotesEnabled: boolean("photo_notes_enabled").notNull().default(true),
   // How long new session credits last, in months; null = they never expire.
   creditValidMonths: integer("credit_valid_months").default(12),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
@@ -174,6 +176,8 @@ export const galleries = pgTable(
     headerImageKey: text("header_image_key"),
     // This gallery's price per extra photo; null uses the studio's price.
     extraPhotoPriceCents: integer("extra_photo_price_cents"),
+    // Client notes on picks for this gallery; null uses the studio setting.
+    notesEnabled: boolean("notes_enabled"),
     // Extra photos the client chose past freeLimit when they submitted, and
     // what they cost (paid through Stripe, or owed when it isn't connected).
     extrasCount: integer("extras_count").notNull().default(0),
@@ -610,6 +614,9 @@ export const favorites = pgTable(
     photoId: uuid("photo_id")
       .notNull()
       .references(() => photos.id, { onDelete: "cascade" }),
+    // The client's note on this pick, e.g. an editing request. Goes away if
+    // they unselect the photo (as in PhotoEZ for WordPress).
+    note: text("note"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [unique("favorites_photo_unique").on(t.photoId)],

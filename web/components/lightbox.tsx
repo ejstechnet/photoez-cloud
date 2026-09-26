@@ -19,6 +19,7 @@ export function Lightbox({
   badge,
   status,
   notice,
+  extra,
 }: {
   items: LightboxItem[];
   index: number;
@@ -34,6 +35,8 @@ export function Lightbox({
   // A message for the viewer, e.g. why a photo couldn't be selected. Shown
   // here because the page behind the lightbox is covered.
   notice?: string | null;
+  // Anything else to show under the photo, e.g. a client's note.
+  extra?: React.ReactNode;
 }) {
   const item = items[index];
   const go = (step: number) => onIndex((index + step + items.length) % items.length);
@@ -127,6 +130,7 @@ export function Lightbox({
             </span>
           )
         )}
+        {extra}
         {notice && (
           <p role="alert" className="max-w-sm rounded-xl bg-sun px-4 py-2 text-center text-sm font-semibold text-brand-deep">
             {notice}

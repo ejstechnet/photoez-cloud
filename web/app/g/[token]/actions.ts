@@ -1,6 +1,6 @@
 "use server";
 
-import { and, count, eq } from "drizzle-orm";
+import { and, count, eq, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { db } from "@/db";
@@ -98,4 +98,33 @@ export async function submitSelections(
   revalidatePath(`/g/${token}`);
   revalidatePath(`/dashboard/galleries/${gallery.id}`);
   return { ok: true };
+}
+
+// A client's note on one of their picks (e.g. an editing request). Only while
+// proofing, only on photos they've picked, plain text up to 500 characters.
+export async function saveNote(
+  token: string,
+  photoId: string,
+  note: string,
+): Promise<{ ok: true; note: string } | { error: string }> {
+  const gallery = await findGalleryByToken(token);
+  if (!gallery) return { error: "This gallery link isn't valid." };
+  if (!gallery.notesEnabled) return { error: "Notes are turned off for this gallery." };
+  if (gallery.status !== "pending") return { error: "Your selections have already been submitted." };
+  if (!z.uuid().safeParse(photoId).success) return { error: "That photo couldn't be found." };
+
+  const clean = note.replace(/\s+$/g, "").slice(0, 500).trim();
+  const updated = await db
+    .update(favorites)
+    .set({ note: clean || null })
+    .where(
+      and(
+        eq(favorites.photoId, photoId),
+        sql`${favorites.photoId} in (select id from photos where gallery_id = ${gallery.id})`,
+      ),
+    )
+    .returning({ id: favorites.id });
+  if (updated.length === 0) return { error: "Pick the photo first, then add a note." };
+  revalidatePath(`/dashboard/galleries/${gallery.id}`);
+  return { ok: true, note: clean };
 }

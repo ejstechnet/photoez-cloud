@@ -7,8 +7,18 @@ import { Lightbox } from "@/components/lightbox";
 import { formatPrice } from "@/lib/booking/format";
 import { extrasFor } from "@/lib/gallery-extras";
 import { submitSelections, toggleFavorite } from "./actions";
+import { NoteEditor } from "./note-editor";
 
-export type Tile = { id: string; number: number; url: string; aspect: number; selected: boolean };
+export type Tile = {
+  id: string;
+  number: number;
+  name: string;
+  caption: string;
+  url: string;
+  aspect: number;
+  selected: boolean;
+  note: string;
+};
 
 // The PhotoEZ proofing experience: numbered proofs, hearts to choose
 // favorites up to the free limit (or past it, for a price per extra photo,
@@ -18,6 +28,7 @@ export function ProofingGallery({
   tiles,
   freeLimit,
   extraPriceCents,
+  notesEnabled,
   locked,
   preview,
   studio,
@@ -28,6 +39,8 @@ export function ProofingGallery({
   freeLimit: number;
   // Price per photo past freeLimit; null means clients are capped at freeLimit.
   extraPriceCents: number | null;
+  // Clients can leave a note on each pick (the studio's or gallery's setting).
+  notesEnabled: boolean;
   locked: boolean;
   preview: boolean;
   studio: string;
@@ -38,6 +51,7 @@ export function ProofingGallery({
   const [message, setMessage] = useState<string | null>(null);
   const [open, setOpen] = useState<number | null>(null);
   const [onlySelected, setOnlySelected] = useState(false);
+  const [notes, setNotes] = useState(() => new Map(tiles.map((t) => [t.id, t.note])));
   const [submitting, startSubmit] = useTransition();
 
   const canSelect = !locked && !preview;
@@ -171,9 +185,9 @@ That includes ${extras.count} extra ${extras.count === 1 ? "photo" : "photos"} f
                   type="button"
                   onClick={() => setOpen(tiles.indexOf(tile))}
                   className="block w-full"
-                  style={{ aspectRatio: tile.aspect }}
-                  aria-label={`View photo ${tile.number}`}
+                  aria-label={`View photo ${tile.number}, ${tile.name}`}
                 >
+                  <span className="block overflow-hidden" style={{ aspectRatio: tile.aspect }}>
                   {/* Signed links to watermarked proofs; next/image optimization isn't needed. */}
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
@@ -184,10 +198,28 @@ That includes ${extras.count} extra ${extras.count === 1 ? "photo" : "photos"} f
                     onContextMenu={(event) => event.preventDefault()}
                     className="size-full object-cover transition duration-300 group-hover:scale-105"
                   />
+                  </span>
+                  {/* The photo's file name, so clients can ask about a specific one. */}
+                  <span
+                    title={tile.name}
+                    className={`block truncate px-2.5 py-1.5 text-left font-mono text-[11px] ${
+                      isSelected ? "bg-lime font-bold text-brand-deep" : "text-white/85"
+                    }`}
+                  >
+                    {tile.name}
+                  </span>
                 </button>
                 <span className="pointer-events-none absolute top-2 left-2 grid size-7 place-items-center rounded-full bg-brand-deep/80 text-xs font-bold text-white">
                   {tile.number}
                 </span>
+                {isSelected && notes.get(tile.id) && (
+                  <span
+                    className="pointer-events-none absolute top-2 right-2 rounded-full bg-sun px-2 py-0.5 text-[11px] font-bold text-brand-deep"
+                    title={notes.get(tile.id)}
+                  >
+                    ✎ Note
+                  </span>
+                )}
                 {(canSelect || preview || isSelected) && (
                   <button
                     type="button"
@@ -195,7 +227,7 @@ That includes ${extras.count} extra ${extras.count === 1 ? "photo" : "photos"} f
                     disabled={locked}
                     aria-pressed={isSelected}
                     aria-label={isSelected ? `Unselect photo ${tile.number}` : `Select photo ${tile.number}`}
-                    className={`absolute right-2 bottom-2 grid size-11 place-items-center rounded-full shadow-lg transition ${
+                    className={`absolute right-2 bottom-9 grid size-11 place-items-center rounded-full shadow-lg transition ${
                       isSelected ? "bg-lime text-brand-deep" : "bg-white/90 text-brand-deep hover:scale-110"
                     }`}
                   >
@@ -254,6 +286,23 @@ That includes ${extras.count} extra ${extras.count === 1 ? "photo" : "photos"} f
           badge="One of your picks"
           status={canSelect ? `${limitText} selected` : undefined}
           notice={message}
+          extra={
+            notesEnabled && selected.has(tiles[open].id) ? (
+              canSelect ? (
+                <NoteEditor
+                  key={tiles[open].id}
+                  token={token}
+                  photoId={tiles[open].id}
+                  note={notes.get(tiles[open].id) ?? ""}
+                  onSaved={(note) => setNotes((current) => new Map(current).set(tiles[open].id, note))}
+                />
+              ) : notes.get(tiles[open].id) ? (
+                <p className="max-w-md rounded-xl bg-white/10 px-4 py-2 text-sm text-white/85">
+                  <span className="font-bold">Your note:</span> {notes.get(tiles[open].id)}
+                </p>
+              ) : null
+            ) : null
+          }
         />
       )}
     </>

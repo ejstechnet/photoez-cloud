@@ -5,8 +5,9 @@ import { HeartIcon } from "@/components/icons";
 import { deletePhoto } from "../actions";
 
 // One photo in the photographer's grid: uncropped in its own shape, a
-// PhotoEZ-style number badge, a lime heart when the client picked it, and a
-// delete button on hover. Clicking opens the lightbox.
+// PhotoEZ-style number badge, a lime heart when the client picked it, the
+// real file name underneath (as in PhotoEZ for WordPress, so picks are easy
+// to find for editing), and a delete button on hover. Clicking opens the lightbox.
 export function PhotoTile({
   galleryId,
   id,
@@ -14,6 +15,7 @@ export function PhotoTile({
   name,
   aspect,
   selected,
+  note,
   thumbUrl,
   onOpen,
 }: {
@@ -23,6 +25,7 @@ export function PhotoTile({
   name: string;
   aspect: number;
   selected: boolean;
+  note?: string | null;
   thumbUrl: string;
   onOpen: () => void;
 }) {
@@ -46,9 +49,9 @@ export function PhotoTile({
         type="button"
         onClick={onOpen}
         className="block w-full"
-        style={{ aspectRatio: aspect }}
         aria-label={`View ${name}`}
       >
+        <span className="block overflow-hidden" style={{ aspectRatio: aspect }}>
         {/* Signed R2 URLs point at pre-sized thumbnails, so next/image optimization isn't needed. */}
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
@@ -57,13 +60,31 @@ export function PhotoTile({
           loading="lazy"
           className="size-full object-cover transition duration-300 group-hover:scale-105"
         />
+        </span>
+        {/* The real file name, e.g. IMG_4821.jpg; full name on hover when it's long. */}
+        <span
+          title={name}
+          className={`block truncate px-2.5 py-1.5 text-left font-mono text-[11px] ${
+            selected ? "bg-lime font-bold text-brand-deep" : "text-white/85"
+          }`}
+        >
+          {name}
+        </span>
       </button>
+      {note && (
+        <span
+          className="pointer-events-none absolute top-11 left-2 rounded-full bg-sun px-2 py-0.5 text-[11px] font-bold text-brand-deep"
+          title={note}
+        >
+          ✎ Note
+        </span>
+      )}
       <span className="pointer-events-none absolute top-2 left-2 grid size-7 place-items-center rounded-full bg-brand-deep/80 text-xs font-bold text-white">
         {number}
       </span>
       {selected && (
         <span
-          className="pointer-events-none absolute right-2 bottom-2 grid size-9 place-items-center rounded-full bg-lime text-brand-deep shadow-lg"
+          className="pointer-events-none absolute right-2 bottom-10 grid size-9 place-items-center rounded-full bg-lime text-brand-deep shadow-lg"
           title="The client picked this photo"
         >
           <HeartIcon size={18} fill="currentColor" />

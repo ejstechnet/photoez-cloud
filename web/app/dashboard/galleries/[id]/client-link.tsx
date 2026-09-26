@@ -11,6 +11,7 @@ export function ClientLink({
   submitted,
   canReopen,
   selectedNames,
+  notes,
   freeLimit,
 }: {
   galleryId: string;
@@ -19,6 +20,8 @@ export function ClientLink({
   // Any stage after proofing: submitted, delivered, completed, or expired.
   canReopen: boolean;
   selectedNames: string[];
+  // The client's notes on their picks, by file name.
+  notes: { name: string; note: string }[];
   freeLimit: number;
 }) {
   const [copied, setCopied] = useState<"link" | "names" | null>(null);
@@ -84,6 +87,19 @@ export function ClientLink({
           )}
         </div>
       </div>
+      {notes.length > 0 && (
+        <div className="mt-4 border-t border-border pt-4">
+          <p className="text-sm font-semibold">Client notes ({notes.length})</p>
+          <ul className="mt-2 space-y-2">
+            {notes.map((n) => (
+              <li key={n.name} className="rounded-xl bg-sun/20 px-3.5 py-2.5 text-sm">
+                <span className="font-mono text-xs font-bold">{n.name}</span>
+                <span className="mt-0.5 block whitespace-pre-line">{n.note}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </section>
   );
 }

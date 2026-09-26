@@ -183,9 +183,10 @@ export default async function StudioPage({ params }: PageProps<"/studio/[slug]">
       </header>
 
       <main className="mx-auto grid w-full max-w-5xl flex-1 gap-8 px-4 py-12 lg:grid-cols-[1fr_1.15fr]">
-        <section className="space-y-8">
+        {/* Each part in its own card, so sections read as separate blocks. */}
+        <section className="space-y-6">
           {bookingOpen && (
-            <div id="book" className="scroll-mt-24">
+            <div id="book" className="card scroll-mt-24 p-6">
               <h2 className="font-display text-2xl font-bold">Book a session</h2>
               <ul className="mt-3 grid gap-2">
                 {bookable.map((s) => (
@@ -216,7 +217,7 @@ export default async function StudioPage({ params }: PageProps<"/studio/[slug]">
             </div>
           )}
           {studio.bio && (
-            <div id="about" className="scroll-mt-24">
+            <div id="about" className="card scroll-mt-24 p-6">
               <h2 className="font-display text-2xl font-bold">About</h2>
               <div
                 className="rich-text mt-3 text-muted"
@@ -226,7 +227,7 @@ export default async function StudioPage({ params }: PageProps<"/studio/[slug]">
             </div>
           )}
           {sessions.length > 0 && (
-            <div id="sessions" className="scroll-mt-24">
+            <div id="sessions" className="card scroll-mt-24 p-6">
               <h2 className="font-display text-2xl font-bold">Sessions</h2>
               <div className="mt-3 flex flex-wrap gap-2">
                 {sessions.map((session) => (
@@ -244,7 +245,7 @@ export default async function StudioPage({ params }: PageProps<"/studio/[slug]">
             </div>
           )}
           {studio.shootLocations.length > 0 && (
-            <div id="where" className="scroll-mt-24">
+            <div id="where" className="card scroll-mt-24 p-6">
               <h2 className="font-display text-2xl font-bold">Where we shoot</h2>
               <p className="mt-3 text-muted">
                 {studio.shootLocations.map((place) => LOCATION_LABELS[place as ShootLocation]).join(" · ")}
@@ -252,7 +253,7 @@ export default async function StudioPage({ params }: PageProps<"/studio/[slug]">
             </div>
           )}
           {faqs.length > 0 && (
-            <div id="faq" className="scroll-mt-24">
+            <div id="faq" className="card scroll-mt-24 p-6">
               <h2 className="font-display text-2xl font-bold">Questions &amp; answers</h2>
               <div className="mt-3 divide-y divide-border rounded-2xl border-2 border-border bg-surface">
                 {faqs.map((faq) => (
