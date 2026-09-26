@@ -12,6 +12,7 @@ import {
   bookingInspoPhotos,
   bookings,
   clients,
+  coupons,
   photographers,
   sessionTypes,
 } from "@/db/schema";
@@ -19,8 +20,11 @@ import { pickAddons } from "@/lib/booking/addons";
 import { isOverlapError, loadRules, slotsForDate } from "@/lib/booking/availability";
 import { MAX_INSPO_PHOTOS, checkAnswers, fieldsForSession } from "@/lib/booking/fields";
 import { currentPrice } from "@/lib/booking/pricing";
-import { depositCents } from "@/lib/booking/format";
 import { PAYMENT_HOLD_MINUTES } from "@/lib/booking/status";
+import { normalizeCode } from "@/lib/coupons";
+import { checkCouponCode } from "@/lib/coupon-lookup";
+import { creditBalance, useCredits } from "@/lib/credits";
+import { nextPayment } from "@/lib/payments/amounts";
 import { paymentAccount, releaseExpiredHolds, releaseHold, startCheckout } from "@/lib/payments/checkout";
 import { contractTemplateFor } from "@/lib/contracts/for-booking";
 import { offeredAddons } from "@/lib/booking/session-addons";
@@ -56,6 +60,7 @@ export type BookingFormState = {
   taken?: boolean;
   // Answers to the studio's own questions, by question id.
   fieldErrors?: Record<string, string>;
+  couponError?: string;
   inspoError?: string;
 };
 
@@ -191,13 +196,43 @@ export async function createBooking(
   }
   const extras = pickAddons(await offeredAddons(session.id), picked);
   if (!extras.ok) return { message: extras.message };
-  const currentPriceCents = currentPrice(session, localDateOf(new Date(), rules.timeZone)).priceCents;
+  const today = localDateOf(new Date(), rules.timeZone);
+  const currentPriceCents = currentPrice(session, today).priceCents;
+
+  // A coupon code, checked again here (the page's preview is only a preview).
+  const codeEntered = normalizeCode(String(formData.get("couponCode") ?? ""));
+  let discountCents = 0;
+  if (codeEntered) {
+    const coupon = await checkCouponCode(
+      studio.id,
+      session.id,
+      codeEntered,
+      currentPriceCents + extras.addonsCents,
+      today,
+      data.email,
+    );
+    if (!coupon.ok) return { couponError: coupon.message, message: coupon.message };
+    discountCents = coupon.discountCents;
+  }
+
+  // Session credit, when the client chose to use it: as much as the total needs.
+  const totalCents = Math.max(0, currentPriceCents + extras.addonsCents - discountCents);
+  const creditWanted =
+    formData.get("useCredit") === "on" ? Math.min(await creditBalance(studio.id, data.email, today), totalCents) : 0;
 
   // With the studio's Stripe connected and a deposit to pay, the booking is
   // held while the client pays; otherwise it's confirmed right away.
-  const takesDeposit =
-    (await paymentAccount(studio.id)) !== null &&
-    depositCents(currentPriceCents + extras.addonsCents, session.depositPercent) > 0;
+  const firstPayment = nextPayment(
+    {
+      priceCents: currentPriceCents,
+      addonsCents: extras.addonsCents,
+      depositPercent: session.depositPercent,
+      discountCents,
+      creditCents: creditWanted,
+    },
+    [],
+  );
+  const takesDeposit = (await paymentAccount(studio.id)) !== null && firstPayment?.kind === "deposit";
   await releaseExpiredHolds(studio.id);
 
   const manageToken = randomBytes(24).toString("base64url");
@@ -218,6 +253,9 @@ export async function createBooking(
             .returning({ id: clients.id })
         )[0].id;
 
+      // The credit actually available at this moment (a second booking could race).
+      const creditCents = creditWanted > 0 ? await useCredits(tx, studio.id, data.email, today, creditWanted) : 0;
+
       const [booking] = await tx.insert(bookings).values({
         photographerId: studio.id,
         sessionTypeId: session.id,
@@ -237,6 +275,9 @@ export async function createBooking(
         notes: data.notes,
         manageToken,
         addonsCents: extras.addonsCents,
+        couponCode: codeEntered || null,
+        discountCents,
+        creditCents,
         answers: checked.answers,
       }).returning({ id: bookings.id });
 
@@ -285,4 +326,48 @@ export async function createBooking(
   // Straight to signing when this session has a contract, like PhotoEZ Contracts.
   const needsContract = saved ? (await contractTemplateFor(saved)) !== null : false;
   redirect(needsContract ? `/booking/${manageToken}/contract?new=1` : `/booking/${manageToken}?new=1`);
+}
+
+// ---- Coupon preview and credit check (from the booking form) ----
+
+// Shows what a code takes off before the client books. createBooking checks again.
+export async function previewCoupon(
+  slug: string,
+  sessionTypeId: string,
+  code: string,
+  totalCents: number,
+  // When the client has typed it, their email (for per-client limits).
+  clientEmail?: string,
+): Promise<
+  { ok: true; code: string; kind: "percent" | "amount"; value: number } | { ok: false; message: string }
+> {
+  const normalized = normalizeCode(code);
+  if (!normalized) return { ok: false, message: "Enter a code." };
+  const [studio] = await db
+    .select({ id: photographers.id, timeZone: photographers.timeZone })
+    .from(photographers)
+    .where(eq(photographers.studioSlug, slug));
+  if (!studio || !z.uuid().safeParse(sessionTypeId).success) return { ok: false, message: "That code isn't valid." };
+  const today = localDateOf(new Date(), studio.timeZone);
+  const email = clientEmail && z.email().safeParse(clientEmail.trim()).success ? clientEmail : undefined;
+  const result = await checkCouponCode(studio.id, sessionTypeId, normalized, Math.max(0, Math.round(totalCents)), today, email);
+  if (!result.ok) return result;
+  // The form recalculates the discount as extras change, so it gets the rule, not a fixed amount.
+  const [coupon] = await db
+    .select({ kind: coupons.kind, value: coupons.value })
+    .from(coupons)
+    .where(and(eq(coupons.photographerId, studio.id), eq(coupons.code, normalized)));
+  return { ok: true, code: normalized, kind: coupon.kind, value: coupon.value };
+}
+
+// Whether this email has a session credit here. Only yes or no, never the
+// amount, so typing someone else's email reveals nothing more than that.
+export async function hasCredit(slug: string, email: string): Promise<boolean> {
+  if (!z.email().safeParse(email.trim()).success) return false;
+  const [studio] = await db
+    .select({ id: photographers.id, timeZone: photographers.timeZone })
+    .from(photographers)
+    .where(eq(photographers.studioSlug, slug));
+  if (!studio) return false;
+  return (await creditBalance(studio.id, email, localDateOf(new Date(), studio.timeZone))) > 0;
 }

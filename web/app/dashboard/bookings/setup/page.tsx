@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { asc, eq } from "drizzle-orm";
 import { db } from "@/db";
-import { addons, bookingFields, contractTemplates, photographers, sessionTypes } from "@/db/schema";
+import { addons, bookingFields, contractTemplates, coupons, photographers, sessionTypes } from "@/db/schema";
 import { FIELD_TYPE_LABELS } from "@/lib/booking/fields";
 import { ArrowRightIcon, PlusIcon } from "@/components/icons";
 import { loadRules, upcomingTimeOff } from "@/lib/booking/availability";
@@ -38,7 +38,7 @@ function formatDay(date: string) {
 
 export default async function BookingSetupPage() {
   const user = await requirePhotographer();
-  const [rules, sessions, [studio], addonList, fields, contracts] = await Promise.all([
+  const [rules, sessions, [studio], addonList, fields, contracts, couponList] = await Promise.all([
     loadRules(user.id),
     db
       .select()
@@ -53,6 +53,7 @@ export default async function BookingSetupPage() {
         freeReschedules: photographers.freeReschedules,
         cancelNoticeHours: photographers.cancelNoticeHours,
         inspoMode: photographers.inspoMode,
+        creditValidMonths: photographers.creditValidMonths,
       })
       .from(photographers)
       .where(eq(photographers.id, user.id)),
@@ -71,6 +72,7 @@ export default async function BookingSetupPage() {
       .from(contractTemplates)
       .where(eq(contractTemplates.photographerId, user.id))
       .orderBy(asc(contractTemplates.createdAt)),
+    db.select().from(coupons).where(eq(coupons.photographerId, user.id)).orderBy(asc(coupons.createdAt)),
   ]);
   const sessionName = new Map(sessions.map((s) => [s.id, s.name]));
   const today = localDateOf(new Date(), rules.timeZone);
@@ -334,6 +336,50 @@ export default async function BookingSetupPage() {
         )}
       </section>
 
+      <section id="coupons" className="card mt-8 scroll-mt-8 p-6 sm:p-8">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <h2 className="font-display text-2xl font-bold">Coupons</h2>
+            <p className="mt-1 text-sm text-muted">Codes clients enter when booking for % or $ off the whole total.</p>
+          </div>
+          <Link href="/dashboard/bookings/coupons/new" className="btn-primary">
+            <PlusIcon size={18} /> Add coupon
+          </Link>
+        </div>
+        {couponList.length === 0 ? (
+          <p className="mt-6 rounded-2xl border-2 border-dashed border-border px-5 py-6 text-center text-sm text-muted">
+            No coupons yet, like SPRING20 for 20% off.
+          </p>
+        ) : (
+          <ul className="mt-6 grid gap-3">
+            {couponList.map((c) => (
+              <li key={c.id}>
+                <Link
+                  href={`/dashboard/bookings/coupons/${c.id}`}
+                  className="group flex items-center gap-4 rounded-2xl border-2 border-border px-5 py-4 transition hover:border-lime"
+                >
+                  <div className="min-w-0 flex-1">
+                    <p className="font-mono font-semibold tracking-wide">{c.code}</p>
+                    <p className="text-sm text-muted">
+                      {c.kind === "percent" ? `${c.value}% off` : `${formatPrice(c.value)} off`}
+                      {c.endsOn ? ` · ends ${c.endsOn}` : ""}
+                      {c.maxUses !== null ? ` · ${c.maxUses} uses total` : ""}
+                      {c.maxUsesPerClient !== null ? ` · ${c.maxUsesPerClient} per client` : ""}
+                    </p>
+                  </div>
+                  {!c.active && (
+                    <span className="rounded-full bg-border px-2.5 py-0.5 text-[11px] font-bold tracking-wider text-muted uppercase">
+                      Paused
+                    </span>
+                  )}
+                  <ArrowRightIcon size={18} className="shrink-0 text-muted transition group-hover:translate-x-1" />
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
       <section className="card mt-8 p-6 sm:p-8">
         <h2 className="font-display text-2xl font-bold">Hours</h2>
         <p className="mt-1 text-sm text-muted">
@@ -366,6 +412,7 @@ export default async function BookingSetupPage() {
             rescheduleNoticeHours={studio.rescheduleNoticeHours}
             freeReschedules={studio.freeReschedules}
             cancelNoticeHours={studio.cancelNoticeHours}
+            creditValidMonths={studio.creditValidMonths}
           />
         </div>
       </section>

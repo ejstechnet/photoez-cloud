@@ -5,7 +5,8 @@ import Link from "next/link";
 import { Field, FormError, SelectField, SubmitButton, TextAreaField, inputClass } from "@/components/form";
 import type { BookingFieldType } from "@/lib/booking/fields";
 import { depositCents, formatPrice } from "@/lib/booking/format";
-import { createBooking, type BookingFormState } from "./actions";
+import { couponDiscount } from "@/lib/coupons";
+import { createBooking, hasCredit, previewCoupon, type BookingFormState } from "./actions";
 import { InspoUploader } from "./inspo-uploader";
 
 export type BookingQuestion = {
@@ -59,7 +60,23 @@ export function BookingForm({
   const errors = state.errors ?? {};
   const fieldErrors = state.fieldErrors ?? {};
   const extrasCents = addons.reduce((sum, a) => sum + (quantities[a.id] ?? 0) * a.priceCents, 0);
-  const totalCents = priceCents + extrasCents;
+  const [coupon, setCoupon] = useState<{ code: string; kind: "percent" | "amount"; value: number } | null>(null);
+  const [couponInput, setCouponInput] = useState("");
+  const [couponMessage, setCouponMessage] = useState<string | null>(null);
+  const [checkingCoupon, setCheckingCoupon] = useState(false);
+  const [creditOffered, setCreditOffered] = useState(false);
+  const discountCents = coupon ? couponDiscount(coupon, priceCents + extrasCents) : 0;
+  const totalCents = priceCents + extrasCents - discountCents;
+
+  async function applyCoupon() {
+    setCouponMessage(null);
+    setCheckingCoupon(true);
+    const email = (document.querySelector<HTMLInputElement>('input[name="email"]')?.value ?? "").trim();
+    const result = await previewCoupon(slug, sessionTypeId, couponInput, priceCents + extrasCents, email);
+    setCheckingCoupon(false);
+    if (result.ok) setCoupon(result);
+    else setCouponMessage(result.message);
+  }
   const step = (n: number) => (addons.length > 0 ? n : n - 1);
 
   const setQuantity = (addon: BookingAddon, quantity: number) =>
@@ -174,6 +191,12 @@ export function BookingForm({
                 <dd>{formatPrice(extrasCents)}</dd>
               </div>
             )}
+            {coupon && discountCents > 0 && (
+              <div className="flex justify-between gap-4 text-lime-ink">
+                <dt>Coupon {coupon.code}</dt>
+                <dd>−{formatPrice(discountCents)}</dd>
+              </div>
+            )}
             <div className="flex justify-between gap-4 text-base font-bold">
               <dt>Total</dt>
               <dd>{formatPrice(totalCents)}</dd>
@@ -197,7 +220,60 @@ export function BookingForm({
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Your name" name="name" autoComplete="name" error={errors.name} required />
-            <Field label="Email" name="email" type="email" autoComplete="email" error={errors.email} required />
+            <Field
+              label="Email"
+              name="email"
+              type="email"
+              autoComplete="email"
+              error={errors.email}
+              required
+              // Only yes/no comes back, never the amount (see hasCredit).
+              onBlur={async (e) => setCreditOffered(await hasCredit(slug, e.currentTarget.value))}
+            />
+          </div>
+          {creditOffered && (
+            <label className="flex items-start gap-3 rounded-xl border-2 border-lime/60 bg-lime/10 px-3.5 py-3">
+              <input type="checkbox" name="useCredit" defaultChecked className="mt-1 size-4 accent-lime-ink" />
+              <span className="text-sm">
+                <span className="block font-semibold">You have a session credit with this studio.</span>
+                Use it for this booking? It comes off what you owe, and your booking page will show the amount.
+              </span>
+            </label>
+          )}
+          <div>
+            <span className="text-sm font-semibold">Coupon code</span>
+            <div className="mt-1.5 flex gap-2">
+              <input
+                value={coupon ? coupon.code : couponInput}
+                onChange={(e) => {
+                  setCoupon(null);
+                  setCouponInput(e.target.value);
+                }}
+                aria-label="Coupon code"
+                autoCapitalize="characters"
+                placeholder="Optional"
+                className={`${inputClass} uppercase`}
+              />
+              {coupon ? (
+                <button type="button" onClick={() => setCoupon(null)} className="btn-secondary shrink-0">
+                  Remove
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={applyCoupon}
+                  disabled={checkingCoupon || couponInput.trim() === ""}
+                  className="btn-secondary shrink-0"
+                >
+                  {checkingCoupon ? "Checking…" : "Apply"}
+                </button>
+              )}
+            </div>
+            {coupon && <p className="mt-1.5 text-xs font-semibold text-lime-ink">Coupon applied.</p>}
+            {(couponMessage || state.couponError) && (
+              <p className="mt-1.5 text-xs font-medium text-danger">{couponMessage ?? state.couponError}</p>
+            )}
+            {coupon && <input type="hidden" name="couponCode" value={coupon.code} />}
           </div>
           <Field label="Phone" name="phone" type="tel" autoComplete="tel" error={errors.phone} hint="Optional" />
           <TextAreaField

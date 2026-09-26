@@ -29,6 +29,20 @@ test("abandoned checkouts don't count as paid", () => {
   assert.deepEqual(nextPayment(booking, tried), { kind: "deposit", amountCents: 14000 });
 });
 
+test("a coupon lowers the total, and the deposit with it", () => {
+  // $280 - $28 (10% coupon) = $252; 50% deposit = $126.
+  assert.deepEqual(nextPayment({ ...booking, discountCents: 2800 }, []), { kind: "deposit", amountCents: 12600 });
+});
+
+test("session credit counts as paid toward the deposit, then the balance", () => {
+  // $100 credit toward a $140 deposit leaves $40 to pay now.
+  assert.deepEqual(nextPayment({ ...booking, creditCents: 10000 }, []), { kind: "deposit", amountCents: 4000 });
+  // A credit bigger than the deposit: straight to the balance.
+  assert.deepEqual(nextPayment({ ...booking, creditCents: 20000 }, []), { kind: "balance", amountCents: 8000 });
+  // Credit covering everything: nothing owed.
+  assert.equal(nextPayment({ ...booking, creditCents: 28000 }, []), null);
+});
+
 test("no deposit asked means pay the full amount as the balance", () => {
   assert.deepEqual(nextPayment({ ...booking, depositPercent: 0 }, []), { kind: "balance", amountCents: 28000 });
   assert.deepEqual(nextPayment({ ...booking, depositPercent: 100 }, []), { kind: "deposit", amountCents: 28000 });

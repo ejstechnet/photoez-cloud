@@ -5,6 +5,7 @@ import { bookings, galleries, payments, photographers } from "@/db/schema";
 import { PAYMENT_HOLD_MINUTES } from "@/lib/booking/status";
 import { siteUrl } from "@/lib/site";
 import { stripe, stripeConfigured } from "@/lib/stripe";
+import { returnBookingCredit } from "@/lib/credits";
 import { nextPayment } from "./amounts";
 
 // Stripe Checkout for booking payments, always on the photographer's own
@@ -130,18 +131,21 @@ export async function applyCheckoutSession(session: Stripe.Checkout.Session) {
 
 // Cancels a booking still waiting for its deposit, freeing its time.
 export async function releaseHold(bookingId: string) {
-  await db
+  const released = await db
     .update(bookings)
     .set({ status: "cancelled", cancelledAt: new Date(), cancelledBy: "client", holdExpiresAt: null })
-    .where(and(eq(bookings.id, bookingId), eq(bookings.status, "pending_payment")));
+    .where(and(eq(bookings.id, bookingId), eq(bookings.status, "pending_payment")))
+    .returning({ id: bookings.id });
+  // Any session credit it used goes back to the client.
+  if (released.length > 0) await returnBookingCredit(bookingId);
 }
 
 // Holds past their time are released before new bookings are saved, so the
 // database's no-overlap rule never counts an abandoned checkout.
 export async function releaseExpiredHolds(photographerId: string) {
-  await db
-    .update(bookings)
-    .set({ status: "cancelled", cancelledAt: new Date(), cancelledBy: "client", holdExpiresAt: null })
+  const expired = await db
+    .select({ id: bookings.id })
+    .from(bookings)
     .where(
       and(
         eq(bookings.photographerId, photographerId),
@@ -149,6 +153,7 @@ export async function releaseExpiredHolds(photographerId: string) {
         lt(bookings.holdExpiresAt, new Date()),
       ),
     );
+  for (const booking of expired) await releaseHold(booking.id);
 }
 
 // A booking whose deposit hold has run out is released; returns its status now.

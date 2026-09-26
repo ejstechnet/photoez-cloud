@@ -5,7 +5,8 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { db } from "@/db";
-import { clients } from "@/db/schema";
+import { clients, sessionCredits } from "@/db/schema";
+import { issueCredit } from "@/lib/credits";
 import { requirePhotographer } from "@/lib/session";
 
 // Server actions for the clients section. They run only on the server, and
@@ -100,4 +101,48 @@ export async function deleteClient(clientId: string): Promise<void> {
 
   revalidatePath("/dashboard", "layout");
   redirect("/dashboard/clients");
+}
+
+// ---- Session credits ----
+
+export type CreditFormState = { message?: string; saved?: boolean };
+
+// Adds a session credit for a client by hand (they need an email: credits
+// are matched by email when they book).
+export async function addClientCredit(clientId: string, _prev: CreditFormState, formData: FormData): Promise<CreditFormState> {
+  const photographer = await requirePhotographer();
+  if (!isUuid(clientId)) return { message: "That client could not be found." };
+  const [client] = await db
+    .select({ name: clients.name, email: clients.email })
+    .from(clients)
+    .where(and(eq(clients.id, clientId), eq(clients.photographerId, photographer.id)));
+  if (!client) return { message: "That client could not be found." };
+  if (!client.email) return { message: "Add the client's email first: credits are matched by email when they book." };
+
+  const amount = String(formData.get("amount") ?? "").trim().replace(/[$,]/g, "");
+  if (!/^\d{1,5}(\.\d{1,2})?$/.test(amount) || Number(amount) <= 0) return { message: "Enter an amount like 50 or 50.00." };
+  const reason = String(formData.get("reason") ?? "").trim().slice(0, 200) || "Added by the studio";
+  const expiresOn = String(formData.get("expiresOn") ?? "").trim();
+  if (expiresOn && !/^\d{4}-\d{2}-\d{2}$/.test(expiresOn)) return { message: "Pick an expiry date, or leave it blank." };
+
+  await issueCredit({
+    photographerId: photographer.id,
+    clientEmail: client.email,
+    clientName: client.name,
+    amountCents: Math.round(Number(amount) * 100),
+    reason,
+    // Blank uses the studio's usual credit length.
+    ...(expiresOn ? { expiresOn } : {}),
+  });
+  revalidatePath(`/dashboard/clients/${clientId}`);
+  return { saved: true };
+}
+
+export async function removeClientCredit(clientId: string, creditId: string): Promise<void> {
+  const photographer = await requirePhotographer();
+  if (!isUuid(creditId)) return;
+  await db
+    .delete(sessionCredits)
+    .where(and(eq(sessionCredits.id, creditId), eq(sessionCredits.photographerId, photographer.id)));
+  revalidatePath(`/dashboard/clients/${clientId}`);
 }

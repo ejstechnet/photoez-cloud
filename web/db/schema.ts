@@ -68,6 +68,8 @@ export const photographers = pgTable("photographers", {
   // Price per photo a client selects beyond a gallery's included number
   // (PhotoEZ's "global extra price"; galleries can override it).
   extraPhotoPriceCents: integer("extra_photo_price_cents").notNull().default(1000),
+  // How long new session credits last, in months; null = they never expire.
+  creditValidMonths: integer("credit_valid_months").default(12),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
@@ -408,6 +410,11 @@ export const bookings = pgTable(
     holdExpiresAt: timestamp("hold_expires_at", { withTimezone: true }),
     // Total of the extras the client added; the booking total is priceCents + addonsCents.
     addonsCents: integer("addons_cents").notNull().default(0),
+    // A coupon's discount off the total, and session credit the client used.
+    // What's owed is priceCents + addonsCents - discountCents; credit counts as paid.
+    couponCode: text("coupon_code"),
+    discountCents: integer("discount_cents").notNull().default(0),
+    creditCents: integer("credit_cents").notNull().default(0),
     // The client's answers to the studio's custom booking questions, copied
     // with each question's wording so later edits don't change past bookings.
     answers: jsonb("answers").$type<BookingAnswer[]>().notNull().default([]),
@@ -462,6 +469,57 @@ export const signedContracts = pgTable("signed_contracts", {
 
 // Payments on a booking through Stripe Checkout, on the photographer's own
 // Stripe account: the deposit at booking, then the balance.
+// Coupon codes clients enter when booking: % or $ off the whole total.
+export const coupons = pgTable(
+  "coupons",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    photographerId: uuid("photographer_id")
+      .notNull()
+      .references(() => photographers.id, { onDelete: "cascade" }),
+    // Stored uppercase; clients can type it any way.
+    code: text("code").notNull(),
+    kind: text("kind", { enum: ["percent", "amount"] }).notNull(),
+    // A percentage (1-100) for "percent", cents for "amount".
+    value: integer("value").notNull(),
+    // Empty = every session.
+    sessionTypeIds: jsonb("session_type_ids").$type<string[]>().notNull().default([]),
+    startsOn: date("starts_on"),
+    endsOn: date("ends_on"),
+    // Most bookings that can use it; null = no limit.
+    maxUses: integer("max_uses"),
+    // Most bookings one client (by email) can use it for; null = no limit.
+    maxUsesPerClient: integer("max_uses_per_client"),
+    active: boolean("active").notNull().default(true),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [unique("coupons_code_unique").on(t.photographerId, t.code)],
+);
+
+// Session credits (like PhotoEZ Booking's credits): money a client can put
+// toward a future booking, matched by email. Issued when a client cancels
+// early enough, returned when a booking that used credit is cancelled, or
+// added by the photographer.
+export const sessionCredits = pgTable(
+  "session_credits",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    photographerId: uuid("photographer_id")
+      .notNull()
+      .references(() => photographers.id, { onDelete: "cascade" }),
+    clientEmail: text("client_email").notNull(),
+    clientName: text("client_name").notNull(),
+    amountCents: integer("amount_cents").notNull(),
+    usedCents: integer("used_cents").notNull().default(0),
+    reason: text("reason").notNull(),
+    sourceBookingId: uuid("source_booking_id").references(() => bookings.id, { onDelete: "set null" }),
+    // Last day it can be used (studio's calendar); null = never expires.
+    expiresOn: date("expires_on"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("session_credits_client_idx").on(t.photographerId, t.clientEmail)],
+);
+
 export const payments = pgTable(
   "payments",
   {

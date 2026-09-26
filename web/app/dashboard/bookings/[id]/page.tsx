@@ -7,7 +7,7 @@ import { bookingInspoPhotos, bookings, photographers } from "@/db/schema";
 import { depositCents, formatDuration, formatPrice } from "@/lib/booking/format";
 import { formatDate, formatTime } from "@/lib/booking/time";
 import { bookingExtras } from "@/lib/booking/session-addons";
-import { amountPaid, balanceDue } from "@/lib/payments/amounts";
+import { amountPaid, balanceDue, bookingTotal } from "@/lib/payments/amounts";
 import { bookingPayments } from "@/lib/payments/checkout";
 import { contractTemplateFor, signedContractFor } from "@/lib/contracts/for-booking";
 import { requirePhotographer } from "@/lib/session";
@@ -45,7 +45,8 @@ export default async function BookingPage({ params }: PageProps<"/dashboard/book
     .where(eq(bookingInspoPhotos.bookingId, booking.id))
     .orderBy(asc(bookingInspoPhotos.position));
   const inspo = await Promise.all(inspoRows.map(async (p) => ({ id: p.id, url: await signedViewUrl(p.fileKey) })));
-  const totalCents = booking.priceCents + booking.addonsCents;
+  // Session + extras, less any coupon (see lib/payments/amounts.ts).
+  const totalCents = bookingTotal(booking);
   const details: [string, React.ReactNode][] = [
     ["When", `${formatDate(booking.startsAt, tz)}, ${formatTime(booking.startsAt, tz)} – ${formatTime(booking.endsAt, tz)}`],
     ["Length", formatDuration(minutes)],
@@ -62,8 +63,16 @@ export default async function BookingPage({ params }: PageProps<"/dashboard/book
               ))}
             </ul>,
           ] as [string, React.ReactNode],
-          ["Total", <strong key="t">{formatPrice(totalCents)}</strong>] as [string, React.ReactNode],
         ]
+      : []),
+    ...(booking.discountCents > 0
+      ? [[`Coupon ${booking.couponCode ?? ""}`.trim(), `−${formatPrice(booking.discountCents)}`] as [string, React.ReactNode]]
+      : []),
+    ...(extras.length > 0 || booking.discountCents > 0
+      ? [["Total", <strong key="t">{formatPrice(totalCents)}</strong>] as [string, React.ReactNode]]
+      : []),
+    ...(booking.creditCents > 0
+      ? [["Session credit", `−${formatPrice(booking.creditCents)} applied`] as [string, React.ReactNode]]
       : []),
     [
       "Deposit",
@@ -72,7 +81,7 @@ export default async function BookingPage({ params }: PageProps<"/dashboard/book
         : `${formatPrice(depositCents(totalCents, booking.depositPercent))} (${booking.depositPercent}%)`,
     ],
     ["Paid", paidCents > 0 ? <strong key="p">{formatPrice(paidCents)}</strong> : "Nothing yet"],
-    ...(booking.status !== "cancelled" && paidCents < totalCents
+    ...(booking.status !== "cancelled" && balanceDue(booking, paymentRows) > 0
       ? [["Balance due", formatPrice(balanceDue(booking, paymentRows))] as [string, React.ReactNode]]
       : []),
     ["Email", <a key="e" href={`mailto:${booking.clientEmail}`} className="link">{booking.clientEmail}</a>],
