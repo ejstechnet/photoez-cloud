@@ -11,6 +11,7 @@ import { isOverlapError } from "@/lib/booking/availability";
 import { isValidTimeZone } from "@/lib/booking/time";
 import { cleanRichTextInput, richTextToPlain } from "@/lib/rich-text";
 import { moveInList } from "@/lib/reorder";
+import { returnBookingCredit } from "@/lib/credits";
 import { requirePhotographer } from "@/lib/session";
 import { deletePrefix, sessionImageKey, signedUploadUrl, storedSize } from "@/lib/storage";
 import { SHOOT_LOCATIONS } from "@/lib/session-types";
@@ -315,6 +316,11 @@ export async function saveClientChanges(
     return { message: "Notice times must be whole hours from 0 to 720 (30 days)." };
   }
   if (freeReschedules === null) return { message: "Free reschedules must be 0 to 10." };
+  const monthsRaw = text(formData, "creditValidMonths").trim();
+  const creditValidMonths = monthsRaw === "" ? null : Number(monthsRaw);
+  if (creditValidMonths !== null && (!Number.isInteger(creditValidMonths) || creditValidMonths < 1 || creditValidMonths > 120)) {
+    return { message: "Credits can last 1 to 120 months, or leave it blank for no expiry." };
+  }
 
   await db
     .update(photographers)
@@ -323,6 +329,7 @@ export async function saveClientChanges(
       rescheduleNoticeHours,
       freeReschedules,
       cancelNoticeHours,
+      creditValidMonths,
     })
     .where(eq(photographers.id, photographer.id));
   revalidatePath("/dashboard/bookings", "layout");
@@ -381,6 +388,8 @@ export async function setBookingStatus(
     if (isOverlapError(error)) return { message: "Another booking now takes that time, so it can't be restored." };
     throw error;
   }
+  // You cancelled: any session credit the client used goes back to them.
+  if (status === "cancelled") await returnBookingCredit(bookingId);
   revalidatePath("/dashboard", "layout");
   revalidatePath("/studio/[slug]", "layout");
   return {};

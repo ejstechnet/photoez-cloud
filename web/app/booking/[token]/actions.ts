@@ -11,6 +11,9 @@ import { findClientBooking } from "@/lib/booking/client-booking";
 import { contractTemplateFor, filledContract, signedContractFor } from "@/lib/contracts/for-booking";
 import { clientOptions } from "@/lib/booking/policy";
 import { localDateOf } from "@/lib/booking/time";
+import { issueCredit } from "@/lib/credits";
+import { amountPaid } from "@/lib/payments/amounts";
+import { bookingPayments } from "@/lib/payments/checkout";
 
 // Client self-service from the private booking link. The link's token is the
 // only key, so every action re-checks the studio's rules on the server; the
@@ -71,10 +74,26 @@ export async function cancelBooking(token: string): Promise<ChangeState> {
     return { message: "This booking can't be cancelled online. Please contact the studio." };
   }
 
-  await db
+  const cancelled = await db
     .update(bookings)
     .set({ status: "cancelled", cancelledAt: new Date(), cancelledBy: "client", creditDue: options.cancel.creditDue })
-    .where(and(eq(bookings.id, booking.id), eq(bookings.status, "confirmed")));
+    .where(and(eq(bookings.id, booking.id), eq(bookings.status, "confirmed")))
+    .returning({ id: bookings.id });
+
+  // Early enough for a credit: everything they paid (online, plus any credit
+  // they'd used) becomes a session credit for a future booking.
+  if (cancelled.length > 0 && options.cancel.creditDue) {
+    const paidOnline = amountPaid(await bookingPayments(booking.id));
+    await db.update(bookings).set({ creditCents: 0 }).where(eq(bookings.id, booking.id));
+    await issueCredit({
+      photographerId: booking.photographerId,
+      clientEmail: booking.clientEmail,
+      clientName: booking.clientName,
+      amountCents: paidOnline + booking.creditCents,
+      reason: "Cancelled early",
+      sourceBookingId: booking.id,
+    });
+  }
 
   revalidatePath("/dashboard", "layout");
   revalidatePath("/studio/[slug]", "layout");

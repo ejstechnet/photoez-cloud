@@ -4,6 +4,7 @@ import { contractTemplates, photographers, sessionTypes, signedContracts } from 
 import { depositCents, formatPrice } from "@/lib/booking/format";
 import { formatDate, formatTime, zoneLabel } from "@/lib/booking/time";
 import { sanitizeRichText } from "@/lib/rich-text";
+import { bookingTotal } from "@/lib/payments/amounts";
 import { fillPlaceholders } from "./placeholders";
 
 type BookingForContract = {
@@ -13,6 +14,7 @@ type BookingForContract = {
   sessionName: string;
   priceCents: number;
   addonsCents: number;
+  discountCents: number;
   depositPercent: number;
   startsAt: Date;
   clientName: string;
@@ -56,7 +58,7 @@ export async function filledContract(booking: BookingForContract, template: { co
     .from(photographers)
     .where(eq(photographers.id, booking.photographerId));
   const tz = studio.timeZone;
-  const total = booking.priceCents + booking.addonsCents;
+  const total = bookingTotal(booking);
   const deposit = depositCents(total, booking.depositPercent);
   return sanitizeRichText(
     fillPlaceholders(template.content, {

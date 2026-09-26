@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { Logo, PrintStack, WorkflowPills } from "@/components/brand";
+import Image from "next/image";
+import { Logo, WorkflowPills } from "@/components/brand";
 import { ArrowRightIcon, ChatIcon, InboxIcon, SearchIcon, WandIcon } from "@/components/icons";
 
 const features = [
@@ -32,9 +33,25 @@ const features = [
 export default function Home() {
   return (
     <main className="flex flex-1 flex-col">
-      <section className="relative overflow-hidden bg-brand text-white">
-        <div className="pointer-events-none absolute -right-24 -top-24 size-96 rounded-full bg-lime/20 blur-3xl" />
-        <div className="pointer-events-none absolute -bottom-32 left-1/3 size-80 rounded-full bg-coral/25 blur-3xl" />
+      <section className="relative overflow-hidden bg-brand-deep text-white">
+        {/* The photographer-at-work image, faded into the navy on every side so its
+            soft white edges never show. Behind the text on wide screens. */}
+        <Image
+          src="/home/hero.webp"
+          alt="A smiling photographer shooting with her camera, surrounded by PhotoEZ Cloud cards: a new inquiry sorted by AI, photos found, a gallery delivered, a client gallery, and a booking confirmed."
+          width={2000}
+          height={1333}
+          priority
+          // Starts right after the text column and fits the whole image (cards included) in what's left.
+          className="pointer-events-none absolute inset-y-0 right-0 hidden h-full w-[min(68%,calc(100%_-_440px))] object-contain object-right lg:block"
+          style={{
+            maskImage:
+              "linear-gradient(to right, transparent 0%, black 13%), linear-gradient(to top, transparent 0%, black 12%), linear-gradient(to bottom, transparent 0%, black 8%), linear-gradient(to left, transparent 0%, black 6%)",
+            maskComposite: "intersect",
+            WebkitMaskComposite: "source-in",
+          }}
+        />
+        <div className="pointer-events-none absolute -bottom-32 left-1/4 size-80 rounded-full bg-coral/20 blur-3xl" />
 
         <header className="relative mx-auto flex max-w-6xl items-center justify-between px-4 py-5">
           <Logo />
@@ -43,8 +60,8 @@ export default function Home() {
           </Link>
         </header>
 
-        <div className="relative mx-auto grid max-w-6xl items-center gap-12 px-4 pt-10 pb-20 lg:grid-cols-[1.2fr_1fr] lg:pt-16">
-          <div>
+        <div className="relative mx-auto max-w-6xl px-4 pt-10 pb-20 lg:pt-16 lg:pb-28">
+          <div className="lg:max-w-xl">
             <p className="inline-flex rounded-full bg-lime px-3 py-1 text-xs font-bold tracking-wider text-brand-deep uppercase">
               PhotoEZ, now in the cloud
             </p>
@@ -77,7 +94,17 @@ export default function Home() {
               </Link>
             </div>
           </div>
-          <PrintStack className="mx-auto hidden sm:block" />
+          {/* On phones and tablets, the image sits under the text instead. */}
+          <Image
+            src="/home/hero.webp"
+            alt=""
+            width={2000}
+            height={1333}
+            className="mx-auto mt-10 w-full max-w-2xl lg:hidden"
+            style={{
+              maskImage: "radial-gradient(ellipse 50% 50% at 50% 50%, black 70%, transparent 100%)",
+            }}
+          />
         </div>
 
         <div className="relative border-t border-white/10 bg-brand-deep/40">

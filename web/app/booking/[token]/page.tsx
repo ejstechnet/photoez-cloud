@@ -5,7 +5,7 @@ import { describePolicy, findClientBooking } from "@/lib/booking/client-booking"
 import { formatDuration, formatPrice } from "@/lib/booking/format";
 import { clientOptions, type Blocked } from "@/lib/booking/policy";
 import { bookingExtras } from "@/lib/booking/session-addons";
-import { amountPaid, balanceDue, nextPayment } from "@/lib/payments/amounts";
+import { amountPaid, balanceDue, bookingTotal, nextPayment } from "@/lib/payments/amounts";
 import { bookingPayments, paymentAccount, settleHold } from "@/lib/payments/checkout";
 import { contractTemplateFor, signedContractFor } from "@/lib/contracts/for-booking";
 import { formatDate, formatTime, zoneLabel } from "@/lib/booking/time";
@@ -64,7 +64,8 @@ export default async function ClientBookingPage({ params, searchParams }: PagePr
     : !cancelled && (await contractTemplateFor(booking))
       ? { signed: null }
       : null;
-  const totalCents = booking.priceCents + booking.addonsCents;
+  // Session + extras, less any coupon (see lib/payments/amounts.ts).
+  const totalCents = bookingTotal(booking);
   const details: [string, React.ReactNode][] = [
     ["Session", booking.sessionName],
     ["Date", formatDate(booking.startsAt, tz)],
@@ -86,8 +87,16 @@ export default async function ClientBookingPage({ params, searchParams }: PagePr
               ))}
             </ul>,
           ] as [string, React.ReactNode],
-          ["Total", <strong key="t">{formatPrice(totalCents)}</strong>] as [string, React.ReactNode],
         ]
+      : []),
+    ...(booking.discountCents > 0
+      ? [[`Coupon ${booking.couponCode ?? ""}`.trim(), `−${formatPrice(booking.discountCents)}`] as [string, React.ReactNode]]
+      : []),
+    ...(extras.length > 0 || booking.discountCents > 0
+      ? [["Total", <strong key="t">{formatPrice(totalCents)}</strong>] as [string, React.ReactNode]]
+      : []),
+    ...(booking.creditCents > 0
+      ? [["Session credit", `−${formatPrice(booking.creditCents)} applied`] as [string, React.ReactNode]]
       : []),
     ...(paidCents > 0 ? [["Paid", formatPrice(paidCents)] as [string, string]] : []),
     ...(!cancelled && due

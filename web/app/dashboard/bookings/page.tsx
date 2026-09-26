@@ -5,6 +5,7 @@ import { bookings, photographers, sessionTypes } from "@/db/schema";
 import { ArrowRightIcon } from "@/components/icons";
 import { formatPrice } from "@/lib/booking/format";
 import { formatDate, formatTime } from "@/lib/booking/time";
+import { bookingTotal } from "@/lib/payments/amounts";
 import { releaseExpiredHolds } from "@/lib/payments/checkout";
 import { requirePhotographer } from "@/lib/session";
 import { BookingStatusPill } from "./status-pill";
@@ -103,7 +104,7 @@ export default async function BookingsPage({ searchParams }: PageProps<"/dashboa
                   <p className="truncate font-semibold">{b.clientName}</p>
                   <p className="truncate text-sm text-muted">
                     {b.sessionName} · {formatDate(b.startsAt, tz, "short")} · {formatTime(b.startsAt, tz)} ·{" "}
-                    {formatPrice(b.priceCents + b.addonsCents)}
+                    {formatPrice(bookingTotal(b))}
                     {b.status === "cancelled" && b.cancelledBy === "client" && " · Cancelled by client"}
                     {b.creditDue && " · Credit owed"}
                     {b.status !== "cancelled" && b.rescheduleCount > 0 && " · Rescheduled"}

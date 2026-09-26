@@ -11,11 +11,13 @@ export function ClientChangesForm({
   rescheduleNoticeHours,
   freeReschedules,
   cancelNoticeHours,
+  creditValidMonths,
 }: {
   enabled: boolean;
   rescheduleNoticeHours: number;
   freeReschedules: number;
   cancelNoticeHours: number;
+  creditValidMonths: number | null;
 }) {
   const [state, formAction, pending] = useActionState(saveClientChanges, {});
   const [on, setOn] = useState(enabled);
@@ -75,6 +77,15 @@ export function ClientChangesForm({
           <input type="hidden" name="cancelNoticeHours" value={cancelNoticeHours} />
         </>
       )}
+      <Field
+        label="Session credits last (months)"
+        name="creditValidMonths"
+        type="number"
+        min={1}
+        max={120}
+        defaultValue={creditValidMonths ?? ""}
+        hint="For credits from early cancellations. Blank = credits never expire. You can change any credit's date on the client's page."
+      />
       <FormError message={state.message} />
       <div className="flex items-center gap-4">
         <SubmitButton pending={pending} fullWidth={false}>
