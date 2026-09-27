@@ -9,6 +9,7 @@ import { signedViewUrl } from "@/lib/storage";
 import { syncStripeStatus } from "@/lib/payments/connect";
 import { stripeConfigured } from "@/lib/stripe";
 import { EmailCard } from "./email-card";
+import { ReviewsCard } from "./reviews-card";
 import { FaqForm } from "./faq-form";
 import { PaymentsCard } from "./payments-card";
 import { NotesToggle } from "./notes-toggle";
@@ -45,6 +46,8 @@ export default async function SettingsPage() {
       sessionReminderHours: photographers.sessionReminderHours,
       balanceReminderDays: photographers.balanceReminderDays,
       galleryExpiryReminderDays: photographers.galleryExpiryReminderDays,
+      reviewRequestDays: photographers.reviewRequestDays,
+      googleReviewUrl: photographers.googleReviewUrl,
     })
     .from(photographers)
     .where(eq(photographers.id, user.id));
@@ -128,6 +131,7 @@ export default async function SettingsPage() {
             galleryExpiryReminderDays={settings.galleryExpiryReminderDays}
             paymentsReady={stripeReady}
           />
+          <ReviewsCard requestDays={settings.reviewRequestDays} googleUrl={settings.googleReviewUrl} />
           <PlanCard
             planLabel={PLAN_LABELS[plan.plan]}
             upsells={plan.upsells}

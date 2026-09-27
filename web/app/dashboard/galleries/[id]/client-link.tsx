@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { emailGalleryToClient, reopenProofing } from "../actions";
+import { emailGalleryToClient, reopenProofing, requestGalleryReview } from "../actions";
 
 // The gallery's private client link, with copy and preview buttons, and a
 // summary of what the client has picked so far.
@@ -13,8 +13,10 @@ export function ClientLink({
   selectedNames,
   notes,
   freeLimit,
+  clientName,
   clientEmail,
   delivered,
+  reviewStatus,
 }: {
   galleryId: string;
   url: string;
@@ -25,14 +27,32 @@ export function ClientLink({
   // The client's notes on their picks, by file name.
   notes: { name: string; note: string }[];
   freeLimit: number;
-  // Where "Email to client" sends the link; null when the client has no email.
+  clientName: string | null;
+  // Where "Email gallery link" sends the link; null when the client has no email.
   clientEmail: string | null;
   delivered: boolean;
+  // This gallery's review so far: null = not asked yet.
+  reviewStatus: "requested" | "submitted" | "approved" | "rejected" | null;
 }) {
   const [copied, setCopied] = useState<"link" | "names" | null>(null);
   const [reopening, startReopen] = useTransition();
   const [emailing, startEmail] = useTransition();
   const [emailResult, setEmailResult] = useState<{ ok: boolean; text: string } | null>(null);
+
+  const [asking, startAsk] = useTransition();
+
+  function askForReview() {
+    if (!clientEmail) return;
+    const again = reviewStatus === "requested";
+    if (!confirm(`${again ? "Send the review request again" : "Ask for a review"}: email ${clientEmail}?`)) return;
+    setEmailResult(null);
+    startAsk(async () => {
+      const result = await requestGalleryReview(galleryId);
+      setEmailResult(
+        "ok" in result ? { ok: true, text: `Review request sent to ${result.to}.` } : { ok: false, text: result.error },
+      );
+    });
+  }
 
   function emailClient() {
     if (!clientEmail) return;
@@ -59,21 +79,59 @@ export function ClientLink({
           <p className="mt-1 truncate font-mono text-sm">{url}</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            onClick={emailClient}
-            disabled={!clientEmail || emailing}
-            title={clientEmail ? undefined : "Add the client's email address to send the link"}
-            className="btn-primary px-5 py-2.5"
-          >
-            {emailing ? "Sending…" : "Email to client"}
-          </button>
-          <button type="button" onClick={() => copy(url, "link")} className="btn-secondary">
+          <button type="button" onClick={() => copy(url, "link")} className="btn-primary px-5 py-2.5">
             {copied === "link" ? "Copied!" : "Copy link"}
           </button>
           <a href={`${url}?preview=1`} target="_blank" rel="noreferrer" className="btn-secondary">
             Preview as client
           </a>
+        </div>
+      </div>
+
+      {/* Reaching the client: the gallery link by email, and a review request once delivered. */}
+      <div className="mt-4 flex flex-col gap-3 border-t border-border pt-4 lg:flex-row lg:items-center">
+        <div className="min-w-0 flex-1">
+          <p className="text-xs font-bold tracking-wider text-muted uppercase">Client</p>
+          <p className="mt-1 truncate text-sm">
+            <span className="font-semibold">{clientName ?? "No client"}</span>
+            {clientEmail ? (
+              <>
+                {" · "}
+                <a href={`mailto:${clientEmail}`} className="link">
+                  {clientEmail}
+                </a>
+              </>
+            ) : (
+              <span className="text-muted"> · no email address yet</span>
+            )}
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={emailClient}
+            disabled={!clientEmail || emailing}
+            title={clientEmail ? undefined : "Add the client's email address to send the link"}
+            className="btn-secondary"
+          >
+            {emailing ? "Sending…" : delivered ? "Email download link" : "Email gallery link"}
+          </button>
+          {delivered && (reviewStatus === null || reviewStatus === "requested") && (
+            <button
+              type="button"
+              onClick={askForReview}
+              disabled={!clientEmail || asking}
+              title={clientEmail ? undefined : "Add the client's email address to ask for a review"}
+              className="btn-secondary"
+            >
+              {asking ? "Sending…" : reviewStatus === "requested" ? "Ask again for review" : "Ask for a review"}
+            </button>
+          )}
+          {reviewStatus && reviewStatus !== "requested" && (
+            <a href="/dashboard/reviews" className="btn-secondary">
+              {reviewStatus === "approved" ? "★ Review published" : reviewStatus === "submitted" ? "★ New review" : "Review hidden"}
+            </a>
+          )}
         </div>
       </div>
 

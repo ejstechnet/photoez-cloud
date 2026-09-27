@@ -27,6 +27,8 @@ export type EmailKind =
   | "selections_submitted"
   | "inquiry_reply"
   | "inquiry_new"
+  | "review_request"
+  | "review_new"
   | "password_reset"
   | "test";
 

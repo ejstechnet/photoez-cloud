@@ -16,6 +16,7 @@ import { richTextHtml } from "@/lib/rich-text";
 import { signedViewUrl } from "@/lib/storage";
 import { InquiryForm } from "./inquiry-form";
 import { StudioNav, barIsDark } from "./studio-nav";
+import { ReviewsJsonLd, StudioReviews, loadStudioReviews } from "./studio-reviews";
 
 // A photographer's public studio page: who they are, what they shoot, and an
 // inquiry form whose submissions land in their Inquiries, already triaged.
@@ -86,6 +87,7 @@ export default async function StudioPage({ params }: PageProps<"/studio/[slug]">
       .orderBy(asc(studioFaqs.sortOrder)),
   ]);
   const bookingOpen = bookable.length > 0 && Boolean(hours);
+  const studioReviews = await loadStudioReviews(studio.id);
   // Special prices apply by the studio's own calendar day.
   const today = localDateOf(new Date(), studio.timeZone);
   const bookHref = `/studio/${slug.toLowerCase()}/book`;
@@ -97,6 +99,7 @@ export default async function StudioPage({ params }: PageProps<"/studio/[slug]">
   const links = [
     bookingOpen && { href: "#book", label: "Book" },
     studio.bio && { href: "#about", label: "About" },
+    studioReviews.list.length > 0 && { href: "#reviews", label: "Reviews" },
     sessions.length > 0 && { href: "#sessions", label: "Sessions" },
     studio.shootLocations.length > 0 && { href: "#where", label: "Where we shoot" },
     faqs.length > 0 && { href: "#faq", label: "FAQ" },
@@ -104,6 +107,7 @@ export default async function StudioPage({ params }: PageProps<"/studio/[slug]">
 
   return (
     <div className="flex flex-1 flex-col">
+      <ReviewsJsonLd name={name} slug={slug.toLowerCase()} reviews={studioReviews} />
       <StudioNav slug={slug} name={name} logoUrl={logoUrl} logoBg={studio.logoBg} links={links} sticky>
         {isOwner && (
           <Link
@@ -190,6 +194,7 @@ export default async function StudioPage({ params }: PageProps<"/studio/[slug]">
               />
             </div>
           )}
+          <StudioReviews reviews={studioReviews} />
           {sessions.length > 0 && (
             <div id="sessions" className="card scroll-mt-28 p-6">
               <h2 className="font-display text-2xl font-bold">Sessions</h2>

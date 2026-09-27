@@ -12,6 +12,7 @@ import { staleProof } from "@/lib/proofs";
 import { GALLERY_STATUSES, type GalleryStatus } from "@/lib/gallery-status";
 import { requirePhotographer } from "@/lib/session";
 import { emailFinalsReady, emailGalleryLink } from "@/lib/email/notify";
+import { requestReview } from "@/lib/review-requests";
 import { afterResponse } from "@/lib/email/send";
 import { studioPlan } from "@/lib/studio-plan";
 import {
@@ -566,4 +567,14 @@ export async function renameGallery(galleryId: string, title: string): Promise<{
   revalidatePath("/dashboard", "layout");
   revalidatePath("/g/[token]", "page");
   return { ok: true };
+}
+
+// "Ask for a review": emails the client a private review link (PhotoEZ Reviews).
+export async function requestGalleryReview(galleryId: string): Promise<{ ok: true; to: string } | { error: string }> {
+  const photographer = await requirePhotographer();
+  if (!(await findOwnedGallery(galleryId, photographer.id))) return { error: "That gallery could not be found." };
+  const result = await requestReview(galleryId);
+  revalidatePath(`/dashboard/galleries/${galleryId}`);
+  revalidatePath("/dashboard/reviews");
+  return result;
 }

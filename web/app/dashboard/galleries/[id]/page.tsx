@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { and, asc, count, eq } from "drizzle-orm";
 import { db } from "@/db";
-import { clients, favorites, galleries, photos } from "@/db/schema";
+import { clients, favorites, galleries, photos, reviews } from "@/db/schema";
 import { getWatermarkSettings, staleProof } from "@/lib/proofs";
 import { siteUrl } from "@/lib/site";
 import { requirePhotographer } from "@/lib/session";
@@ -39,9 +39,11 @@ export default async function GalleryPage({ params }: PageProps<"/dashboard/gall
       extrasCents: galleries.extrasCents,
       clientName: clients.name,
       clientEmail: clients.email,
+      reviewStatus: reviews.status,
     })
     .from(galleries)
     .leftJoin(clients, eq(clients.id, galleries.clientId))
+    .leftJoin(reviews, eq(reviews.galleryId, galleries.id))
     .where(and(eq(galleries.id, id), eq(galleries.photographerId, user.id)));
   if (!gallery) notFound();
 
@@ -136,7 +138,9 @@ export default async function GalleryPage({ params }: PageProps<"/dashboard/gall
         <ClientLink
           galleryId={gallery.id}
           url={`${siteUrl}/g/${gallery.shareToken}`}
+          clientName={gallery.clientName}
           clientEmail={gallery.clientEmail}
+          reviewStatus={gallery.reviewStatus}
           delivered={gallery.status === "delivered" || gallery.status === "completed"}
           submitted={gallery.status === "submitted" || gallery.status === "paid_and_submitted"}
           canReopen={gallery.status !== "pending"}

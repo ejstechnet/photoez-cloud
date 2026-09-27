@@ -349,3 +349,26 @@ export async function sendTestEmail(): Promise<{ ok: string } | { error: string 
       : "Email isn't set up on this computer, so it was saved to the Email log instead of sent.",
   };
 }
+
+// ---- Reviews ----
+
+export type ReviewFormState = { message?: string; saved?: boolean };
+
+export async function saveReviewSettings(_prev: ReviewFormState, formData: FormData): Promise<ReviewFormState> {
+  const photographer = await requirePhotographer();
+  const days = String(formData.get("reviewRequestDays") ?? "off");
+  const reviewRequestDays = days === "off" ? null : Number(days);
+  if (reviewRequestDays !== null && ![1, 3, 5, 7, 14].includes(reviewRequestDays)) {
+    return { message: "Choose when to ask for reviews." };
+  }
+  const url = String(formData.get("googleReviewUrl") ?? "").trim();
+  if (url && (!/^https:\/\/\S+$/.test(url) || url.length > 500)) {
+    return { message: "Paste the full Google link, starting with https://" };
+  }
+  await db
+    .update(photographers)
+    .set({ reviewRequestDays, googleReviewUrl: url || null })
+    .where(eq(photographers.id, photographer.id));
+  revalidatePath("/dashboard", "layout");
+  return { saved: true };
+}
