@@ -15,7 +15,7 @@ import { LOCATION_LABELS, OFFERABLE_TYPES, SESSION_LABELS, type ShootLocation } 
 import { richTextHtml } from "@/lib/rich-text";
 import { signedViewUrl } from "@/lib/storage";
 import { InquiryForm } from "./inquiry-form";
-import { NavBrand } from "./nav-brand";
+import { StudioNav, barIsDark } from "./studio-nav";
 
 // A photographer's public studio page: who they are, what they shoot, and an
 // inquiry form whose submissions land in their Inquiries, already triaged.
@@ -104,74 +104,38 @@ export default async function StudioPage({ params }: PageProps<"/studio/[slug]">
 
   return (
     <div className="flex flex-1 flex-col">
-      <nav className="sticky top-0 z-30 border-b border-white/10 bg-brand-deep/95 text-white backdrop-blur">
-        <div className="mx-auto flex max-w-5xl items-center gap-3 px-4 py-3">
-          <NavBrand>
-            {logoUrl && (
-              <span
-                className="grid size-9 shrink-0 place-items-center rounded-lg p-1"
-                style={{ backgroundColor: studio.logoBg }}
-              >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={logoUrl} alt="" className="max-h-full max-w-full object-contain" />
-              </span>
-            )}
-            <span className="truncate font-display text-lg">{name}</span>
-          </NavBrand>
-          <div className="ml-auto flex items-center gap-1">
-            {links.map((link) => (
-              <a
-                key={link.href}
-                href={link.href}
-                className="hidden rounded-full px-3 py-1.5 text-xs font-bold tracking-wider text-white/75 uppercase transition hover:bg-white/10 hover:text-white md:block"
-              >
-                {link.label}
-              </a>
-            ))}
-            {isOwner && (
-              <Link
-                href="/dashboard/settings#studio"
-                className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold tracking-wider text-sun uppercase hover:bg-white/10"
-              >
-                <GearIcon size={17} strokeWidth={2.25} /> Settings
-              </Link>
-            )}
-            {bookingOpen ? (
-              <Link
-                href={bookHref}
-                className="ml-1 rounded-full bg-lime px-4 py-2 text-xs font-bold tracking-wider whitespace-nowrap text-brand-deep uppercase transition hover:-translate-y-0.5"
-              >
-                Book now
-              </Link>
-            ) : (
-              <a
-                href="#contact"
-                className="ml-1 rounded-full bg-lime px-4 py-2 text-xs font-bold tracking-wider whitespace-nowrap text-brand-deep uppercase transition hover:-translate-y-0.5"
-              >
-                Get in touch
-              </a>
-            )}
-          </div>
-        </div>
-      </nav>
+      <StudioNav slug={slug} name={name} logoUrl={logoUrl} logoBg={studio.logoBg} links={links} sticky>
+        {isOwner && (
+          <Link
+            href="/dashboard/settings#studio"
+            className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold tracking-wider uppercase ${
+              barIsDark(studio.logoBg) ? "text-sun hover:bg-white/10" : "text-brand hover:bg-brand-deep/5"
+            }`}
+          >
+            <GearIcon size={17} strokeWidth={2.25} /> Settings
+          </Link>
+        )}
+        {bookingOpen ? (
+          <Link
+            href={bookHref}
+            className="ml-1 rounded-full bg-lime px-4 py-2 text-xs font-bold tracking-wider whitespace-nowrap text-brand-deep uppercase transition hover:-translate-y-0.5"
+          >
+            Book now
+          </Link>
+        ) : (
+          <a
+            href="#contact"
+            className="ml-1 rounded-full bg-lime px-4 py-2 text-xs font-bold tracking-wider whitespace-nowrap text-brand-deep uppercase transition hover:-translate-y-0.5"
+          >
+            Get in touch
+          </a>
+        )}
+      </StudioNav>
 
       <header id="top" className="relative overflow-hidden bg-brand text-white">
         <div className="pointer-events-none absolute -top-24 -right-24 size-80 rounded-full bg-lime/15 blur-3xl" />
         <div className="pointer-events-none absolute -bottom-32 left-1/4 size-72 rounded-full bg-coral/20 blur-3xl" />
         <div className="relative mx-auto flex max-w-5xl flex-col gap-6 px-4 py-14 sm:flex-row sm:items-center">
-          {logoUrl && (
-            // A card in the photographer's chosen color, so their logo reads well
-            // on navy ("transparent" puts it straight on the header).
-            <div
-              className={`grid size-32 shrink-0 place-items-center rounded-3xl p-3 sm:size-36 ${
-                studio.logoBg === "transparent" ? "" : "shadow-2xl shadow-black/30"
-              }`}
-              style={{ backgroundColor: studio.logoBg }}
-            >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={logoUrl} alt={`${name} logo`} className="max-h-full max-w-full object-contain" />
-            </div>
-          )}
           <div className="min-w-0">
             {studio.serviceArea && (
               <p className="text-sm font-bold tracking-wider text-sky-light uppercase">{studio.serviceArea}</p>
@@ -186,7 +150,7 @@ export default async function StudioPage({ params }: PageProps<"/studio/[slug]">
         {/* Each part in its own card, so sections read as separate blocks. */}
         <section className="space-y-6">
           {bookingOpen && (
-            <div id="book" className="card scroll-mt-24 p-6">
+            <div id="book" className="card scroll-mt-28 p-6">
               <h2 className="font-display text-2xl font-bold">Book a session</h2>
               <ul className="mt-3 grid gap-2">
                 {bookable.map((s) => (
@@ -217,7 +181,7 @@ export default async function StudioPage({ params }: PageProps<"/studio/[slug]">
             </div>
           )}
           {studio.bio && (
-            <div id="about" className="card scroll-mt-24 p-6">
+            <div id="about" className="card scroll-mt-28 p-6">
               <h2 className="font-display text-2xl font-bold">About</h2>
               <div
                 className="rich-text mt-3 text-muted"
@@ -227,7 +191,7 @@ export default async function StudioPage({ params }: PageProps<"/studio/[slug]">
             </div>
           )}
           {sessions.length > 0 && (
-            <div id="sessions" className="card scroll-mt-24 p-6">
+            <div id="sessions" className="card scroll-mt-28 p-6">
               <h2 className="font-display text-2xl font-bold">Sessions</h2>
               <div className="mt-3 flex flex-wrap gap-2">
                 {sessions.map((session) => (
@@ -245,7 +209,7 @@ export default async function StudioPage({ params }: PageProps<"/studio/[slug]">
             </div>
           )}
           {studio.shootLocations.length > 0 && (
-            <div id="where" className="card scroll-mt-24 p-6">
+            <div id="where" className="card scroll-mt-28 p-6">
               <h2 className="font-display text-2xl font-bold">Where we shoot</h2>
               <p className="mt-3 text-muted">
                 {studio.shootLocations.map((place) => LOCATION_LABELS[place as ShootLocation]).join(" · ")}
@@ -253,7 +217,7 @@ export default async function StudioPage({ params }: PageProps<"/studio/[slug]">
             </div>
           )}
           {faqs.length > 0 && (
-            <div id="faq" className="card scroll-mt-24 p-6">
+            <div id="faq" className="card scroll-mt-28 p-6">
               <h2 className="font-display text-2xl font-bold">Questions &amp; answers</h2>
               <div className="mt-3 divide-y divide-border rounded-2xl border-2 border-border bg-surface">
                 {faqs.map((faq) => (
@@ -275,7 +239,7 @@ export default async function StudioPage({ params }: PageProps<"/studio/[slug]">
         {/* Navy panel so the contact form stands apart from the rest of the page. */}
         <section
           id="contact"
-          className="relative scroll-mt-24 self-start overflow-hidden rounded-3xl bg-brand-deep p-6 text-white shadow-xl shadow-brand-deep/25 sm:p-8"
+          className="relative scroll-mt-28 self-start overflow-hidden rounded-3xl bg-brand-deep p-6 text-white shadow-xl shadow-brand-deep/25 sm:p-8"
         >
           <div className="pointer-events-none absolute -top-20 -right-20 size-56 rounded-full bg-lime/20 blur-3xl" />
           <h2 className="relative font-display text-3xl font-bold">Let&apos;s talk</h2>

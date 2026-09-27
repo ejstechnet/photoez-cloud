@@ -55,9 +55,14 @@ export default function Home() {
 
         <header className="relative mx-auto flex max-w-6xl items-center justify-between px-4 py-5">
           <Logo />
-          <Link href="/login" className="text-sm font-bold tracking-wider text-white/90 uppercase hover:text-lime">
-            Log in
-          </Link>
+          <nav className="flex items-center gap-6">
+            <Link href="/" className="text-sm font-bold tracking-wider text-white/90 uppercase hover:text-lime">
+              Home
+            </Link>
+            <Link href="/login" className="text-sm font-bold tracking-wider text-white/90 uppercase hover:text-lime">
+              Log in
+            </Link>
+          </nav>
         </header>
 
         <div className="relative mx-auto max-w-6xl px-4 pt-10 pb-20 lg:pt-16 lg:pb-28">

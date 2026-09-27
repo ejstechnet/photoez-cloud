@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 // Dashboard navigation pill, lime when its section is open.
 export function NavLink({ href, children }: { href: string; children: React.ReactNode }) {
   const pathname = usePathname();
-  const active = href === "/dashboard" ? pathname === href : pathname.startsWith(href);
+  const active = href === "/dashboard" || href === "/" ? pathname === href : pathname.startsWith(href);
 
   return (
     <Link
