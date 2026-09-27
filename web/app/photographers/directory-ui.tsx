@@ -156,7 +156,7 @@ export function ListingCard({ listing }: { listing: Listing }) {
                 src={url}
                 alt={`${listing.studioName} photography example ${i + 1}`}
                 loading="lazy"
-                className="aspect-square w-full rounded-xl object-cover"
+                className="aspect-[2/3] w-full rounded-xl object-cover"
               />
             ))}
           </div>
