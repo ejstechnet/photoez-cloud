@@ -13,7 +13,7 @@ import { contractTemplateFor, signedContractFor } from "@/lib/contracts/for-book
 import { requirePhotographer } from "@/lib/session";
 import { siteUrl } from "@/lib/site";
 import { signedViewUrl } from "@/lib/storage";
-import { setBookingStatus } from "../actions";
+import { deleteBooking, setBookingStatus } from "../actions";
 import { ConfirmButton } from "../confirm-button";
 import { BookingStatusPill } from "../status-pill";
 
@@ -223,10 +223,29 @@ export default async function BookingPage({ params }: PageProps<"/dashboard/book
             {booking.status === "cancelled" ? "Restore booking" : "Mark not completed"}
           </ConfirmButton>
         )}
+        <ConfirmButton
+          action={deleteBooking.bind(null, booking.id)}
+          confirmText={[
+            `Delete ${booking.clientName}'s booking for good? This can't be undone.`,
+            paidCents > 0
+              ? `Its ${formatPrice(paidCents)} in payments will be removed from your revenue too. Refunds are made in your Stripe dashboard.`
+              : "",
+            booking.status === "confirmed" && !isPast
+              ? "The client isn't emailed. To let them know, cancel the booking instead."
+              : "",
+          ]
+            .filter(Boolean)
+            .join("\n\n")}
+          pendingLabel="Deleting…"
+          danger
+        >
+          Delete booking
+        </ConfirmButton>
       </div>
-      {booking.status === "confirmed" && (
+      {booking.status === "confirmed" && !isPast && (
         <p className="mt-4 text-sm text-muted">
-          Cancelling here doesn&apos;t email the client yet (emails arrive in a later update), so let them know.
+          Cancelling emails the client and opens the time for others. Deleting removes the booking for good, without
+          an email.
         </p>
       )}
     </div>
