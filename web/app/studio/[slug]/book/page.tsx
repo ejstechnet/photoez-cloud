@@ -134,7 +134,7 @@ export default async function BookPage({ params, searchParams }: PageProps<"/stu
 
   return (
     <div className="flex flex-1 flex-col">
-      <StudioBar slug={slug} name={name} logoUrl={logoUrl} logoBg={studio.logoBg} />
+      <StudioBar slug={slug} name={name} logoUrl={logoUrl} logoBg={studio.logoBg} bookButton={false} />
 
       <main className={`mx-auto w-full flex-1 px-4 py-10 ${session ? "max-w-3xl" : "max-w-5xl"}`}>
         <p className="text-sm font-bold tracking-wider text-lime-ink uppercase">{name}</p>

@@ -5,19 +5,19 @@ import { useRouter } from "next/navigation";
 import { ImagesIcon } from "@/components/icons";
 import { prepareLogoUpload, removeStudioLogo, saveLogoBackground, saveStudioLogo } from "./actions";
 
-// Card colors behind the logo. "None" shows the logo straight on the studio
-// page's navy header, so the preview uses navy for it too.
+// Colors for the top menu bar on the studio's public pages, which the logo
+// sits on. "transparent" (PhotoEZ navy) is for logos made for dark backgrounds.
 const SWATCHES = [
   { value: "#ffffff", label: "White" },
   { value: "#f4f4f8", label: "Light gray" },
   { value: "#1a3a6b", label: "Navy" },
   { value: "#111111", label: "Black" },
-  { value: "transparent", label: "None" },
+  { value: "transparent", label: "PhotoEZ navy" },
 ];
-const HEADER_NAVY = "#1a3a6b";
+const HEADER_NAVY = "#0f2548";
 const cardColor = (bg: string) => (bg === "transparent" ? HEADER_NAVY : bg);
 
-// Studio logo for the public studio page, and the color of the card behind it.
+// Studio logo for the public pages, and the color of the menu bar it sits on.
 // Both save right away, separately from the rest of the studio profile.
 export function StudioLogo({ currentUrl, background }: { currentUrl: string | null; background: string }) {
   const router = useRouter();
@@ -69,12 +69,13 @@ export function StudioLogo({ currentUrl, background }: { currentUrl: string | nu
       <span className="text-sm font-semibold">Studio logo</span>
       <div className="mt-1.5 flex items-center gap-4">
         <div
-          className="grid size-24 shrink-0 place-items-center overflow-hidden rounded-2xl border-2 border-border p-2 transition-colors"
+          // A preview of the menu bar: the logo on the chosen color, as clients see it.
+          className="flex h-20 w-44 shrink-0 items-center overflow-hidden rounded-2xl border-2 border-border px-4 transition-colors sm:w-56"
           style={{ backgroundColor: cardColor(bg) }}
         >
           {shown ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={shown} alt="Studio logo" className="max-h-full max-w-full object-contain" />
+            <img src={shown} alt="Studio logo" className="h-14 w-auto max-w-full object-contain" />
           ) : (
             <ImagesIcon size={28} className="text-muted" />
           )}
@@ -107,7 +108,7 @@ export function StudioLogo({ currentUrl, background }: { currentUrl: string | nu
       </div>
 
       <div className="mt-4">
-        <span className="text-sm font-semibold">Background behind the logo</span>
+        <span className="text-sm font-semibold">Menu bar color</span>
         <div className="mt-2 flex flex-wrap items-center gap-2">
           {SWATCHES.map((swatch) => (
             <button
@@ -140,13 +141,14 @@ export function StudioLogo({ currentUrl, background }: { currentUrl: string | nu
               value={bg === "transparent" ? "#ffffff" : bg}
               onChange={(event) => chooseBackground(event.target.value)}
               className="size-6 cursor-pointer rounded-full border-0 bg-transparent p-0"
-              aria-label="Custom background color"
+              aria-label="Custom menu bar color"
             />
             Custom
           </label>
         </div>
         <p className="mt-1.5 text-xs text-muted">
-          Pick a color your logo stands out on. &ldquo;None&rdquo; puts it straight on the navy header.
+          The top menu on your studio page, booking pages, and client galleries uses this color, with your logo right
+          on it. Pick one your logo stands out on.
         </p>
       </div>
       <input

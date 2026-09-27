@@ -1,39 +1,40 @@
 import Link from "next/link";
 import { PhotoEZCloudMark } from "@/components/brand";
+import { StudioNav } from "./studio-nav";
 
-// Top bar for the studio's inner pages (booking, booking confirmation): the
-// studio's logo and name, linking back to its studio page.
+// Top bar for the studio's inner pages (booking, booking confirmation):
+// the studio's menu, linking back to its studio page.
 export function StudioBar({
   slug,
   name,
   logoUrl,
   logoBg,
+  bookButton = true,
 }: {
   slug: string;
   name: string;
   logoUrl: string | null;
   logoBg: string;
+  // Off on the booking page itself.
+  bookButton?: boolean;
 }) {
   return (
-    <nav className="border-b border-white/10 bg-brand-deep text-white">
-      <div className="mx-auto flex max-w-5xl items-center gap-3 px-4 py-3">
-        <Link href={`/studio/${slug}`} className="flex min-w-0 items-center gap-3">
-          {logoUrl && (
-            <span className="grid size-9 shrink-0 place-items-center rounded-lg p-1" style={{ backgroundColor: logoBg }}>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={logoUrl} alt="" className="max-h-full max-w-full object-contain" />
-            </span>
-          )}
-          <span className="truncate font-display text-lg">{name}</span>
-        </Link>
+    <StudioNav
+      slug={slug}
+      name={name}
+      logoUrl={logoUrl}
+      logoBg={logoBg}
+      links={[{ href: `/studio/${slug}#contact`, label: "Contact" }]}
+    >
+      {bookButton && (
         <Link
-          href={`/studio/${slug}`}
-          className="ml-auto rounded-full px-3 py-1.5 text-xs font-bold tracking-wider whitespace-nowrap text-white/75 uppercase transition hover:bg-white/10 hover:text-white"
+          href={`/studio/${slug}/book`}
+          className="ml-1 rounded-full bg-lime px-4 py-2 text-xs font-bold tracking-wider whitespace-nowrap text-brand-deep uppercase transition hover:-translate-y-0.5"
         >
-          Studio page
+          Book a session
         </Link>
-      </div>
-    </nav>
+      )}
+    </StudioNav>
   );
 }
 

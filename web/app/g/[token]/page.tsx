@@ -1,3 +1,4 @@
+import { StudioNav } from "@/app/studio/[slug]/studio-nav";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -72,45 +73,22 @@ export default async function ClientGalleryPage({ params, searchParams }: PagePr
         </p>
       )}
       {/* Studio navigation, so clients can get back to the studio (and book again). */}
-      <nav className="border-b border-white/10 bg-brand-deep text-white">
-        <div className="mx-auto flex max-w-6xl items-center gap-3 px-4 py-3">
-          {gallery.studioSlug ? (
-            <Link href={`/studio/${gallery.studioSlug}`} className="flex min-w-0 items-center gap-3">
-              {logoUrl && (
-                <span className="grid size-9 shrink-0 place-items-center rounded-lg p-1" style={{ backgroundColor: gallery.logoBg }}>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={logoUrl} alt="" className="max-h-full max-w-full object-contain" />
-                </span>
-              )}
-              <span className="truncate font-display text-lg">{studio}</span>
-            </Link>
-          ) : (
-            <span className="truncate font-display text-lg">{studio}</span>
-          )}
-          {gallery.studioSlug && (
-            <div className="ml-auto flex items-center gap-1">
-              <Link
-                href={`/studio/${gallery.studioSlug}`}
-                className="hidden rounded-full px-3 py-1.5 text-xs font-bold tracking-wider whitespace-nowrap text-white/75 uppercase transition hover:bg-white/10 hover:text-white sm:block"
-              >
-                Studio page
-              </Link>
-              <Link
-                href={`/studio/${gallery.studioSlug}#contact`}
-                className="rounded-full px-3 py-1.5 text-xs font-bold tracking-wider whitespace-nowrap text-white/75 uppercase transition hover:bg-white/10 hover:text-white"
-              >
-                Contact
-              </Link>
-              <Link
-                href={`/studio/${gallery.studioSlug}/book`}
-                className="ml-1 rounded-full bg-lime px-4 py-2 text-xs font-bold tracking-wider whitespace-nowrap text-brand-deep uppercase transition hover:-translate-y-0.5"
-              >
-                Book a session
-              </Link>
-            </div>
-          )}
-        </div>
-      </nav>
+      <StudioNav
+        slug={gallery.studioSlug}
+        name={studio}
+        logoUrl={logoUrl}
+        logoBg={gallery.logoBg}
+        links={gallery.studioSlug ? [{ href: `/studio/${gallery.studioSlug}#contact`, label: "Contact" }] : []}
+      >
+        {gallery.studioSlug && (
+          <Link
+            href={`/studio/${gallery.studioSlug}/book`}
+            className="ml-1 rounded-full bg-lime px-4 py-2 text-xs font-bold tracking-wider whitespace-nowrap text-brand-deep uppercase transition hover:-translate-y-0.5"
+          >
+            Book a session
+          </Link>
+        )}
+      </StudioNav>
 
       <header
         className={`relative overflow-hidden bg-brand text-white ${

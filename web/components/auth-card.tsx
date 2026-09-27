@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Logo, PrintStack } from "./brand";
 
 // Split-screen frame for sign-up and login: a navy PhotoEZ panel with the
@@ -28,6 +29,11 @@ export function AuthCard({
       <div className="flex flex-col">
         <div className="bg-brand px-4 py-4 lg:hidden">
           <Logo />
+        </div>
+        <div className="flex justify-end px-6 pt-5">
+          <Link href="/" className="text-sm font-bold tracking-wider text-muted uppercase hover:text-foreground">
+            ← Home
+          </Link>
         </div>
         <div className="flex flex-1 items-center justify-center px-4 py-12">
           <div className="w-full max-w-sm">
