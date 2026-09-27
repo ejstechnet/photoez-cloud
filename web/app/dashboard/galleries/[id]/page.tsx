@@ -19,6 +19,8 @@ import { describeDownloads, downloadSummaries } from "@/lib/downloads";
 import { paidGalleryExtras } from "@/lib/payments/gallery-checkout";
 import { formatPrice } from "@/lib/booking/format";
 import { PhotoGrid } from "./photo-grid";
+import { CullingGrid } from "./culling-grid";
+import { isCullMetrics } from "@/lib/culling";
 import { ProofRefresher } from "./proof-refresher";
 import { Uploader } from "./uploader";
 
@@ -57,6 +59,7 @@ export default async function GalleryPage({ params }: PageProps<"/dashboard/gall
       height: photos.height,
       favoriteId: favorites.id,
       note: favorites.note,
+      cull: photos.cull,
     })
     .from(photos)
     .leftJoin(favorites, eq(favorites.photoId, photos.id))
@@ -82,6 +85,7 @@ export default async function GalleryPage({ params }: PageProps<"/dashboard/gall
       aspect: photo.width && photo.height ? photo.width / photo.height : 2 / 3,
       selected: photo.favoriteId !== null,
       note: photo.note,
+      cull: isCullMetrics(photo.cull) ? photo.cull : null,
       thumbUrl: await signedViewUrl(photoKey(photo.fileKey, "thumb")),
       previewUrl: await signedViewUrl(photoKey(photo.fileKey, "preview")),
     })),
@@ -187,7 +191,7 @@ export default async function GalleryPage({ params }: PageProps<"/dashboard/gall
             </p>
           )}
           <Uploader galleryId={gallery.id} kind="proof" watermark={watermarkForBrowser} />
-          {proofs.length > 0 && <PhotoGrid galleryId={gallery.id} photos={proofs} />}
+          {proofs.length > 0 && <CullingGrid galleryId={gallery.id} photos={proofs} />}
         </div>
       </section>
 

@@ -18,6 +18,7 @@ export function PhotoTile({
   note,
   thumbUrl,
   onOpen,
+  badges,
 }: {
   galleryId: string;
   id: string;
@@ -28,6 +29,8 @@ export function PhotoTile({
   note?: string | null;
   thumbUrl: string;
   onOpen: () => void;
+  // Extra labels, e.g. culling help's "Blurry".
+  badges?: React.ReactNode;
 }) {
   const [pending, startTransition] = useTransition();
 
@@ -79,6 +82,7 @@ export function PhotoTile({
           ✎ Note
         </span>
       )}
+      {badges && <span className="pointer-events-none absolute bottom-9 left-2 flex flex-wrap gap-1">{badges}</span>}
       <span className="pointer-events-none absolute top-2 left-2 grid size-7 place-items-center rounded-full bg-brand-deep/80 text-xs font-bold text-white">
         {number}
       </span>

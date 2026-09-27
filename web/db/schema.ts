@@ -254,6 +254,8 @@ export const photos = pgTable(
     position: integer("position").notNull().default(0),
     // When the watermarked proof was last made (null = no proof yet).
     proofMadeAt: timestamp("proof_made_at", { withTimezone: true }),
+    // Culling help's measurements (lib/culling.ts); null = not checked yet.
+    cull: jsonb("cull").$type<import("../lib/culling").CullMetrics>(),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index("photos_gallery_idx").on(t.galleryId, t.kind, t.position)],
