@@ -1,20 +1,21 @@
 "use server";
 
 import { randomBytes } from "node:crypto";
-import { and, eq, ne } from "drizzle-orm";
+import { and, asc, count, eq, max, ne } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { db } from "@/db";
-import { photographers, studioFaqs } from "@/db/schema";
+import { photographers, studioFaqs, studioPhotos } from "@/db/schema";
 import { MAX_FAQS } from "@/lib/faq";
 import { cleanRichTextInput, richTextToPlain } from "@/lib/rich-text";
 import { requirePhotographer } from "@/lib/session";
 import { testEmail } from "@/lib/email/messages";
 import { sendToStudio, studioSender } from "@/lib/email/send";
-import { deletePrefix, signedUploadUrl, storedSize, studioLogoKey, watermarkKey } from "@/lib/storage";
+import { deletePrefix, signedUploadUrl, storedSize, studioLogoKey, studioPhotoKey, watermarkKey } from "@/lib/storage";
 import { MAX_WATERMARK_BYTES, WATERMARK_POSITIONS } from "@/lib/watermark";
 import { OFFERABLE_TYPES, SHOOT_LOCATIONS } from "@/lib/session-types";
-import { isAllowedSlug } from "@/lib/studio";
+import { MAX_STUDIO_PHOTOS, isAllowedSlug } from "@/lib/studio";
+import { moveInList } from "@/lib/reorder";
 
 // Step 1 of replacing the watermark: a one-time link to upload the new PNG.
 export async function prepareWatermarkUpload(
@@ -371,4 +372,79 @@ export async function saveReviewSettings(_prev: ReviewFormState, formData: FormD
     .where(eq(photographers.id, photographer.id));
   revalidatePath("/dashboard", "layout");
   return { saved: true };
+}
+
+// ---- Examples of work (studio page portfolio) ----
+// Same two steps as other photos: a one-time upload link for a browser-resized
+// JPEG, then a save that checks it arrived. Up to MAX_STUDIO_PHOTOS.
+
+const MAX_STUDIO_PHOTO_BYTES = 4 * 1024 * 1024;
+
+export async function prepareStudioPhotoUpload(
+  size: number,
+): Promise<{ version: string; url: string } | { error: string }> {
+  const photographer = await requirePhotographer();
+  const [{ n }] = await db
+    .select({ n: count() })
+    .from(studioPhotos)
+    .where(eq(studioPhotos.photographerId, photographer.id));
+  if (n >= MAX_STUDIO_PHOTOS) return { error: `You can show up to ${MAX_STUDIO_PHOTOS} photos. Remove one to add another.` };
+  if (size > MAX_STUDIO_PHOTO_BYTES) return { error: "That photo is too large. Try a smaller one." };
+  const version = randomBytes(6).toString("hex");
+  return { version, url: await signedUploadUrl(studioPhotoKey(photographer.id, version), "image/jpeg") };
+}
+
+export async function saveStudioPhoto(version: string): Promise<{ ok: true } | { error: string }> {
+  const photographer = await requirePhotographer();
+  if (!/^[a-f0-9]{12}$/.test(version)) return { error: "That upload couldn't be saved." };
+  const key = studioPhotoKey(photographer.id, version);
+  const size = await storedSize(key);
+  if (size === null) return { error: "The photo upload didn't finish. Try again." };
+  const [{ n, last }] = await db
+    .select({ n: count(), last: max(studioPhotos.position) })
+    .from(studioPhotos)
+    .where(eq(studioPhotos.photographerId, photographer.id));
+  if (size > MAX_STUDIO_PHOTO_BYTES || n >= MAX_STUDIO_PHOTOS) {
+    await deletePrefix(key);
+    return { error: n >= MAX_STUDIO_PHOTOS ? `You can show up to ${MAX_STUDIO_PHOTOS} photos.` : "That photo is too large." };
+  }
+  await db.insert(studioPhotos).values({ photographerId: photographer.id, fileKey: key, position: (last ?? -1) + 1 });
+  revalidatePath("/dashboard/settings");
+  revalidatePath("/studio/[slug]", "page");
+  return { ok: true };
+}
+
+export async function removeStudioPhoto(photoId: string): Promise<void> {
+  const photographer = await requirePhotographer();
+  if (!z.uuid().safeParse(photoId).success) return;
+  const [removed] = await db
+    .delete(studioPhotos)
+    .where(and(eq(studioPhotos.id, photoId), eq(studioPhotos.photographerId, photographer.id)))
+    .returning({ fileKey: studioPhotos.fileKey });
+  if (removed) await deletePrefix(removed.fileKey);
+  revalidatePath("/dashboard/settings");
+  revalidatePath("/studio/[slug]", "page");
+}
+
+// Moves a portfolio photo one place earlier (-1) or later (1).
+export async function moveStudioPhoto(photoId: string, by: -1 | 1): Promise<void> {
+  const photographer = await requirePhotographer();
+  const rows = await db
+    .select({ id: studioPhotos.id })
+    .from(studioPhotos)
+    .where(eq(studioPhotos.photographerId, photographer.id))
+    .orderBy(asc(studioPhotos.position), asc(studioPhotos.createdAt));
+  const order = moveInList(
+    rows.map((r) => r.id),
+    photoId,
+    by,
+  );
+  if (!order) return;
+  await db.transaction(async (tx) => {
+    for (const [position, id] of order.entries()) {
+      await tx.update(studioPhotos).set({ position }).where(eq(studioPhotos.id, id));
+    }
+  });
+  revalidatePath("/dashboard/settings");
+  revalidatePath("/studio/[slug]", "page");
 }

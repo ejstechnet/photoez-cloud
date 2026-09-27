@@ -107,7 +107,7 @@ export default async function ClientGalleryPage({ params, searchParams }: PagePr
         ) : (
           <div className="pointer-events-none absolute -top-24 -right-24 size-80 rounded-full bg-lime/15 blur-3xl" />
         )}
-        <div className={`relative mx-auto w-full max-w-6xl px-4 pb-8 ${headerUrl ? "pt-24" : "pt-6"}`}>
+        <div className={`relative mx-auto w-full max-w-[1440px] px-4 pb-8 ${headerUrl ? "pt-24" : "pt-6"}`}>
           <p className="text-sm font-bold tracking-wider text-sky-light uppercase">{studio}</p>
           <h1 className="mt-1 font-display text-4xl font-bold tracking-tight break-words sm:text-5xl">
             {gallery.title}
@@ -118,7 +118,7 @@ export default async function ClientGalleryPage({ params, searchParams }: PagePr
         </div>
       </header>
 
-      <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8">
+      <main className="mx-auto w-full max-w-[1440px] flex-1 px-4 py-8">
         {gallery.status === "expired" ? (
           <Notice title="This gallery has expired">
             Contact {studio} if you still need your photos.

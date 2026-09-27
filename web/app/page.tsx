@@ -53,7 +53,7 @@ export default function Home() {
         />
         <div className="pointer-events-none absolute -bottom-32 left-1/4 size-80 rounded-full bg-coral/20 blur-3xl" />
 
-        <header className="relative mx-auto flex max-w-6xl items-center justify-between px-4 py-5">
+        <header className="relative mx-auto flex max-w-7xl items-center justify-between px-4 py-5">
           <Logo />
           <nav className="flex items-center gap-6">
             <Link href="/" className="text-sm font-bold tracking-wider text-white/90 uppercase hover:text-lime">
@@ -65,7 +65,7 @@ export default function Home() {
           </nav>
         </header>
 
-        <div className="relative mx-auto max-w-6xl px-4 pt-10 pb-20 lg:pt-16 lg:pb-28">
+        <div className="relative mx-auto max-w-7xl px-4 pt-10 pb-20 lg:pt-16 lg:pb-28">
           <div className="lg:max-w-xl">
             <p className="inline-flex rounded-full bg-lime px-3 py-1 text-xs font-bold tracking-wider text-brand-deep uppercase">
               PhotoEZ, now in the cloud
@@ -113,14 +113,14 @@ export default function Home() {
         </div>
 
         <div className="relative border-t border-white/10 bg-brand-deep/40">
-          <div className="mx-auto flex max-w-6xl flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="mx-auto flex max-w-7xl flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-sm text-white/70">Every client, from first hello to final delivery.</p>
             <WorkflowPills />
           </div>
         </div>
       </section>
 
-      <section className="mx-auto w-full max-w-6xl px-4 py-20">
+      <section className="mx-auto w-full max-w-7xl px-4 py-20">
         <p className="text-sm font-bold tracking-wider text-coral uppercase">The AI toolkit</p>
         <h2 className="mt-2 max-w-xl font-display text-4xl font-bold tracking-tight">
           Less admin. <span className="italic text-link">More art.</span>

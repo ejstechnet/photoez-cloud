@@ -117,7 +117,8 @@ export async function emailBookingCancelled(
   }
 }
 
-export async function emailBookingRescheduled(bookingId: string, oldStartsAt: Date) {
+// The client moved it (both are told), or the studio did (only the client is).
+export async function emailBookingRescheduled(bookingId: string, oldStartsAt: Date, by: "client" | "studio" = "client") {
   const loaded = await loadBooking(bookingId);
   if (!loaded) return;
   const { booking, studio, facts, dashboardUrl } = loaded;
@@ -129,6 +130,7 @@ export async function emailBookingRescheduled(bookingId: string, oldStartsAt: Da
     messages.bookingRescheduledClient(facts, oldWhen),
     { bookingId },
   );
+  if (by === "studio") return;
   await sendToStudio(
     booking.photographerId,
     "booking_rescheduled",

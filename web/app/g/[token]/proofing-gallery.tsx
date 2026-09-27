@@ -243,7 +243,7 @@ That includes ${extras.count} extra ${extras.count === 1 ? "photo" : "photos"} f
       {/* Sticky PhotoEZ selection bar */}
       {!locked && (
         <div className="fixed inset-x-0 bottom-0 z-20 border-t border-border bg-surface/95 backdrop-blur">
-          <div className="mx-auto flex max-w-6xl flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="mx-auto flex max-w-[1440px] flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="text-sm">
               <span className="font-semibold">
                 {extras.count > 0

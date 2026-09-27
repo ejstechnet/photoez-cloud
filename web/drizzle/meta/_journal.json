@@ -169,6 +169,13 @@
       "when": 1790482218200,
       "tag": "0023_messy_nextwave",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1790487347743,
+      "tag": "0024_worried_demogoblin",
+      "breakpoints": true
     }
   ]
 }

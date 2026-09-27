@@ -136,7 +136,7 @@ export default async function BookPage({ params, searchParams }: PageProps<"/stu
     <div className="flex flex-1 flex-col">
       <StudioBar slug={slug} name={name} logoUrl={logoUrl} logoBg={studio.logoBg} bookButton={false} />
 
-      <main className={`mx-auto w-full flex-1 px-4 py-10 ${session ? "max-w-3xl" : "max-w-5xl"}`}>
+      <main className={`mx-auto w-full flex-1 px-4 py-10 ${session ? "max-w-3xl" : "max-w-7xl"}`}>
         <p className="text-sm font-bold tracking-wider text-lime-ink uppercase">{name}</p>
         <h1 className="mt-1 font-display text-4xl font-bold tracking-tight sm:text-5xl">Book a session</h1>
         {one(query.payment) === "cancelled" && (

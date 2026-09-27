@@ -39,6 +39,11 @@ export function studioLogoKey(photographerId: string, version: string, extension
   return `photographers/${photographerId}/branding/logo-${version}.${extension}`;
 }
 
+// A portfolio photo in "Examples of work" on the studio page.
+export function studioPhotoKey(photographerId: string, version: string) {
+  return `photographers/${photographerId}/portfolio/${version}.jpg`;
+}
+
 // The photo shown above a session on the booking page. A new key per upload,
 // so browsers never show a cached old photo.
 export function sessionImageKey(photographerId: string, sessionTypeId: string, version: string) {

@@ -1,6 +1,6 @@
 "use server";
 
-import { emailBookingCancelled } from "@/lib/email/notify";
+import { emailBookingCancelled, emailBookingRescheduled } from "@/lib/email/notify";
 import { afterResponse } from "@/lib/email/send";
 import { randomBytes } from "node:crypto";
 import { and, asc, eq, ne } from "drizzle-orm";
@@ -18,7 +18,7 @@ import {
   sessionTypes,
 } from "@/db/schema";
 import { isOverlapError } from "@/lib/booking/availability";
-import { isValidTimeZone } from "@/lib/booking/time";
+import { isValidTimeZone, zonedToUtc } from "@/lib/booking/time";
 import { cleanRichTextInput, richTextToPlain } from "@/lib/rich-text";
 import { moveInList } from "@/lib/reorder";
 import { returnBookingCredit } from "@/lib/credits";
@@ -443,7 +443,7 @@ export async function moveSessionType(sessionTypeId: string, by: -1 | 1): Promis
 // signed contract, payment records, and inspiration photos. Any session
 // credit it used goes back to the client first. The client isn't emailed:
 // cancel first if they need to know.
-export async function deleteBooking(bookingId: string): Promise<{ message?: string }> {
+export async function deleteBooking(bookingId: string, returnTo?: string): Promise<{ message?: string }> {
   const photographer = await requirePhotographer();
   if (!isUuid(bookingId)) return { message: "That booking could not be found." };
   const [booking] = await db
@@ -463,5 +463,55 @@ export async function deleteBooking(bookingId: string): Promise<{ message?: stri
 
   revalidatePath("/dashboard", "layout");
   revalidatePath("/studio/[slug]", "layout");
-  redirect("/dashboard/bookings");
+  // Back where they came from (e.g. the calendar), but only within Bookings.
+  redirect(returnTo && /^\/dashboard\/bookings(\?[\w=&-]*)?$/.test(returnTo) ? returnTo : "/dashboard/bookings");
+}
+
+// The studio moves a booking (from the calendar), like PhotoEZ Booking's
+// admin reschedule: any day and time, as long as it doesn't overlap another
+// booking. It doesn't count against the client's own free reschedules.
+export async function rescheduleByStudio(
+  bookingId: string,
+  date: string,
+  time: string,
+  emailClient: boolean,
+): Promise<{ message?: string }> {
+  const photographer = await requirePhotographer();
+  if (!isUuid(bookingId) || !/^\d{4}-\d{2}-\d{2}$/.test(date) || !/^([01]\d|2[0-3]):[0-5]\d$/.test(time)) {
+    return { message: "Choose a date and time." };
+  }
+  const [row] = await db
+    .select({ booking: bookings, timeZone: photographers.timeZone })
+    .from(bookings)
+    .innerJoin(photographers, eq(photographers.id, bookings.photographerId))
+    .where(and(eq(bookings.id, bookingId), eq(bookings.photographerId, photographer.id)));
+  if (!row) return { message: "That booking could not be found." };
+  const { booking } = row;
+  if (booking.status === "cancelled") return { message: "Restore this booking before moving it." };
+
+  const startsAt = zonedToUtc(date, time, row.timeZone);
+  if (Number.isNaN(startsAt.getTime())) return { message: "Choose a date and time." };
+  if (startsAt.getTime() === booking.startsAt.getTime()) return {};
+  const minutes = Math.round((booking.endsAt.getTime() - booking.startsAt.getTime()) / 60_000);
+  try {
+    await db
+      .update(bookings)
+      .set({
+        startsAt,
+        endsAt: new Date(startsAt.getTime() + minutes * 60_000),
+        // New time, so the reminders go out again before it.
+        reminderSentAt: null,
+        balanceReminderSentAt: null,
+      })
+      .where(eq(bookings.id, booking.id));
+  } catch (error) {
+    if (isOverlapError(error)) return { message: "Another booking already takes that time." };
+    throw error;
+  }
+  if (emailClient && booking.status === "confirmed" && startsAt > new Date()) {
+    afterResponse(() => emailBookingRescheduled(booking.id, booking.startsAt, "studio"));
+  }
+  revalidatePath("/dashboard", "layout");
+  revalidatePath("/studio/[slug]", "layout");
+  return {};
 }

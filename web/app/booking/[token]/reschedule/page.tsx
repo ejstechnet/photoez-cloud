@@ -61,7 +61,7 @@ export default async function ReschedulePage({ params, searchParams }: PageProps
         <div className="bg-brand-deep px-4 py-4 font-display text-lg text-white">{name}</div>
       )}
 
-      <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-10">
+      <main className="mx-auto w-full max-w-4xl flex-1 px-4 py-10">
         <Link href={`/booking/${token}`} className="text-xs font-bold tracking-wider text-muted uppercase hover:text-foreground">
           ← Your booking
         </Link>
