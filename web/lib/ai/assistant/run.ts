@@ -3,7 +3,7 @@ import { and, count, eq, gte } from "drizzle-orm";
 import { db } from "@/db";
 import { aiUsage, photographers } from "@/db/schema";
 import { localDateOf, zonedToUtc } from "@/lib/booking/time";
-import { AI_ASSISTANT_ALLOWANCE, hasFeature } from "@/lib/plans";
+import { AI_ASSISTANT_ALLOWANCE, effectivePlan, hasFeature } from "@/lib/plans";
 import { ASSISTANT_TOOLS, runTool, type Proposal } from "./tools";
 
 // The Studio Assistant: answers a photographer's question about their studio
@@ -36,7 +36,7 @@ export type ChatTurn = { role: "user" | "assistant"; text: string };
 // Questions asked this month (studio's calendar), and what the plan allows.
 export async function assistantAllowance(photographerId: string) {
   const [studio] = await db
-    .select({ plan: photographers.plan, timeZone: photographers.timeZone })
+    .select({ plan: photographers.plan, trialEndsAt: photographers.trialEndsAt, timeZone: photographers.timeZone })
     .from(photographers)
     .where(eq(photographers.id, photographerId));
   const monthStart = zonedToUtc(`${localDateOf(new Date(), studio.timeZone).slice(0, 7)}-01`, "00:00", studio.timeZone);
@@ -44,8 +44,9 @@ export async function assistantAllowance(photographerId: string) {
     .select({ used: count() })
     .from(aiUsage)
     .where(and(eq(aiUsage.photographerId, photographerId), eq(aiUsage.feature, "assistant"), gte(aiUsage.createdAt, monthStart)));
-  const limit = AI_ASSISTANT_ALLOWANCE[studio.plan];
-  return { enabled: hasFeature(studio.plan, "aiSearch"), used, limit, left: Math.max(0, limit - used), timeZone: studio.timeZone };
+  const plan = effectivePlan(studio.plan, studio.trialEndsAt);
+  const limit = AI_ASSISTANT_ALLOWANCE[plan];
+  return { enabled: hasFeature(plan, "aiSearch"), used, limit, left: Math.max(0, limit - used), timeZone: studio.timeZone };
 }
 
 export async function askAssistant(

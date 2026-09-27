@@ -137,7 +137,7 @@ export default async function ReschedulePage({ params, searchParams }: PageProps
         )}
       </main>
 
-      <StudioFooter />
+      <StudioFooter studioId={booking.photographerId} />
     </div>
   );
 }

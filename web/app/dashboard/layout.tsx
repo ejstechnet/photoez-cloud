@@ -1,4 +1,9 @@
+import Link from "next/link";
+import { eq } from "drizzle-orm";
+import { db } from "@/db";
+import { photographers } from "@/db/schema";
 import { Logo } from "@/components/brand";
+import { trialDaysLeft } from "@/lib/plans";
 import { requirePhotographer } from "@/lib/session";
 import { GearIcon } from "@/components/icons";
 import { NavLink } from "./nav-link";
@@ -8,7 +13,13 @@ import { SignOutButton } from "./sign-out-button";
 // Frame shared by every dashboard page: a PhotoEZ navy band with the logo,
 // navigation pills, and sign-out.
 export default async function DashboardLayout({ children }: LayoutProps<"/dashboard">) {
-  await requirePhotographer();
+  const user = await requirePhotographer();
+  const [studio] = await db
+    .select({ plan: photographers.plan, trialEndsAt: photographers.trialEndsAt })
+    .from(photographers)
+    .where(eq(photographers.id, user.id));
+  // Days left in the free Pro trial (0 once it's over or a plan is chosen).
+  const trialLeft = studio?.plan === "free" ? trialDaysLeft(studio.trialEndsAt) : 0;
 
   return (
     <div className="flex flex-1 flex-col">
@@ -46,6 +57,7 @@ export default async function DashboardLayout({ children }: LayoutProps<"/dashbo
               items={[
                 { href: "/dashboard/settings", label: "Settings" },
                 { href: "/dashboard/design", label: "Design" },
+                { href: "/dashboard/billing", label: "Billing" },
                 { href: "/dashboard/emails", label: "Email log" },
               ]}
             />
@@ -53,6 +65,14 @@ export default async function DashboardLayout({ children }: LayoutProps<"/dashbo
           <SignOutButton />
         </div>
       </header>
+      {trialLeft > 0 && (
+        <p className="bg-lime px-4 py-2 text-center text-sm font-semibold text-brand-deep">
+          Pro trial: {trialLeft === 1 ? "1 day" : `${trialLeft} days`} left.{" "}
+          <Link href="/dashboard/billing" className="underline underline-offset-4">
+            See plans
+          </Link>
+        </p>
+      )}
       <main className="mx-auto w-full max-w-[1440px] px-4 py-10">{children}</main>
     </div>
   );

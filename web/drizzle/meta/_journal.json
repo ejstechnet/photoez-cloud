@@ -225,6 +225,13 @@
       "when": 1790543745751,
       "tag": "0031_famous_tenebrous",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1790547252467,
+      "tag": "0032_dear_power_pack",
+      "breakpoints": true
     }
   ]
 }

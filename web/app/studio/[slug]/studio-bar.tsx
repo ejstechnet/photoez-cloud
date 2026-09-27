@@ -1,6 +1,10 @@
 import Link from "next/link";
 import { PhotoEZCloudMark } from "@/components/brand";
 import { StudioNav } from "./studio-nav";
+import { eq } from "drizzle-orm";
+import { db } from "@/db";
+import { photographers } from "@/db/schema";
+import { effectivePlan, hasFeature } from "@/lib/plans";
 import { studioLinks } from "@/lib/studio-links";
 
 // Top bar for the studio's inner pages (booking, booking confirmation,
@@ -40,7 +44,14 @@ export async function StudioBar({
   );
 }
 
-export function StudioFooter() {
+// "Powered by PhotoEZ Cloud", unless a Studio-plan studio turned it off
+// (Billing).
+export async function StudioFooter({ studioId }: { studioId: string }) {
+  const [studio] = await db
+    .select({ plan: photographers.plan, trialEndsAt: photographers.trialEndsAt, hide: photographers.hideBranding })
+    .from(photographers)
+    .where(eq(photographers.id, studioId));
+  if (studio?.hide && hasFeature(effectivePlan(studio.plan, studio.trialEndsAt), "removeBranding")) return null;
   return (
     <footer className="border-t border-border py-6">
       <p className="flex items-center justify-center gap-2 text-xs text-muted">

@@ -107,6 +107,7 @@ export default async function Home() {
                   { href: "/dashboard/clients", label: "Clients" },
                   { href: "/dashboard/assistant", label: "Studio Assistant" },
                   { href: "/dashboard/settings", label: "Settings" },
+                  { href: "/dashboard/billing", label: "Billing" },
                   ...(studioSlug ? [{ href: `/studio/${studioSlug}`, label: "My studio page" }] : []),
                 ]}
               />
@@ -116,6 +117,9 @@ export default async function Home() {
             <nav className="flex items-center gap-6">
               <Link href="/" className="text-sm font-bold tracking-wider text-white/90 uppercase hover:text-lime">
                 Home
+              </Link>
+              <Link href="/pricing" className="text-sm font-bold tracking-wider text-white/90 uppercase hover:text-lime">
+                Pricing
               </Link>
               <Link href="/login" className="text-sm font-bold tracking-wider text-white/90 uppercase hover:text-lime">
                 Log in
@@ -343,7 +347,9 @@ export default async function Home() {
             <a href={PHOTOEZ_LINKS.demos} className="hover:text-foreground">
               Plugin demos
             </a>
-            <span />
+            <Link href="/pricing" className="hover:text-foreground">
+              Pricing
+            </Link>
             <a href={PHOTOEZ_LINKS.liteWordPressOrg} className="hover:text-foreground">
               PhotoEZ Lite on WordPress.org
             </a>

@@ -243,7 +243,7 @@ export default async function ClientBookingPage({ params, searchParams }: PagePr
         )}
       </main>
 
-      <StudioFooter />
+      <StudioFooter studioId={booking.photographerId} />
     </div>
   );
 }

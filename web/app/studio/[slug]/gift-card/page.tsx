@@ -94,7 +94,7 @@ export default async function GiftCardPage({ params, searchParams }: PageProps<"
           </div>
         </div>
       </main>
-      <StudioFooter />
+      <StudioFooter studioId={studio.id} />
     </div>
   );
 }

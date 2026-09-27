@@ -291,7 +291,7 @@ export default async function BookPage({ params, searchParams }: PageProps<"/stu
         )}
       </main>
 
-      <StudioFooter />
+      <StudioFooter studioId={studio.id} />
     </div>
   );
 }
