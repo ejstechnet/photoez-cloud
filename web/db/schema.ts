@@ -67,8 +67,22 @@ export const photographers = pgTable("photographers", {
   // go straight to it; chargesEnabled is Stripe's "ready to take payments".
   stripeAccountId: text("stripe_account_id"),
   stripeChargesEnabled: boolean("stripe_charges_enabled").notNull().default(false),
-  // Subscription tier (lib/plans.ts). Billing comes later; set by hand for now.
+  // Subscription tier (lib/plans.ts): set from the Stripe subscription
+  // (lib/billing.ts), or by hand for complimentary accounts.
   plan: text("plan", { enum: PLANS }).notNull().default("free"),
+  // New sign-ups get Pro free until this moment (no card needed).
+  trialEndsAt: timestamp("trial_ends_at", { withTimezone: true }),
+  // The studio's PhotoEZ Cloud subscription, on the PhotoEZ Cloud Stripe
+  // account (not the studio's own connected account).
+  billingCustomerId: text("billing_customer_id"),
+  subscriptionId: text("subscription_id"),
+  // Stripe's status: active, trialing, past_due, canceled, …
+  subscriptionStatus: text("subscription_status"),
+  planInterval: text("plan_interval", { enum: ["month", "year"] }),
+  currentPeriodEnd: timestamp("current_period_end", { withTimezone: true }),
+  cancelAtPeriodEnd: boolean("cancel_at_period_end").notNull().default(false),
+  // Studio plan: hide "Powered by PhotoEZ Cloud" on the studio's pages.
+  hideBranding: boolean("hide_branding").notNull().default(false),
   // Price per photo a client selects beyond a gallery's included number
   // (PhotoEZ's "global extra price"; galleries can override it).
   extraPhotoPriceCents: integer("extra_photo_price_cents").notNull().default(1000),

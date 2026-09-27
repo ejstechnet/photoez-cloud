@@ -18,6 +18,7 @@ import { tagNextPhotos } from "@/lib/gallery-tagging";
 import { searchGalleryPhotos } from "@/lib/photo-search";
 import { afterResponse } from "@/lib/email/send";
 import { studioPlan } from "@/lib/studio-plan";
+import { galleryLimitError, isActiveStatus, storageLimitError } from "@/lib/plan-usage";
 import {
   deletePrefix,
   galleryHeaderKey,
@@ -39,7 +40,7 @@ const isUuid = (value: string) => z.uuid().safeParse(value).success;
 async function findOwnedGallery(galleryId: string, photographerId: string) {
   if (!isUuid(galleryId)) return null;
   const [gallery] = await db
-    .select({ id: galleries.id })
+    .select({ id: galleries.id, status: galleries.status })
     .from(galleries)
     .where(and(eq(galleries.id, galleryId), eq(galleries.photographerId, photographerId)));
   return gallery ?? null;
@@ -125,6 +126,8 @@ export async function createGallery(_prev: GalleryFormState, formData: FormData)
   const photographer = await requirePhotographer();
   const result = await parseGallery(formData, photographer.id);
   if (!result.ok) return result.state;
+  const limit = await galleryLimitError(photographer.id);
+  if (limit) return { message: limit };
 
   const [gallery] = await db
     .insert(galleries)
@@ -189,9 +192,15 @@ export async function reopenProofing(galleryId: string): Promise<void> {
 // dropdown. The dates that go with each stage are kept consistent.
 export async function setGalleryStatus(galleryId: string, status: string): Promise<{ ok: true } | { error: string }> {
   const photographer = await requirePhotographer();
-  if (!(await findOwnedGallery(galleryId, photographer.id))) return { error: "That gallery could not be found." };
+  const current = await findOwnedGallery(galleryId, photographer.id);
+  if (!current) return { error: "That gallery could not be found." };
   if (!(GALLERY_STATUSES as readonly string[]).includes(status)) return { error: "Pick a status from the list." };
   const next = status as GalleryStatus;
+  // Reopening a finished gallery makes it count as active again.
+  if (!isActiveStatus(current.status) && isActiveStatus(next)) {
+    const limit = await galleryLimitError(photographer.id);
+    if (limit) return { error: limit };
+  }
 
   if (next === "delivered" || next === "completed") {
     const [{ finals }] = await db
@@ -315,6 +324,11 @@ export async function prepareUploads(
 
   const parsed = z.array(fileInfoSchema).min(1).max(MAX_PHOTOS_PER_BATCH).safeParse(files);
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Those files can't be uploaded." };
+  const full = await storageLimitError(
+    photographer.id,
+    parsed.data.reduce((total, file) => total + file.size, 0),
+  );
+  if (full) return { error: full };
 
   const uploads = await Promise.all(
     parsed.data.map(async (file) => {

@@ -2,7 +2,7 @@ import { and, asc, eq, isNotNull, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { clients, favorites, galleries, photographers, photos } from "@/db/schema";
 import { extraPhotoPrice } from "@/lib/gallery-extras";
-import { hasFeature } from "@/lib/plans";
+import { effectivePlan, hasFeature } from "@/lib/plans";
 
 // The client side of a gallery, reached only through its private share link.
 // There's no login: the unguessable token *is* the key, so every lookup starts
@@ -23,7 +23,8 @@ export async function findGalleryByToken(token: string) {
       photographerId: galleries.photographerId,
       galleryExtraPrice: galleries.extraPhotoPriceCents,
       studioExtraPrice: photographers.extraPhotoPriceCents,
-      plan: photographers.plan,
+      subscribedPlan: photographers.plan,
+      trialEndsAt: photographers.trialEndsAt,
       extrasCount: galleries.extrasCount,
       extrasCents: galleries.extrasCents,
       galleryNotes: galleries.notesEnabled,
@@ -42,17 +43,18 @@ export async function findGalleryByToken(token: string) {
     .leftJoin(clients, eq(clients.id, galleries.clientId))
     .where(eq(galleries.shareToken, token));
   if (!gallery) return null;
+  const plan = effectivePlan(gallery.subscribedPlan, gallery.trialEndsAt);
   // What each photo past the included number costs, or null when the client
   // is simply capped (the photographer's plan decides; see lib/plans.ts).
   const extraPriceCents = extraPhotoPrice({
-    planAllows: hasFeature(gallery.plan, "galleryUpsells"),
+    planAllows: hasFeature(plan, "galleryUpsells"),
     freeLimit: gallery.freeLimit,
     galleryPriceCents: gallery.galleryExtraPrice,
     studioPriceCents: gallery.studioExtraPrice,
   });
   // Client notes on picks: the gallery's own setting, or the studio's.
   const notesEnabled = gallery.galleryNotes ?? gallery.studioNotes;
-  return { ...gallery, extraPriceCents, notesEnabled };
+  return { ...gallery, plan, extraPriceCents, notesEnabled };
 }
 
 export type ClientGallery = NonNullable<Awaited<ReturnType<typeof findGalleryByToken>>>;

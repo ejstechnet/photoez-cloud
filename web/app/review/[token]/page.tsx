@@ -85,7 +85,7 @@ export default async function ReviewPage({ params }: PageProps<"/review/[token]"
           )}
         </div>
       </main>
-      <StudioFooter />
+      <StudioFooter studioId={studio.id} />
     </div>
   );
 }

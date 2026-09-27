@@ -12,7 +12,7 @@ import {
   studioFaqs,
   studioPhotos,
 } from "@/db/schema";
-import { PhotoEZCloudMark } from "@/components/brand";
+import { StudioFooter } from "./studio-bar";
 import { GearIcon } from "@/components/icons";
 import { formatDuration, formatPrice } from "@/lib/booking/format";
 import { currentPrice } from "@/lib/booking/pricing";
@@ -453,11 +453,7 @@ export default async function StudioPage({
       {/* Examples of work, full width under the booking and contact sections. */}
       <PortfolioGallery studioName={name} photos={portfolio} />
 
-      <footer className="border-t border-border py-6">
-        <p className="flex items-center justify-center gap-2 text-xs text-muted">
-          <PhotoEZCloudMark className="h-5 w-7" /> Powered by PhotoEZ Cloud
-        </p>
-      </footer>
+      <StudioFooter studioId={studio.id} />
     </div>
   );
 }

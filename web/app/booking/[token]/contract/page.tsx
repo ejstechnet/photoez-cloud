@@ -98,7 +98,7 @@ export default async function ContractPage({ params, searchParams }: PageProps<"
       </main>
 
       <div className="print:hidden">
-        <StudioFooter />
+        <StudioFooter studioId={booking.photographerId} />
       </div>
     </div>
   );
