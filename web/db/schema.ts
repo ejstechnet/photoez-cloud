@@ -789,3 +789,49 @@ export const aiUsage = pgTable(
   },
   (t) => [index("ai_usage_photographer_idx").on(t.photographerId, t.feature, t.createdAt)],
 );
+
+// Something the Studio Assistant prepared for the photographer to approve
+// (an email, reminders, booking changes). Nothing happens until they click
+// Approve; the payload is re-checked then (lib/ai/assistant/proposals.ts).
+export const assistantProposals = pgTable(
+  "assistant_proposals",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    photographerId: uuid("photographer_id")
+      .notNull()
+      .references(() => photographers.id, { onDelete: "cascade" }),
+    kind: text("kind", { enum: ["client_email", "gallery_emails", "balance_reminders", "booking_status"] }).notNull(),
+    payload: jsonb("payload").$type<Record<string, unknown>>().notNull(),
+    // What the card says, e.g. "Email 3 clients: Your gallery closes Friday".
+    summary: text("summary").notNull(),
+    status: text("status", { enum: ["pending", "done", "dismissed"] }).notNull().default("pending"),
+    // What happened when it was approved, e.g. "Sent 3 of 3".
+    result: text("result"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    doneAt: timestamp("done_at", { withTimezone: true }),
+  },
+  (t) => [index("assistant_proposals_photographer_idx").on(t.photographerId, t.createdAt)],
+);
+
+// A Studio Assistant conversation, kept so the photographer can look back
+// at earlier answers (e.g. camera settings) or pick up where they left off.
+// Only the 10 most recent are kept, for up to 90 days (lib/ai/assistant/history.ts).
+export const assistantConversations = pgTable(
+  "assistant_conversations",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    photographerId: uuid("photographer_id")
+      .notNull()
+      .references(() => photographers.id, { onDelete: "cascade" }),
+    // The first question, shortened, for the Recent list.
+    title: text("title").notNull(),
+    // Questions and answers in order; an answer lists the approval cards it made.
+    turns: jsonb("turns")
+      .$type<{ role: "user" | "assistant"; text: string; proposalIds?: string[] }[]>()
+      .notNull()
+      .default([]),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("assistant_conversations_photographer_idx").on(t.photographerId, t.updatedAt)],
+);

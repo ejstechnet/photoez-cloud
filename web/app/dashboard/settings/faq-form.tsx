@@ -14,6 +14,15 @@ export function FaqForm({ saved, suggestions }: { saved: { question: string; ans
     [...saved, ...suggestions.map((question) => ({ question, answer: "" }))].map((row, key) => ({ ...row, key })),
   );
   const [nextKey, setNextKey] = useState(rows.length);
+  // Which questions are open for editing (all start closed, so the list is short).
+  const [open, setOpen] = useState<Set<number>>(new Set());
+  const toggle = (key: number) =>
+    setOpen((current) => {
+      const next = new Set(current);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
   const answered = rows.filter((row) => row.answer.trim() !== "").length;
 
   const update = (key: number, change: Partial<Row>) =>
@@ -28,12 +37,52 @@ export function FaqForm({ saved, suggestions }: { saved: { question: string; ans
 
   return (
     <form action={formAction} className="space-y-4">
-      <p className="text-sm font-semibold text-lime-ink">
-        {answered === 1 ? "1 question answered" : `${answered} questions answered`}
-      </p>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-sm font-semibold text-lime-ink">
+          {answered === 1 ? "1 question answered" : `${answered} questions answered`}
+        </p>
+        <button
+          type="button"
+          onClick={() => setOpen(open.size > 0 ? new Set() : new Set(rows.map((r) => r.key)))}
+          className="text-xs font-bold tracking-wider text-muted uppercase hover:text-foreground"
+        >
+          {open.size > 0 ? "Close all" : "Open all"}
+        </button>
+      </div>
       <ol className="space-y-3">
         {rows.map((row, i) => {
           const empty = row.answer.trim() === "";
+          const isOpen = open.has(row.key);
+          if (!isOpen) {
+            // Closed: just the question; its fields still go with the form.
+            return (
+              <li key={row.key} className={`rounded-2xl border-2 transition ${empty ? "border-dashed border-border" : "border-lime/60"}`}>
+                <input type="hidden" name="question" value={row.question} />
+                <input type="hidden" name="answer" value={row.answer} />
+                <button
+                  type="button"
+                  onClick={() => toggle(row.key)}
+                  className="flex w-full items-center gap-3 px-4 py-3 text-left"
+                  aria-expanded={false}
+                >
+                  <span
+                    className={`grid size-5 shrink-0 place-items-center rounded-full text-[11px] font-bold ${
+                      empty ? "border-2 border-border text-muted" : "bg-lime text-brand-deep"
+                    }`}
+                    aria-hidden="true"
+                  >
+                    {empty ? "" : "✓"}
+                  </span>
+                  <span className={`min-w-0 flex-1 truncate font-semibold ${row.question ? "" : "text-muted"}`}>
+                    {row.question || "New question"}
+                  </span>
+                  <span className="shrink-0 text-xs font-bold tracking-wider text-muted uppercase">
+                    {empty ? "Answer" : "Edit"}
+                  </span>
+                </button>
+              </li>
+            );
+          }
           return (
             <li
               key={row.key}
@@ -59,6 +108,9 @@ export function FaqForm({ saved, suggestions }: { saved: { question: string; ans
                   <IconButton label="Remove" onClick={() => setRows((current) => current.filter((r) => r.key !== row.key))}>
                     ✕
                   </IconButton>
+                  <IconButton label="Close" onClick={() => toggle(row.key)}>
+                    ▴
+                  </IconButton>
                 </div>
               </div>
               <textarea
@@ -79,6 +131,7 @@ export function FaqForm({ saved, suggestions }: { saved: { question: string; ans
         type="button"
         onClick={() => {
           setRows((current) => [...current, { key: nextKey, question: "", answer: "" }]);
+          setOpen((current) => new Set(current).add(nextKey));
           setNextKey(nextKey + 1);
         }}
         className="btn-secondary"

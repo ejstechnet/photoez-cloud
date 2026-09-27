@@ -9,6 +9,7 @@ import { paymentAccount } from "@/lib/payments/checkout";
 import { signedViewUrl } from "@/lib/storage";
 import { StudioFooter } from "../studio-bar";
 import { StudioNav } from "../studio-nav";
+import { studioLinks } from "@/lib/studio-links";
 import { GiftCardForm } from "./gift-card-form";
 
 async function findStudio(slug: string) {
@@ -39,7 +40,7 @@ export default async function GiftCardPage({ params, searchParams }: PageProps<"
         name={name}
         logoUrl={logoUrl}
         logoBg={studio.studioLogoBg}
-        links={[{ href: `/studio/${slug}#contact`, label: "Contact" }]}
+        links={(await studioLinks(slug)).filter((link) => link.label !== "Gift cards")}
       >
         <Link
           href={`/studio/${slug}/book`}
