@@ -6,6 +6,8 @@ import { z } from "zod";
 import { db } from "@/db";
 import { favorites, galleries, photos } from "@/db/schema";
 import { findGalleryByToken, isOverLimit } from "@/lib/client-gallery";
+import { hasFeature } from "@/lib/plans";
+import { searchGalleryPhotos } from "@/lib/photo-search";
 import { extrasFor } from "@/lib/gallery-extras";
 import { paymentAccount } from "@/lib/payments/checkout";
 import { paidGalleryExtras, startGalleryCheckout } from "@/lib/payments/gallery-checkout";
@@ -131,4 +133,14 @@ export async function saveNote(
   if (updated.length === 0) return { error: "Pick the photo first, then add a note." };
   revalidatePath(`/dashboard/galleries/${gallery.id}`);
   return { ok: true, note: clean };
+}
+
+// The client's gallery search: photo ids matching what they typed. Only on
+// plans with gallery search, and only the photos they're currently choosing
+// from (proofs) or downloading (finals).
+export async function searchGallery(token: string, query: string): Promise<string[]> {
+  const gallery = await findGalleryByToken(token);
+  if (!gallery || !hasFeature(gallery.plan, "aiSearch")) return [];
+  const delivered = gallery.status === "delivered" || gallery.status === "completed";
+  return searchGalleryPhotos(gallery.id, query, [delivered ? "final" : "proof"]);
 }
