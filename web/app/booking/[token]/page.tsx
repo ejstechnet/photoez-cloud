@@ -114,7 +114,7 @@ export default async function ClientBookingPage({ params, searchParams }: PagePr
         <div className="bg-brand-deep px-4 py-4 font-display text-lg text-white">{name}</div>
       )}
 
-      <main className="mx-auto w-full max-w-2xl flex-1 px-4 py-10">
+      <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-10">
         {justBooked ? (
           <div className="text-center">
             <span className="mx-auto grid size-16 place-items-center rounded-full bg-lime text-3xl font-bold text-brand-deep">

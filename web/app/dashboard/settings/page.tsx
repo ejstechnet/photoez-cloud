@@ -1,6 +1,6 @@
 import { asc, eq } from "drizzle-orm";
 import { db } from "@/db";
-import { photographers, studioFaqs } from "@/db/schema";
+import { photographers, studioFaqs, studioPhotos } from "@/db/schema";
 import { SUGGESTED_FAQ_QUESTIONS } from "@/lib/faq";
 import { requirePhotographer } from "@/lib/session";
 import { siteUrl } from "@/lib/site";
@@ -14,6 +14,7 @@ import { FaqForm } from "./faq-form";
 import { PaymentsCard } from "./payments-card";
 import { NotesToggle } from "./notes-toggle";
 import { PlanCard } from "./plan-card";
+import { PortfolioCard } from "./portfolio-card";
 import { PLAN_LABELS, planFor } from "@/lib/plans";
 import { studioPlan } from "@/lib/studio-plan";
 import { StudioForm } from "./studio-form";
@@ -61,6 +62,15 @@ export default async function SettingsPage() {
   const suggestions = SUGGESTED_FAQ_QUESTIONS.filter((q) => !askedAlready.has(q.toLowerCase()));
 
   const plan = await studioPlan(user.id);
+  const portfolio = await Promise.all(
+    (
+      await db
+        .select({ id: studioPhotos.id, fileKey: studioPhotos.fileKey })
+        .from(studioPhotos)
+        .where(eq(studioPhotos.photographerId, user.id))
+        .orderBy(asc(studioPhotos.position), asc(studioPhotos.createdAt))
+    ).map(async (photo) => ({ id: photo.id, url: await signedViewUrl(photo.fileKey) })),
+  );
   // Still waiting on Stripe's approval? Ask Stripe now instead of relying on its webhook.
   let stripeReady = settings.stripeReady;
   if (!stripeReady && settings.stripeAccountId && stripeConfigured()) {
@@ -103,6 +113,8 @@ export default async function SettingsPage() {
               />
             </div>
           </section>
+
+          <PortfolioCard photos={portfolio} />
 
           <section className="card p-6 sm:p-8">
             <h2 className="font-display text-2xl font-bold">Proofing</h2>

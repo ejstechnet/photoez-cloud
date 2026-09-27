@@ -1,17 +1,20 @@
 import Link from "next/link";
-import { and, asc, desc, eq, gte, lt, ne } from "drizzle-orm";
+import { and, asc, desc, eq, gte, lt, lte, ne, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { bookings, photographers, sessionTypes } from "@/db/schema";
+import { blackoutDates, bookings, photographers, sessionTypes } from "@/db/schema";
 import { ArrowRightIcon } from "@/components/icons";
 import { formatPrice } from "@/lib/booking/format";
-import { formatDate, formatTime } from "@/lib/booking/time";
+import { addDays, formatDate, formatTime, localDateOf, zonedToUtc } from "@/lib/booking/time";
+import { isMonth, monthGrid } from "@/lib/booking/calendar";
 import { bookingTotal } from "@/lib/payments/amounts";
 import { releaseExpiredHolds } from "@/lib/payments/checkout";
 import { requirePhotographer } from "@/lib/session";
+import { BookingCalendar, type CalendarBooking } from "./booking-calendar";
 import { BookingStatusPill } from "./status-pill";
 
 const VIEWS = {
   upcoming: "Upcoming",
+  calendar: "Calendar",
   past: "Past",
   cancelled: "Cancelled",
 } as const;
@@ -19,29 +22,87 @@ type View = keyof typeof VIEWS;
 
 export default async function BookingsPage({ searchParams }: PageProps<"/dashboard/bookings">) {
   const user = await requirePhotographer();
-  const { view: rawView } = await searchParams;
-  const view: View = rawView === "past" || rawView === "cancelled" ? rawView : "upcoming";
+  const { view: rawView, month: rawMonth } = await searchParams;
+  const view: View = rawView === "past" || rawView === "cancelled" || rawView === "calendar" ? rawView : "upcoming";
   // Checkouts abandoned past their 30-minute hold free their times first.
   await releaseExpiredHolds(user.id);
   const now = new Date();
 
   const where = {
     upcoming: and(ne(bookings.status, "cancelled"), gte(bookings.endsAt, now)),
+    // The calendar loads its own month below.
+    calendar: undefined,
     past: and(ne(bookings.status, "cancelled"), lt(bookings.endsAt, now)),
     cancelled: eq(bookings.status, "cancelled"),
   }[view];
 
   const [rows, [studio], sessionRows] = await Promise.all([
-    db
-      .select()
-      .from(bookings)
-      .where(and(eq(bookings.photographerId, user.id), where))
-      .orderBy(view === "upcoming" ? asc(bookings.startsAt) : desc(bookings.startsAt))
-      .limit(200),
+    view === "calendar"
+      ? Promise.resolve([] as (typeof bookings.$inferSelect)[])
+      : db
+          .select()
+          .from(bookings)
+          .where(and(eq(bookings.photographerId, user.id), where))
+          .orderBy(view === "upcoming" ? asc(bookings.startsAt) : desc(bookings.startsAt))
+          .limit(200),
     db.select({ timeZone: photographers.timeZone }).from(photographers).where(eq(photographers.id, user.id)),
     db.select({ id: sessionTypes.id }).from(sessionTypes).where(eq(sessionTypes.photographerId, user.id)).limit(1),
   ]);
   const tz = studio.timeZone;
+
+  // Calendar: the bookings and time off across the visible weeks of the month.
+  const month = isMonth(rawMonth) ? rawMonth : localDateOf(now, tz).slice(0, 7);
+  const calendar =
+    view === "calendar"
+      ? await (async () => {
+          const weeks = monthGrid(month);
+          const from = zonedToUtc(weeks[0][0], "00:00", tz);
+          const to = zonedToUtc(addDays(weeks[weeks.length - 1][6], 1), "00:00", tz);
+          const [monthBookings, timeOff] = await Promise.all([
+            db
+              .select({
+                booking: bookings,
+                paidCents: sql<number>`(select coalesce(sum(amount_cents), 0) from payments where payments.booking_id = ${bookings.id} and payments.status = 'paid')::int`,
+              })
+              .from(bookings)
+              .where(
+                and(
+                  eq(bookings.photographerId, user.id),
+                  ne(bookings.status, "cancelled"),
+                  gte(bookings.startsAt, from),
+                  lt(bookings.startsAt, to),
+                ),
+              )
+              .orderBy(asc(bookings.startsAt)),
+            db
+              .select({ startDate: blackoutDates.startDate, endDate: blackoutDates.endDate, note: blackoutDates.note })
+              .from(blackoutDates)
+              .where(
+                and(
+                  eq(blackoutDates.photographerId, user.id),
+                  lte(blackoutDates.startDate, weeks[weeks.length - 1][6]),
+                  gte(blackoutDates.endDate, weeks[0][0]),
+                ),
+              ),
+          ]);
+          return {
+            // Plain values for the interactive calendar (it runs in the browser).
+            bookings: monthBookings.map(({ booking: b, paidCents }): CalendarBooking => ({
+              id: b.id,
+              startsAt: b.startsAt.toISOString(),
+              endsAt: b.endsAt.toISOString(),
+              clientName: b.clientName,
+              clientEmail: b.clientEmail,
+              clientPhone: b.clientPhone,
+              sessionName: b.sessionName,
+              status: b.status,
+              totalCents: bookingTotal(b),
+              dueCents: Math.max(0, bookingTotal(b) - paidCents - b.creditCents),
+            })),
+            timeOff,
+          };
+        })()
+      : null;
 
   return (
     <>
@@ -65,22 +126,51 @@ export default async function BookingsPage({ searchParams }: PageProps<"/dashboa
         </p>
       )}
 
-      <nav className="mt-8 flex gap-2" aria-label="Filter bookings">
-        {(Object.keys(VIEWS) as View[]).map((key) => (
-          <Link
-            key={key}
-            href={key === "upcoming" ? "/dashboard/bookings" : `/dashboard/bookings?view=${key}`}
-            aria-current={view === key ? "page" : undefined}
-            className={`rounded-full px-4 py-2 text-xs font-bold tracking-wider uppercase transition ${
-              view === key ? "bg-brand text-white" : "border-2 border-border text-muted hover:text-foreground"
-            }`}
-          >
-            {VIEWS[key]}
-          </Link>
-        ))}
-      </nav>
+      <div className="mt-8 flex flex-wrap items-center justify-between gap-3">
+        {/* List or calendar, like PhotoEZ Booking's two views. */}
+        <div className="inline-flex rounded-full border-2 border-border bg-surface p-1" role="group" aria-label="View">
+          {(
+            [
+              ["list", "☰ List", "/dashboard/bookings"],
+              ["calendar", "▦ Calendar", "/dashboard/bookings?view=calendar"],
+            ] as const
+          ).map(([key, label, href]) => {
+            const active = key === "calendar" ? view === "calendar" : view !== "calendar";
+            return (
+              <Link
+                key={key}
+                href={href}
+                aria-current={active ? "page" : undefined}
+                className={`rounded-full px-4 py-1.5 text-xs font-bold tracking-wider uppercase transition ${
+                  active ? "bg-brand text-white" : "text-muted hover:text-foreground"
+                }`}
+              >
+                {label}
+              </Link>
+            );
+          })}
+        </div>
+        {view !== "calendar" && (
+          <nav className="flex gap-2" aria-label="Filter bookings">
+            {(["upcoming", "past", "cancelled"] as const).map((key) => (
+              <Link
+                key={key}
+                href={key === "upcoming" ? "/dashboard/bookings" : `/dashboard/bookings?view=${key}`}
+                aria-current={view === key ? "page" : undefined}
+                className={`rounded-full px-4 py-2 text-xs font-bold tracking-wider uppercase transition ${
+                  view === key ? "bg-violet/15 text-violet" : "text-muted hover:text-foreground"
+                }`}
+              >
+                {VIEWS[key]}
+              </Link>
+            ))}
+          </nav>
+        )}
+      </div>
 
-      {rows.length === 0 ? (
+      {calendar ? (
+        <BookingCalendar month={month} timeZone={tz} bookings={calendar.bookings} timeOff={calendar.timeOff} />
+      ) : rows.length === 0 ? (
         <p className="card mt-6 border-2 border-dashed px-6 py-14 text-center text-muted">
           {view === "upcoming" ? "No upcoming bookings yet." : `No ${VIEWS[view].toLowerCase()} bookings.`}
         </p>

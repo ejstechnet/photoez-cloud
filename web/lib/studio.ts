@@ -20,3 +20,6 @@ export function suggestSlug(text: string) {
     .slice(0, 40)
     .replace(/-+$/, "");
 }
+
+// "Examples of work" on the studio page holds up to this many photos.
+export const MAX_STUDIO_PHOTOS = 10;

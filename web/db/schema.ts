@@ -703,3 +703,19 @@ export const reviews = pgTable(
   },
   (t) => [index("reviews_photographer_idx").on(t.photographerId, t.status)],
 );
+
+// "Examples of work" on the studio page: up to 10 portfolio photos, in the
+// photographer's order. Stored as ~1600px JPEGs (fileKey).
+export const studioPhotos = pgTable(
+  "studio_photos",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    photographerId: uuid("photographer_id")
+      .notNull()
+      .references(() => photographers.id, { onDelete: "cascade" }),
+    fileKey: text("file_key").notNull(),
+    position: integer("position").notNull().default(0),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("studio_photos_photographer_idx").on(t.photographerId, t.position)],
+);

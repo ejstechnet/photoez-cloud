@@ -44,7 +44,7 @@ export function StudioNav({
       className={`z-30 border-b shadow-sm ${sticky ? "sticky top-0" : ""} ${dark ? "border-white/10" : "border-border"}`}
       style={{ backgroundColor: color }}
     >
-      <div className="mx-auto flex max-w-5xl items-center gap-3 px-4 py-2">
+      <div className="mx-auto flex max-w-7xl items-center gap-3 px-4 py-2">
         {home ? (
           <Link href={home} className="flex min-w-0 items-center" aria-label={`${name} home`}>
             {brand}

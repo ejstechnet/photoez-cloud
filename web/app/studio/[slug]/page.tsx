@@ -5,7 +5,7 @@ import { notFound } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { and, asc, eq } from "drizzle-orm";
 import { db } from "@/db";
-import { bookingHours, photographers, sessionTypes, studioFaqs } from "@/db/schema";
+import { bookingHours, photographers, sessionTypes, studioFaqs, studioPhotos } from "@/db/schema";
 import { PhotoEZCloudMark } from "@/components/brand";
 import { GearIcon } from "@/components/icons";
 import { formatDuration, formatPrice } from "@/lib/booking/format";
@@ -15,6 +15,7 @@ import { LOCATION_LABELS, OFFERABLE_TYPES, SESSION_LABELS, type ShootLocation } 
 import { richTextHtml } from "@/lib/rich-text";
 import { signedViewUrl } from "@/lib/storage";
 import { InquiryForm } from "./inquiry-form";
+import { PortfolioGallery } from "./portfolio-gallery";
 import { StudioNav, barIsDark } from "./studio-nav";
 import { ReviewsJsonLd, StudioReviews, loadStudioReviews } from "./studio-reviews";
 
@@ -88,6 +89,15 @@ export default async function StudioPage({ params }: PageProps<"/studio/[slug]">
   ]);
   const bookingOpen = bookable.length > 0 && Boolean(hours);
   const studioReviews = await loadStudioReviews(studio.id);
+  const portfolio = await Promise.all(
+    (
+      await db
+        .select({ id: studioPhotos.id, fileKey: studioPhotos.fileKey })
+        .from(studioPhotos)
+        .where(eq(studioPhotos.photographerId, studio.id))
+        .orderBy(asc(studioPhotos.position), asc(studioPhotos.createdAt))
+    ).map(async (photo) => ({ id: photo.id, url: await signedViewUrl(photo.fileKey) })),
+  );
   // Special prices apply by the studio's own calendar day.
   const today = localDateOf(new Date(), studio.timeZone);
   const bookHref = `/studio/${slug.toLowerCase()}/book`;
@@ -98,6 +108,7 @@ export default async function StudioPage({ params }: PageProps<"/studio/[slug]">
 
   const links = [
     bookingOpen && { href: "#book", label: "Book" },
+    portfolio.length > 0 && { href: "#work", label: "Work" },
     studio.bio && { href: "#about", label: "About" },
     studioReviews.list.length > 0 && { href: "#reviews", label: "Reviews" },
     sessions.length > 0 && { href: "#sessions", label: "Sessions" },
@@ -139,7 +150,7 @@ export default async function StudioPage({ params }: PageProps<"/studio/[slug]">
       <header id="top" className="relative overflow-hidden bg-brand text-white">
         <div className="pointer-events-none absolute -top-24 -right-24 size-80 rounded-full bg-lime/15 blur-3xl" />
         <div className="pointer-events-none absolute -bottom-32 left-1/4 size-72 rounded-full bg-coral/20 blur-3xl" />
-        <div className="relative mx-auto flex max-w-5xl flex-col gap-6 px-4 py-14 sm:flex-row sm:items-center">
+        <div className="relative mx-auto flex max-w-7xl flex-col gap-6 px-4 py-14 sm:flex-row sm:items-center">
           <div className="min-w-0">
             {studio.serviceArea && (
               <p className="text-sm font-bold tracking-wider text-sky-light uppercase">{studio.serviceArea}</p>
@@ -150,7 +161,9 @@ export default async function StudioPage({ params }: PageProps<"/studio/[slug]">
         </div>
       </header>
 
-      <main className="mx-auto grid w-full max-w-5xl flex-1 gap-8 px-4 py-12 lg:grid-cols-[1fr_1.15fr]">
+      <PortfolioGallery studioName={name} photos={portfolio} />
+
+      <main className="mx-auto grid w-full max-w-7xl flex-1 gap-8 px-4 py-12 lg:grid-cols-[1fr_1.15fr]">
         {/* Each part in its own card, so sections read as separate blocks. */}
         <section className="space-y-6">
           {bookingOpen && (
