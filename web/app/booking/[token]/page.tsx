@@ -120,7 +120,7 @@ export default async function ClientBookingPage({ params, searchParams }: PagePr
       <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-10">
         {justBooked ? (
           <div className="text-center">
-            <span className="mx-auto grid size-16 place-items-center rounded-full bg-lime text-3xl font-bold text-brand-deep">
+            <span className="mx-auto grid size-16 place-items-center rounded-full bg-lime text-3xl font-bold text-on-accent">
               ✓
             </span>
             <h1 className="mt-4 font-display text-4xl font-bold tracking-tight">You&apos;re booked!</h1>

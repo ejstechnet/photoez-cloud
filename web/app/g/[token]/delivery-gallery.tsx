@@ -1,5 +1,6 @@
 "use client";
 
+import { galleryItemClass, galleryListClass, galleryTileAspect, type GalleryLayout } from "@/lib/gallery-layout";
 import { useState } from "react";
 import { DownloadIcon } from "@/components/icons";
 import { Lightbox } from "@/components/lightbox";
@@ -17,6 +18,7 @@ export type FinalTile = {
 // The PhotoEZ "Final delivery" page: clean, unwatermarked finals in the
 // masonry grid, a download on every photo, and one ZIP for everything.
 export function DeliveryGallery({
+  layout = "masonry",
   token,
   preview = false,
   tiles,
@@ -24,6 +26,8 @@ export function DeliveryGallery({
   clientFirstName,
   totalSize,
 }: {
+  // The studio's gallery layout from the Page Designer.
+  layout?: GalleryLayout;
   token: string;
   // The photographer's "Preview as client": downloads work but aren't recorded.
   preview?: boolean;
@@ -50,15 +54,15 @@ export function DeliveryGallery({
         </a>
       </div>
 
-      <ul className="mt-8 columns-2 gap-3 sm:columns-3 lg:columns-4 xl:columns-5">
+      <ul className={`mt-8 ${galleryListClass(layout)}`}>
         {tiles.map((tile, i) => (
-          <li key={tile.id} className="mb-3 break-inside-avoid">
+          <li key={tile.id} className={galleryItemClass(layout)}>
             <div className="group relative overflow-hidden rounded-2xl bg-brand-deep">
               <button
                 type="button"
                 onClick={() => setOpen(i)}
                 className="block w-full"
-                style={{ aspectRatio: tile.aspect }}
+                style={{ aspectRatio: galleryTileAspect(layout, tile.aspect) }}
                 aria-label={`View photo ${tile.number}`}
               >
                 {/* Signed links to pre-sized versions; next/image optimization isn't needed. */}
@@ -76,7 +80,7 @@ export function DeliveryGallery({
               <a
                 href={tile.downloadUrl}
                 aria-label={`Download photo ${tile.number}`}
-                className="absolute right-2 bottom-2 grid size-11 place-items-center rounded-full bg-white/90 text-brand-deep shadow-lg transition hover:scale-110 hover:bg-lime"
+                className="absolute right-2 bottom-2 grid size-11 place-items-center rounded-full bg-white/90 text-brand-deep shadow-lg transition hover:scale-110 hover:bg-lime hover:text-on-accent"
               >
                 <DownloadIcon size={20} />
               </a>

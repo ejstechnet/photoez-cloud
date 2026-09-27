@@ -82,7 +82,7 @@ export function Calendar({
               scroll={false}
               aria-current={isSelected ? "date" : undefined}
               className={`grid aspect-square place-items-center rounded-full text-sm font-bold transition ${
-                isSelected ? "bg-brand text-white" : "bg-lime/20 text-lime-ink hover:bg-lime hover:text-brand-deep"
+                isSelected ? "bg-brand text-white" : "bg-lime/20 text-lime-ink hover:bg-lime hover:text-on-accent"
               }`}
             >
               {day}

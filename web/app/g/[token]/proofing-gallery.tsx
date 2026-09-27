@@ -1,5 +1,6 @@
 "use client";
 
+import { galleryItemClass, galleryListClass, galleryTileAspect, type GalleryLayout } from "@/lib/gallery-layout";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowRightIcon, HeartIcon } from "@/components/icons";
@@ -24,6 +25,7 @@ export type Tile = {
 // favorites up to the free limit (or past it, for a price per extra photo,
 // when the studio offers extras), and a sticky bar to submit selections.
 export function ProofingGallery({
+  layout = "masonry",
   token,
   tiles,
   freeLimit,
@@ -34,6 +36,8 @@ export function ProofingGallery({
   studio,
   clientFirstName,
 }: {
+  // The studio's gallery layout from the Page Designer.
+  layout?: GalleryLayout;
   token: string;
   tiles: Tile[];
   freeLimit: number;
@@ -169,13 +173,13 @@ That includes ${extras.count} extra ${extras.count === 1 ? "photo" : "photos"} f
         </div>
       )}
 
-      {/* Masonry, like the PhotoEZ proofing gallery: columns keep every photo
-          uncropped in its own shape. Numbers read down each column. */}
-      <ul className="mt-6 columns-2 gap-3 pb-28 sm:columns-3 lg:columns-4 xl:columns-5">
+      {/* The studio's gallery layout (Page Designer). Masonry, like the PhotoEZ
+          proofing gallery, keeps every photo uncropped in its own shape. */}
+      <ul className={`mt-6 pb-28 ${galleryListClass(layout)}`}>
         {shown.map((tile) => {
           const isSelected = selected.has(tile.id);
           return (
-            <li key={tile.id} className="mb-3 break-inside-avoid">
+            <li key={tile.id} className={galleryItemClass(layout)}>
               <div
                 className={`group relative overflow-hidden rounded-2xl bg-brand-deep transition ${
                   isSelected ? "ring-4 ring-lime" : ""
@@ -187,7 +191,7 @@ That includes ${extras.count} extra ${extras.count === 1 ? "photo" : "photos"} f
                   className="block w-full"
                   aria-label={`View photo ${tile.number}, ${tile.name}`}
                 >
-                  <span className="block overflow-hidden" style={{ aspectRatio: tile.aspect }}>
+                  <span className="block overflow-hidden" style={{ aspectRatio: galleryTileAspect(layout, tile.aspect) }}>
                   {/* Signed links to watermarked proofs; next/image optimization isn't needed. */}
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
@@ -203,7 +207,7 @@ That includes ${extras.count} extra ${extras.count === 1 ? "photo" : "photos"} f
                   <span
                     title={tile.name}
                     className={`block truncate px-2.5 py-1.5 text-left font-mono text-[11px] ${
-                      isSelected ? "bg-lime font-bold text-brand-deep" : "text-white/85"
+                      isSelected ? "bg-lime font-bold text-on-accent" : "text-white/85"
                     }`}
                   >
                     {tile.name}
@@ -228,7 +232,7 @@ That includes ${extras.count} extra ${extras.count === 1 ? "photo" : "photos"} f
                     aria-pressed={isSelected}
                     aria-label={isSelected ? `Unselect photo ${tile.number}` : `Select photo ${tile.number}`}
                     className={`absolute right-2 bottom-9 grid size-11 place-items-center rounded-full shadow-lg transition ${
-                      isSelected ? "bg-lime text-brand-deep" : "bg-white/90 text-brand-deep hover:scale-110"
+                      isSelected ? "bg-lime text-on-accent" : "bg-white/90 text-brand-deep hover:scale-110"
                     }`}
                   >
                     <HeartIcon size={22} fill={isSelected ? "currentColor" : "none"} />

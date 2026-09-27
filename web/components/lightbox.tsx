@@ -106,7 +106,7 @@ export function Lightbox({
         {item.downloadUrl ? (
           <a
             href={item.downloadUrl}
-            className="inline-flex items-center gap-2.5 rounded-full border-2 border-white bg-lime px-7 py-3 font-semibold text-brand-deep transition hover:bg-white"
+            className="inline-flex items-center gap-2.5 rounded-full border-2 border-white bg-lime px-7 py-3 font-semibold text-on-accent transition hover:bg-white hover:text-brand-deep"
           >
             <DownloadIcon size={20} /> Download full resolution
           </a>
@@ -116,7 +116,7 @@ export function Lightbox({
             onClick={() => onToggle(item.id)}
             aria-pressed={isSelected}
             className={`inline-flex items-center gap-2.5 rounded-full border-2 px-7 py-3 font-semibold transition ${
-              isSelected ? "border-white bg-lime text-brand-deep" : "border-white bg-black/60 hover:border-lime"
+              isSelected ? "border-white bg-lime text-on-accent" : "border-white bg-black/60 hover:border-lime"
             }`}
           >
             <HeartIcon size={20} fill={isSelected ? "currentColor" : "none"} className={isSelected ? "" : "opacity-60"} />
