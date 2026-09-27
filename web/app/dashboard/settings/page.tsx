@@ -20,6 +20,8 @@ import { PLAN_LABELS, planFor } from "@/lib/plans";
 import { studioPlan } from "@/lib/studio-plan";
 import { StudioForm } from "./studio-form";
 import { StudioLogo } from "./studio-logo";
+import { PhotoUpload } from "@/components/photo-upload";
+import { prepareHeadshotUpload, removeHeadshot, saveHeadshot } from "./actions";
 import { WatermarkForm } from "./watermark-form";
 
 export default async function SettingsPage() {
@@ -33,6 +35,7 @@ export default async function SettingsPage() {
       studioSlug: photographers.studioSlug,
       logoKey: photographers.studioLogoKey,
       logoBg: photographers.studioLogoBg,
+      headshotKey: photographers.headshotKey,
       studioTagline: photographers.studioTagline,
       studioBio: photographers.studioBio,
       serviceArea: photographers.serviceArea,
@@ -100,6 +103,18 @@ export default async function SettingsPage() {
               <StudioLogo
                 currentUrl={settings.logoKey ? await signedViewUrl(settings.logoKey) : null}
                 background={settings.logoBg}
+              />
+            </div>
+            <div className="mt-6 border-t border-border pt-6">
+              <PhotoUpload
+                label="Your headshot"
+                hint="Shown with your About section on your studio page, so clients see who they'll be working with."
+                aspect="square"
+                maxEdge={800}
+                currentUrl={settings.headshotKey ? await signedViewUrl(settings.headshotKey) : null}
+                prepare={prepareHeadshotUpload}
+                save={saveHeadshot}
+                remove={removeHeadshot}
               />
             </div>
             <div className="mt-6 border-t border-border pt-6">

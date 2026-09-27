@@ -1,0 +1,1 @@
+ALTER TABLE "photographers" ADD COLUMN "headshot_key" text;

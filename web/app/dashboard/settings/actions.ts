@@ -11,7 +11,7 @@ import { cleanRichTextInput, richTextToPlain } from "@/lib/rich-text";
 import { requirePhotographer } from "@/lib/session";
 import { testEmail } from "@/lib/email/messages";
 import { sendToStudio, studioSender } from "@/lib/email/send";
-import { deletePrefix, signedUploadUrl, storedSize, studioLogoKey, studioPhotoKey, watermarkKey } from "@/lib/storage";
+import { deletePrefix, headshotKey, signedUploadUrl, storedSize, studioLogoKey, studioPhotoKey, watermarkKey } from "@/lib/storage";
 import { MAX_WATERMARK_BYTES, WATERMARK_POSITIONS } from "@/lib/watermark";
 import { OFFERABLE_TYPES, SHOOT_LOCATIONS } from "@/lib/session-types";
 import { MAX_STUDIO_PHOTOS, isAllowedSlug } from "@/lib/studio";
@@ -481,4 +481,49 @@ export async function saveGiftCardSettings(_prev: GiftSettingsState, formData: F
   revalidatePath("/dashboard", "layout");
   revalidatePath("/studio/[slug]", "layout");
   return { saved: true };
+}
+
+// ---- Headshot (About on the studio page) ----
+
+const MAX_HEADSHOT_BYTES = 3 * 1024 * 1024;
+
+export async function prepareHeadshotUpload(size: number): Promise<{ version: string; url: string } | { error: string }> {
+  const photographer = await requirePhotographer();
+  if (size > MAX_HEADSHOT_BYTES) return { error: "That photo is too large. Try a smaller one." };
+  const version = randomBytes(6).toString("hex");
+  return { version, url: await signedUploadUrl(headshotKey(photographer.id, version), "image/jpeg") };
+}
+
+export async function saveHeadshot(version: string): Promise<{ ok: true } | { error: string }> {
+  const photographer = await requirePhotographer();
+  if (!/^[a-f0-9]{12}$/.test(version)) return { error: "That upload couldn't be saved." };
+  const key = headshotKey(photographer.id, version);
+  const size = await storedSize(key);
+  if (size === null) return { error: "The photo upload didn't finish. Try again." };
+  if (size > MAX_HEADSHOT_BYTES) {
+    await deletePrefix(key);
+    return { error: "That photo is too large. Try a smaller one." };
+  }
+  const [current] = await db
+    .select({ key: photographers.headshotKey })
+    .from(photographers)
+    .where(eq(photographers.id, photographer.id));
+  if (current?.key) await deletePrefix(current.key);
+  await db.update(photographers).set({ headshotKey: key }).where(eq(photographers.id, photographer.id));
+  revalidatePath("/dashboard/settings");
+  revalidatePath("/studio/[slug]", "page");
+  return { ok: true };
+}
+
+export async function removeHeadshot(): Promise<void> {
+  const photographer = await requirePhotographer();
+  const [current] = await db
+    .select({ key: photographers.headshotKey })
+    .from(photographers)
+    .where(eq(photographers.id, photographer.id));
+  if (!current?.key) return;
+  await deletePrefix(current.key);
+  await db.update(photographers).set({ headshotKey: null }).where(eq(photographers.id, photographer.id));
+  revalidatePath("/dashboard/settings");
+  revalidatePath("/studio/[slug]", "page");
 }

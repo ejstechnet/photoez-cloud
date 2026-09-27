@@ -39,6 +39,8 @@ export const photographers = pgTable("photographers", {
   // context AI triage uses when drafting replies.
   studioSlug: text("studio_slug").unique(),
   studioLogoKey: text("studio_logo_key"),
+  // The photographer's own photo, shown in About on the studio page.
+  headshotKey: text("headshot_key"),
   // Card color behind the logo on the studio page: a hex color or "transparent".
   studioLogoBg: text("studio_logo_bg").notNull().default("#ffffff"),
   studioTagline: text("studio_tagline"),

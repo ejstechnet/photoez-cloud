@@ -39,6 +39,12 @@ export function studioLogoKey(photographerId: string, version: string, extension
   return `photographers/${photographerId}/branding/logo-${version}.${extension}`;
 }
 
+// The photographer's headshot in About on the studio page. A new key per
+// upload, so browsers never show a cached old photo.
+export function headshotKey(photographerId: string, version: string) {
+  return `photographers/${photographerId}/branding/headshot-${version}.jpg`;
+}
+
 // A portfolio photo in "Examples of work" on the studio page.
 export function studioPhotoKey(photographerId: string, version: string) {
   return `photographers/${photographerId}/portfolio/${version}.jpg`;
