@@ -13,6 +13,7 @@ import { GALLERY_STATUSES, type GalleryStatus } from "@/lib/gallery-status";
 import { requirePhotographer } from "@/lib/session";
 import { emailFinalsReady, emailGalleryLink } from "@/lib/email/notify";
 import { requestReview } from "@/lib/review-requests";
+import { isCullMetrics, type CullMetrics } from "@/lib/culling";
 import { afterResponse } from "@/lib/email/send";
 import { studioPlan } from "@/lib/studio-plan";
 import {
@@ -577,4 +578,25 @@ export async function requestGalleryReview(galleryId: string): Promise<{ ok: tru
   revalidatePath(`/dashboard/galleries/${galleryId}`);
   revalidatePath("/dashboard/reviews");
   return result;
+}
+
+// Culling help: saves the measurements the photographer's browser made for
+// some of this gallery's photos (see lib/culling-browser.ts).
+export async function saveCullResults(
+  galleryId: string,
+  results: { photoId: string; cull: CullMetrics }[],
+): Promise<{ ok: true } | { error: string }> {
+  const photographer = await requirePhotographer();
+  if (!(await findOwnedGallery(galleryId, photographer.id))) return { error: "That gallery could not be found." };
+  const valid = results
+    .slice(0, 50)
+    .filter((r) => z.uuid().safeParse(r.photoId).success && isCullMetrics(r.cull));
+  for (const { photoId, cull } of valid) {
+    await db
+      .update(photos)
+      .set({ cull })
+      .where(and(eq(photos.id, photoId), eq(photos.galleryId, galleryId)));
+  }
+  revalidatePath(`/dashboard/galleries/${galleryId}`);
+  return { ok: true };
 }
