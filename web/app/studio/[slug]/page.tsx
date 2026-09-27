@@ -119,9 +119,9 @@ export default async function StudioPage({ params }: PageProps<"/studio/[slug]">
   const isOwner = session?.user.id === studio.id;
 
   const links = [
+    (studio.bio || headshotUrl) && { href: "#about", label: "About" },
     bookingOpen && { href: "#book", label: "Book" },
     portfolio.length > 0 && { href: "#work", label: "Work" },
-    (studio.bio || headshotUrl) && { href: "#about", label: "About" },
     studioReviews.list.length > 0 && { href: "#reviews", label: "Reviews" },
     sessions.length > 0 && { href: "#sessions", label: "Sessions" },
     studio.shootLocations.length > 0 && { href: "#where", label: "Where we shoot" },
@@ -197,6 +197,34 @@ export default async function StudioPage({ params }: PageProps<"/studio/[slug]">
       <main className="mx-auto grid w-full max-w-7xl flex-1 gap-8 px-4 py-12 lg:grid-cols-[1fr_1.15fr]">
         {/* Each part in its own card, so sections read as separate blocks. */}
         <section className="space-y-6">
+          {(studio.bio || headshotUrl) && (
+            <div id="about" className="card scroll-mt-28 p-6">
+              {headshotUrl ? (
+                // The photographer's headshot beside "Meet …", so clients see who they'll work with.
+                <div className="flex items-center gap-4">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={headshotUrl}
+                    alt={studio.name}
+                    className="size-24 shrink-0 rounded-full object-cover shadow-lg ring-4 ring-lime/40 sm:size-28"
+                  />
+                  <div>
+                    <h2 className="font-display text-2xl font-bold">About</h2>
+                    <p className="mt-0.5 font-semibold text-muted">Meet {studio.name}</p>
+                  </div>
+                </div>
+              ) : (
+                <h2 className="font-display text-2xl font-bold">About</h2>
+              )}
+              {studio.bio && (
+                <div
+                  className="rich-text mt-3 text-muted"
+                  // Cleaned by richTextHtml (lib/rich-text.ts) to simple formatting only.
+                  dangerouslySetInnerHTML={{ __html: richTextHtml(studio.bio) }}
+                />
+              )}
+            </div>
+          )}
           {bookingOpen && (
             <div id="book" className="card scroll-mt-28 p-6">
               <h2 className="font-display text-2xl font-bold">Book a session</h2>
@@ -226,34 +254,6 @@ export default async function StudioPage({ params }: PageProps<"/studio/[slug]">
                   </li>
                 ))}
               </ul>
-            </div>
-          )}
-          {(studio.bio || headshotUrl) && (
-            <div id="about" className="card scroll-mt-28 p-6">
-              {headshotUrl ? (
-                // The photographer's headshot beside "Meet …", so clients see who they'll work with.
-                <div className="flex items-center gap-4">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={headshotUrl}
-                    alt={studio.name}
-                    className="size-24 shrink-0 rounded-full object-cover shadow-lg ring-4 ring-lime/40 sm:size-28"
-                  />
-                  <div>
-                    <h2 className="font-display text-2xl font-bold">About</h2>
-                    <p className="mt-0.5 font-semibold text-muted">Meet {studio.name}</p>
-                  </div>
-                </div>
-              ) : (
-                <h2 className="font-display text-2xl font-bold">About</h2>
-              )}
-              {studio.bio && (
-                <div
-                  className="rich-text mt-3 text-muted"
-                  // Cleaned by richTextHtml (lib/rich-text.ts) to simple formatting only.
-                  dangerouslySetInnerHTML={{ __html: richTextHtml(studio.bio) }}
-                />
-              )}
             </div>
           )}
           <StudioReviews reviews={studioReviews} />
