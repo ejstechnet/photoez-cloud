@@ -15,6 +15,7 @@ const values: PlaceholderValues = {
   STUDIO_EMAIL: "studio@example.com",
   TOTAL_AMOUNT: "$250",
   DEPOSIT_AMOUNT: "$125",
+  CREDIT_APPLIED: "$0",
   BALANCE_DUE: "$125",
   TODAY_DATE: "September 25, 2026",
 };

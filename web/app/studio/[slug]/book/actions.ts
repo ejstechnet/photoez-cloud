@@ -1,5 +1,7 @@
 "use server";
 
+import { findUsableCard, takeFromCard } from "@/lib/gift-cards";
+import { giftCardApplies } from "@/lib/gift-card-rules";
 import { emailBookingConfirmed } from "@/lib/email/notify";
 import { afterResponse } from "@/lib/email/send";
 import { randomBytes } from "node:crypto";
@@ -63,6 +65,7 @@ export type BookingFormState = {
   // Answers to the studio's own questions, by question id.
   fieldErrors?: Record<string, string>;
   couponError?: string;
+  giftCardError?: string;
   inspoError?: string;
 };
 
@@ -222,6 +225,15 @@ export async function createBooking(
   const creditWanted =
     formData.get("useCredit") === "on" ? Math.min(await creditBalance(studio.id, data.email, today), totalCents) : 0;
 
+  // A gift card, checked again here: it covers what's left after coupon and credit.
+  const giftEntered = String(formData.get("giftCardCode") ?? "").trim();
+  const card = giftEntered ? await findUsableCard(studio.id, giftEntered) : null;
+  if (giftEntered && !card) {
+    const message = "That gift card code isn't valid or has no balance left.";
+    return { giftCardError: message, message };
+  }
+  const giftWanted = card ? giftCardApplies(card.balanceCents, totalCents - creditWanted) : 0;
+
   // With the studio's Stripe connected and a deposit to pay, the booking is
   // held while the client pays; otherwise it's confirmed right away.
   const firstPayment = nextPayment(
@@ -231,6 +243,7 @@ export async function createBooking(
       depositPercent: session.depositPercent,
       discountCents,
       creditCents: creditWanted,
+      giftCardCents: giftWanted,
     },
     [],
   );
@@ -257,6 +270,8 @@ export async function createBooking(
 
       // The credit actually available at this moment (a second booking could race).
       const creditCents = creditWanted > 0 ? await useCredits(tx, studio.id, data.email, today, creditWanted) : 0;
+      // Taken off the card now, so it can't be spent twice.
+      const giftCardCents = card ? await takeFromCard(tx, card.id, giftCardApplies(giftWanted, totalCents - creditCents)) : 0;
 
       const [booking] = await tx.insert(bookings).values({
         photographerId: studio.id,
@@ -280,6 +295,8 @@ export async function createBooking(
         couponCode: codeEntered || null,
         discountCents,
         creditCents,
+        giftCardId: giftCardCents > 0 ? card!.id : null,
+        giftCardCents,
         answers: checked.answers,
       }).returning({ id: bookings.id });
 
@@ -365,14 +382,31 @@ export async function previewCoupon(
   return { ok: true, code: normalized, kind: coupon.kind, value: coupon.value };
 }
 
-// Whether this email has a session credit here. Only yes or no, never the
-// amount, so typing someone else's email reveals nothing more than that.
-export async function hasCredit(slug: string, email: string): Promise<boolean> {
-  if (!z.email().safeParse(email.trim()).success) return false;
+// The session credit this email has here (0 = none), so the form can offer
+// it and show what it takes off. Elle chose to show the amount (2026-09-27):
+// clearer for clients, at the small cost that anyone typing a client's email
+// sees their credit amount (nothing else about them).
+export async function creditAvailable(slug: string, email: string): Promise<number> {
+  if (!z.email().safeParse(email.trim()).success) return 0;
   const [studio] = await db
     .select({ id: photographers.id, timeZone: photographers.timeZone })
     .from(photographers)
     .where(eq(photographers.studioSlug, slug));
-  if (!studio) return false;
-  return (await creditBalance(studio.id, email, localDateOf(new Date(), studio.timeZone))) > 0;
+  if (!studio) return 0;
+  return creditBalance(studio.id, email, localDateOf(new Date(), studio.timeZone));
+}
+
+// ---- Gift card check (from the booking form) ----
+
+// A gift card's balance, so the form can show what it covers. createBooking
+// checks again. The code itself is the secret, so the balance is safe to show.
+export async function previewGiftCard(
+  slug: string,
+  code: string,
+): Promise<{ ok: true; code: string; balanceCents: number } | { ok: false; message: string }> {
+  if (!code.trim()) return { ok: false, message: "Enter your gift card code." };
+  const [studio] = await db.select({ id: photographers.id }).from(photographers).where(eq(photographers.studioSlug, slug));
+  const card = studio ? await findUsableCard(studio.id, code) : null;
+  if (!card) return { ok: false, message: "That gift card code isn't valid or has no balance left." };
+  return { ok: true, code: card.code, balanceCents: card.balanceCents };
 }

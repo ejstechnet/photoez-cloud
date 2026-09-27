@@ -6,7 +6,7 @@ import { ArrowRightIcon } from "@/components/icons";
 import { formatPrice } from "@/lib/booking/format";
 import { addDays, formatDate, formatTime, localDateOf, zonedToUtc } from "@/lib/booking/time";
 import { isMonth, monthGrid } from "@/lib/booking/calendar";
-import { bookingTotal } from "@/lib/payments/amounts";
+import { bookingTotal, prepaid } from "@/lib/payments/amounts";
 import { releaseExpiredHolds } from "@/lib/payments/checkout";
 import { requirePhotographer } from "@/lib/session";
 import { BookingCalendar, type CalendarBooking } from "./booking-calendar";
@@ -97,7 +97,7 @@ export default async function BookingsPage({ searchParams }: PageProps<"/dashboa
               sessionName: b.sessionName,
               status: b.status,
               totalCents: bookingTotal(b),
-              dueCents: Math.max(0, bookingTotal(b) - paidCents - b.creditCents),
+              dueCents: Math.max(0, bookingTotal(b) - paidCents - prepaid(b)),
             })),
             timeOff,
           };

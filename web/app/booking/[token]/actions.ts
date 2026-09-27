@@ -12,6 +12,7 @@ import { contractTemplateFor, filledContract, signedContractFor } from "@/lib/co
 import { clientOptions } from "@/lib/booking/policy";
 import { localDateOf } from "@/lib/booking/time";
 import { issueCredit } from "@/lib/credits";
+import { restoreBookingGiftCard } from "@/lib/gift-cards";
 import { amountPaid } from "@/lib/payments/amounts";
 import { bookingPayments } from "@/lib/payments/checkout";
 import { emailBookingCancelled, emailBookingRescheduled, emailContractSigned } from "@/lib/email/notify";
@@ -90,6 +91,8 @@ export async function cancelBooking(token: string): Promise<ChangeState> {
   // they'd used) becomes a session credit for a future booking.
   let credit: { amountCents: number; expiresOn: string | null } | null = null;
   if (cancelled.length > 0 && options.cancel.creditDue) {
+    // Early enough: a gift card they used goes back onto the card.
+    await restoreBookingGiftCard(booking.id);
     const paidOnline = amountPaid(await bookingPayments(booking.id));
     await db.update(bookings).set({ creditCents: 0 }).where(eq(bookings.id, booking.id));
     credit = await issueCredit({

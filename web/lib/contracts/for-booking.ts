@@ -1,10 +1,10 @@
 import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { contractTemplates, photographers, sessionTypes, signedContracts } from "@/db/schema";
-import { depositCents, formatPrice } from "@/lib/booking/format";
+import { formatPrice } from "@/lib/booking/format";
 import { formatDate, formatTime, zoneLabel } from "@/lib/booking/time";
 import { sanitizeRichText } from "@/lib/rich-text";
-import { bookingTotal } from "@/lib/payments/amounts";
+import { bookingDeposit, bookingTotal, prepaid } from "@/lib/payments/amounts";
 import { fillPlaceholders } from "./placeholders";
 
 type BookingForContract = {
@@ -16,6 +16,9 @@ type BookingForContract = {
   addonsCents: number;
   discountCents: number;
   depositPercent: number;
+  // Session credit and gift card amounts lower the deposit (see bookingDeposit).
+  creditCents?: number;
+  giftCardCents?: number;
   startsAt: Date;
   clientName: string;
   clientEmail: string;
@@ -59,7 +62,7 @@ export async function filledContract(booking: BookingForContract, template: { co
     .where(eq(photographers.id, booking.photographerId));
   const tz = studio.timeZone;
   const total = bookingTotal(booking);
-  const deposit = depositCents(total, booking.depositPercent);
+  const deposit = bookingDeposit(booking);
   return sanitizeRichText(
     fillPlaceholders(template.content, {
       CLIENT_NAME: booking.clientName,
@@ -73,7 +76,9 @@ export async function filledContract(booking: BookingForContract, template: { co
       STUDIO_EMAIL: studio.email,
       TOTAL_AMOUNT: formatPrice(total),
       DEPOSIT_AMOUNT: formatPrice(deposit),
-      BALANCE_DUE: formatPrice(total - deposit),
+      CREDIT_APPLIED: formatPrice(prepaid(booking)),
+      // What's still owed after the deposit, session credit, and gift cards.
+      BALANCE_DUE: formatPrice(Math.max(0, total - prepaid(booking) - deposit)),
       TODAY_DATE: formatDate(new Date(), tz).replace(/^\w+, /, ""),
     }),
   );

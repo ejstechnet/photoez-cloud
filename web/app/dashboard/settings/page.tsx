@@ -10,6 +10,7 @@ import { syncStripeStatus } from "@/lib/payments/connect";
 import { stripeConfigured } from "@/lib/stripe";
 import { EmailCard } from "./email-card";
 import { ReviewsCard } from "./reviews-card";
+import { GiftCardsCard } from "./gift-cards-card";
 import { FaqForm } from "./faq-form";
 import { PaymentsCard } from "./payments-card";
 import { NotesToggle } from "./notes-toggle";
@@ -49,6 +50,10 @@ export default async function SettingsPage() {
       galleryExpiryReminderDays: photographers.galleryExpiryReminderDays,
       reviewRequestDays: photographers.reviewRequestDays,
       googleReviewUrl: photographers.googleReviewUrl,
+      giftCardsEnabled: photographers.giftCardsEnabled,
+      giftCardAmounts: photographers.giftCardAmounts,
+      giftCardMinCents: photographers.giftCardMinCents,
+      giftCardMaxCents: photographers.giftCardMaxCents,
     })
     .from(photographers)
     .where(eq(photographers.id, user.id));
@@ -144,6 +149,13 @@ export default async function SettingsPage() {
             paymentsReady={stripeReady}
           />
           <ReviewsCard requestDays={settings.reviewRequestDays} googleUrl={settings.googleReviewUrl} />
+          <GiftCardsCard
+            enabled={settings.giftCardsEnabled}
+            amounts={settings.giftCardAmounts}
+            minCents={settings.giftCardMinCents}
+            maxCents={settings.giftCardMaxCents}
+            paymentsReady={stripeReady}
+          />
           <PlanCard
             planLabel={PLAN_LABELS[plan.plan]}
             upsells={plan.upsells}

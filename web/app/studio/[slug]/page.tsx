@@ -37,6 +37,8 @@ async function findStudio(slug: string) {
       shootLocations: photographers.shootLocations,
       quoteOnlyTypes: photographers.quoteOnlyTypes,
       timeZone: photographers.timeZone,
+      giftCardsEnabled: photographers.giftCardsEnabled,
+      stripeReady: photographers.stripeChargesEnabled,
     })
     .from(photographers)
     .where(eq(photographers.studioSlug, slug.toLowerCase()));
@@ -89,6 +91,7 @@ export default async function StudioPage({ params }: PageProps<"/studio/[slug]">
   ]);
   const bookingOpen = bookable.length > 0 && Boolean(hours);
   const studioReviews = await loadStudioReviews(studio.id);
+  const giftCardsOpen = studio.giftCardsEnabled && studio.stripeReady;
   const portfolio = await Promise.all(
     (
       await db
@@ -114,6 +117,7 @@ export default async function StudioPage({ params }: PageProps<"/studio/[slug]">
     sessions.length > 0 && { href: "#sessions", label: "Sessions" },
     studio.shootLocations.length > 0 && { href: "#where", label: "Where we shoot" },
     faqs.length > 0 && { href: "#faq", label: "FAQ" },
+    giftCardsOpen && { href: `/studio/${slug.toLowerCase()}/gift-card`, label: "Gift cards" },
   ].filter((link): link is { href: string; label: string } => Boolean(link));
 
   return (
@@ -208,6 +212,23 @@ export default async function StudioPage({ params }: PageProps<"/studio/[slug]">
             </div>
           )}
           <StudioReviews reviews={studioReviews} />
+          {giftCardsOpen && (
+            <Link
+              href={`/studio/${slug.toLowerCase()}/gift-card`}
+              className="group card flex items-center gap-4 border-2 border-lime/50 bg-lime/10 p-6 transition hover:-translate-y-0.5 hover:shadow-lg"
+            >
+              <span className="text-4xl" aria-hidden="true">
+                🎁
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block font-display text-xl font-bold">Give the gift of photos</span>
+                <span className="block text-sm text-muted">Gift cards for any session, emailed on the day you choose.</span>
+              </span>
+              <span className="text-xs font-bold tracking-wider text-lime-ink uppercase transition group-hover:translate-x-1">
+                Buy →
+              </span>
+            </Link>
+          )}
           {sessions.length > 0 && (
             <div id="sessions" className="card scroll-mt-28 p-6">
               <h2 className="font-display text-2xl font-bold">Sessions</h2>

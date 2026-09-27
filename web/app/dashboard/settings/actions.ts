@@ -16,6 +16,7 @@ import { MAX_WATERMARK_BYTES, WATERMARK_POSITIONS } from "@/lib/watermark";
 import { OFFERABLE_TYPES, SHOOT_LOCATIONS } from "@/lib/session-types";
 import { MAX_STUDIO_PHOTOS, isAllowedSlug } from "@/lib/studio";
 import { moveInList } from "@/lib/reorder";
+import { parseAmountList } from "@/lib/gift-card-rules";
 
 // Step 1 of replacing the watermark: a one-time link to upload the new PNG.
 export async function prepareWatermarkUpload(
@@ -447,4 +448,37 @@ export async function moveStudioPhoto(photoId: string, by: -1 | 1): Promise<void
   });
   revalidatePath("/dashboard/settings");
   revalidatePath("/studio/[slug]", "page");
+}
+
+// ---- Gift cards ----
+
+export type GiftSettingsState = { message?: string; saved?: boolean };
+
+export async function saveGiftCardSettings(_prev: GiftSettingsState, formData: FormData): Promise<GiftSettingsState> {
+  const photographer = await requirePhotographer();
+  const amounts = parseAmountList(String(formData.get("amounts") ?? ""));
+  if (!amounts) return { message: "List up to 6 whole-dollar amounts, like 50, 100, 250." };
+  let minCents: number | null = null;
+  let maxCents: number | null = null;
+  if (formData.get("allowCustom") === "on") {
+    const min = String(formData.get("min") ?? "").trim();
+    const max = String(formData.get("max") ?? "").trim();
+    if (!/^\d{1,5}$/.test(min) || !/^\d{1,5}$/.test(max) || Number(min) < 1 || Number(max) <= Number(min)) {
+      return { message: "Enter the smallest and largest amounts, like 25 and 1000." };
+    }
+    minCents = Number(min) * 100;
+    maxCents = Number(max) * 100;
+  }
+  await db
+    .update(photographers)
+    .set({
+      giftCardsEnabled: formData.get("enabled") === "on",
+      giftCardAmounts: amounts,
+      giftCardMinCents: minCents,
+      giftCardMaxCents: maxCents,
+    })
+    .where(eq(photographers.id, photographer.id));
+  revalidatePath("/dashboard", "layout");
+  revalidatePath("/studio/[slug]", "layout");
+  return { saved: true };
 }
