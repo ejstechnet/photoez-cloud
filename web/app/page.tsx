@@ -2,6 +2,8 @@ import Link from "next/link";
 import Image from "next/image";
 import { Logo, WorkflowPills } from "@/components/brand";
 import { ArrowRightIcon, ChatIcon, InboxIcon, SearchIcon, WandIcon } from "@/components/icons";
+import { PHOTOEZ_LINKS, WORDPRESS_PLUGINS } from "@/lib/photoez-links";
+import { WordPressMockup } from "@/components/marketing-mockups";
 
 const features = [
   {
@@ -28,6 +30,19 @@ const features = [
     icon: <ChatIcon size={22} />,
     tile: "bg-lime",
   },
+];
+
+// What PhotoEZ Cloud does today (the home page's "in one place" list).
+const cloudFeatures = [
+  { title: "Your studio page", body: "Your work, sessions, reviews, and FAQ, with an inquiry form that sorts itself." },
+  { title: "Online booking", body: "Real open times, add-ons, deposits, reschedules, and session credits." },
+  { title: "Proofing & delivery", body: "Watermarked proofs, client favorites and notes, paid extras, clean downloads." },
+  { title: "Contracts", body: "Signed online, filled in from each booking automatically." },
+  { title: "Payments", body: "Deposits, balances, and extras straight to your own Stripe account." },
+  { title: "Gift cards & coupons", body: "Sell gift cards on your page; offer codes with limits you set." },
+  { title: "Reviews", body: "Asked for after delivery, approved by you, shown on your page." },
+  { title: "Emails & reminders", body: "Confirmations, reminders, and gallery emails sent for you." },
+  { title: "Page Designer", body: "Your colors, fonts, banner, and gallery style." },
 ];
 
 export default function Home() {
@@ -138,8 +153,140 @@ export default function Home() {
         </div>
       </section>
 
-      <footer className="mt-auto border-t border-border py-8 text-center text-sm text-muted">
-        Built by Elle Jones · Part of the PhotoEZ family from EJS Tech
+      {/* What PhotoEZ Cloud does today. */}
+      <section className="border-y border-border bg-surface">
+        <div className="mx-auto w-full max-w-7xl px-4 py-20">
+          <div className="grid items-center gap-12 lg:grid-cols-2">
+            <div>
+              <p className="text-sm font-bold tracking-wider text-lime-ink uppercase">PhotoEZ Cloud</p>
+              <h2 className="mt-2 max-w-2xl font-display text-4xl font-bold tracking-tight">
+                Your whole studio, <span className="italic text-link">in one place.</span>
+              </h2>
+              <p className="mt-3 max-w-2xl text-muted">
+                Nothing to install or host. Sign up and get your own studio page, booking, galleries, and payments, all
+                designed to look like your brand.
+              </p>
+              <div className="mt-8 flex flex-wrap gap-3">
+                <Link href="/signup" className="btn-primary">
+                  Start your studio <ArrowRightIcon size={18} />
+                </Link>
+                <Link href="/login" className="btn-secondary">
+                  Log in
+                </Link>
+              </div>
+            </div>
+            {/* A photography studio (Elle's image, 1536×1024). */}
+            <Image
+              src="/home/studio.webp"
+              alt="A bright photography studio with a camera on the desk, a backdrop, and studio lights"
+              width={1536}
+              height={1024}
+              sizes="(min-width: 1024px) 50vw, 100vw"
+              className="w-full rounded-3xl shadow-2xl ring-1 ring-black/5"
+            />
+          </div>
+          <ul className="mt-16 grid gap-x-8 gap-y-6 sm:grid-cols-2 lg:grid-cols-3">
+            {cloudFeatures.map((feature) => (
+              <li key={feature.title} className="flex gap-3">
+                <span className="mt-1 grid size-6 shrink-0 place-items-center rounded-full bg-lime text-xs font-bold text-brand-deep">
+                  ✓
+                </span>
+                <span>
+                  <span className="block font-semibold">{feature.title}</span>
+                  <span className="block text-sm text-muted">{feature.body}</span>
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </section>
+
+      {/* The WordPress suite, for photographers who run their own WordPress site. */}
+      <section className="mx-auto w-full max-w-7xl px-4 py-20">
+        <div className="grid items-start gap-10 lg:grid-cols-[1fr_1.1fr]">
+          <div>
+            <p className="text-sm font-bold tracking-wider text-violet uppercase">Prefer WordPress?</p>
+            <h2 className="mt-2 font-display text-4xl font-bold tracking-tight">
+              Meet <span className="italic text-link">PhotoEZ for WordPress.</span>
+            </h2>
+            <p className="mt-3 text-muted">
+              Already have a WordPress website? The PhotoEZ plugin suite brings proofing, booking, contracts, and more
+              right into it, on your own site and your own hosting. Same PhotoEZ workflow, from the same maker.
+            </p>
+            <div className="mt-6 flex flex-wrap gap-3">
+              <a href={PHOTOEZ_LINKS.site} className="btn-primary">
+                Visit photoez.net <ArrowRightIcon size={18} />
+              </a>
+              <a href={PHOTOEZ_LINKS.demos} className="btn-secondary">
+                Try the demos
+              </a>
+            </div>
+            <p className="mt-4 text-sm text-muted">
+              Start free with{" "}
+              <a href={PHOTOEZ_LINKS.liteWordPressOrg} className="link">
+                PhotoEZ Lite on WordPress.org
+              </a>
+              , or{" "}
+              <a href={PHOTOEZ_LINKS.buy} className="link">
+                get the full suite
+              </a>{" "}
+              from EJS Tech.
+            </p>
+            <div className="mt-10">
+              <WordPressMockup />
+            </div>
+          </div>
+          <ul className="grid gap-3">
+            {WORDPRESS_PLUGINS.map((plugin) => (
+              <li key={plugin.name} className="card flex items-start gap-4 p-5">
+                <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-violet/15 font-display text-lg font-bold text-violet">
+                  {plugin.name.replace("PhotoEZ ", "").charAt(0)}
+                </span>
+                <span>
+                  <span className="block font-semibold">{plugin.name}</span>
+                  <span className="block text-sm text-muted">{plugin.body}</span>
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </section>
+
+      <footer className="mt-auto border-t border-border bg-surface py-10 text-sm text-muted">
+        <div className="mx-auto flex max-w-7xl flex-col gap-6 px-4 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <Logo tone="dark" />
+            <p className="mt-3">Built by Elle Jones · Part of the PhotoEZ family from EJS Tech</p>
+          </div>
+          <nav className="grid grid-cols-2 gap-x-10 gap-y-2" aria-label="More from PhotoEZ">
+            <p className="font-bold tracking-wider text-foreground uppercase">PhotoEZ Cloud</p>
+            <p className="font-bold tracking-wider text-foreground uppercase">PhotoEZ for WordPress</p>
+            <Link href="/signup" className="hover:text-foreground">
+              Start your studio
+            </Link>
+            <a href={PHOTOEZ_LINKS.site} className="hover:text-foreground">
+              photoez.net
+            </a>
+            <Link href="/login" className="hover:text-foreground">
+              Log in
+            </Link>
+            <a href={PHOTOEZ_LINKS.demos} className="hover:text-foreground">
+              Plugin demos
+            </a>
+            <span />
+            <a href={PHOTOEZ_LINKS.liteWordPressOrg} className="hover:text-foreground">
+              PhotoEZ Lite on WordPress.org
+            </a>
+            <span />
+            <a href={PHOTOEZ_LINKS.lite} className="hover:text-foreground">
+              About PhotoEZ Lite
+            </a>
+            <span />
+            <a href={PHOTOEZ_LINKS.ejstech} className="hover:text-foreground">
+              EJS Tech
+            </a>
+          </nav>
+        </div>
       </footer>
     </main>
   );

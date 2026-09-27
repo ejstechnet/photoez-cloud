@@ -7,6 +7,7 @@ import { formatPrice } from "@/lib/booking/format";
 import { formatDate, formatTime } from "@/lib/booking/time";
 import { PERIODS, PERIOD_LABELS, parsePeriod } from "@/lib/dashboard-periods";
 import { dashboardStats } from "@/lib/dashboard-stats";
+import { PHOTOEZ_LINKS } from "@/lib/photoez-links";
 import { requirePhotographer } from "@/lib/session";
 
 // The studio at a glance, like PhotoEZ for WordPress's dashboard: revenue,
@@ -163,6 +164,28 @@ export default async function DashboardPage({ searchParams }: PageProps<"/dashbo
           )}
         </section>
       </div>
+
+      {/* For photographers who also run a WordPress website. */}
+      <section className="card mt-8 flex flex-col gap-4 p-6 sm:flex-row sm:items-center">
+        <span className="grid size-12 shrink-0 place-items-center rounded-2xl bg-violet/15 text-2xl" aria-hidden="true">
+          🧩
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="font-display text-xl font-bold">Have a WordPress website too?</p>
+          <p className="text-sm text-muted">
+            PhotoEZ for WordPress brings proofing, booking, contracts, and reviews into your own site. Start free with
+            PhotoEZ Lite.
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <a href={PHOTOEZ_LINKS.site} target="_blank" rel="noreferrer" className="btn-secondary">
+            photoez.net
+          </a>
+          <a href={PHOTOEZ_LINKS.liteWordPressOrg} target="_blank" rel="noreferrer" className="btn-secondary">
+            Get PhotoEZ Lite
+          </a>
+        </div>
+      </section>
     </>
   );
 }
