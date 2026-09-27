@@ -8,10 +8,13 @@ export function InquiryForm({
   slug,
   studioName,
   sessions,
+  fromDirectory = false,
 }: {
   slug: string;
   studioName: string;
   sessions: { type: string; label: string; quote: boolean }[];
+  // The visitor came from the photographer directory (/photographers).
+  fromDirectory?: boolean;
 }) {
   const [state, formAction, pending] = useActionState<InquiryFormState, FormData>(
     submitInquiry.bind(null, slug),
@@ -45,6 +48,7 @@ export function InquiryForm({
         </label>
       </div>
       <input type="hidden" name="startedAt" value={startedAt} />
+      {fromDirectory && <input type="hidden" name="from" value="directory" />}
 
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="Your name" name="name" autoComplete="name" error={errors.name} required />

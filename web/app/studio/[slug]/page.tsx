@@ -79,8 +79,10 @@ export async function generateMetadata({
 
 export default async function StudioPage({
   params,
+  searchParams,
 }: PageProps<"/studio/[slug]">) {
   const { slug } = await params;
+  const { from } = await searchParams;
   const studio = await findStudio(slug);
   if (!studio) notFound();
 
@@ -396,6 +398,7 @@ export default async function StudioPage({
                 slug={slug.toLowerCase()}
                 studioName={name}
                 sessions={sessions}
+                fromDirectory={from === "directory"}
               />
             </div>
           </section>

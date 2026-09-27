@@ -15,6 +15,8 @@ import { FaqForm } from "./faq-form";
 import { PaymentsCard } from "./payments-card";
 import { NotesToggle } from "./notes-toggle";
 import { PlanCard } from "./plan-card";
+import { DirectoryCard } from "./directory-card";
+import { directoryReadiness } from "@/lib/directory/search";
 import { PortfolioCard } from "./portfolio-card";
 import { PLAN_LABELS, planFor } from "@/lib/plans";
 import { studioPlan } from "@/lib/studio-plan";
@@ -42,6 +44,10 @@ export default async function SettingsPage() {
       offeredTypes: photographers.offeredTypes,
       shootLocations: photographers.shootLocations,
       quoteOnlyTypes: photographers.quoteOnlyTypes,
+      directoryListed: photographers.directoryListed,
+      directoryZip: photographers.directoryZip,
+      directoryCity: photographers.directoryCity,
+      directoryState: photographers.directoryState,
       stripeAccountId: photographers.stripeAccountId,
       stripeReady: photographers.stripeChargesEnabled,
       photoNotesEnabled: photographers.photoNotesEnabled,
@@ -70,6 +76,7 @@ export default async function SettingsPage() {
   const suggestions = SUGGESTED_FAQ_QUESTIONS.filter((q) => !askedAlready.has(q.toLowerCase()));
 
   const plan = await studioPlan(user.id);
+  const directory = await directoryReadiness(user.id);
   const portfolio = await Promise.all(
     (
       await db
@@ -133,6 +140,13 @@ export default async function SettingsPage() {
               />
             </div>
           </section>
+
+          <DirectoryCard
+            listed={settings.directoryListed}
+            zip={settings.directoryZip ?? ""}
+            place={settings.directoryCity ? `${settings.directoryCity}, ${settings.directoryState}` : null}
+            steps={directory.steps}
+          />
 
           <PortfolioCard photos={portfolio} />
 
