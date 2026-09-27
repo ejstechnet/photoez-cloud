@@ -30,6 +30,7 @@ async function findStudio(slug: string) {
       businessName: photographers.businessName,
       logoKey: photographers.studioLogoKey,
       logoBg: photographers.studioLogoBg,
+      headshotKey: photographers.headshotKey,
       tagline: photographers.studioTagline,
       bio: photographers.studioBio,
       serviceArea: photographers.serviceArea,
@@ -60,6 +61,7 @@ export default async function StudioPage({ params }: PageProps<"/studio/[slug]">
 
   const name = studio.businessName ?? studio.name;
   const logoUrl = studio.logoKey ? await signedViewUrl(studio.logoKey) : null;
+  const headshotUrl = studio.headshotKey ? await signedViewUrl(studio.headshotKey) : null;
   // Keep the photographer's offered sessions in a consistent order.
   const sessions = OFFERABLE_TYPES.filter((type) => studio.offeredTypes.includes(type)).map((type) => ({
     type,
@@ -112,7 +114,7 @@ export default async function StudioPage({ params }: PageProps<"/studio/[slug]">
   const links = [
     bookingOpen && { href: "#book", label: "Book" },
     portfolio.length > 0 && { href: "#work", label: "Work" },
-    studio.bio && { href: "#about", label: "About" },
+    (studio.bio || headshotUrl) && { href: "#about", label: "About" },
     studioReviews.list.length > 0 && { href: "#reviews", label: "Reviews" },
     sessions.length > 0 && { href: "#sessions", label: "Sessions" },
     studio.shootLocations.length > 0 && { href: "#where", label: "Where we shoot" },
@@ -151,9 +153,7 @@ export default async function StudioPage({ params }: PageProps<"/studio/[slug]">
         )}
       </StudioNav>
 
-      <header id="top" className="relative overflow-hidden bg-brand text-white">
-        <div className="pointer-events-none absolute -top-24 -right-24 size-80 rounded-full bg-lime/15 blur-3xl" />
-        <div className="pointer-events-none absolute -bottom-32 left-1/4 size-72 rounded-full bg-coral/20 blur-3xl" />
+      <header id="top" className="relative overflow-hidden bg-black text-white">
         <div className="relative mx-auto flex max-w-7xl flex-col gap-6 px-4 py-14 sm:flex-row sm:items-center">
           <div className="min-w-0">
             {studio.serviceArea && (
@@ -201,14 +201,32 @@ export default async function StudioPage({ params }: PageProps<"/studio/[slug]">
               </ul>
             </div>
           )}
-          {studio.bio && (
+          {(studio.bio || headshotUrl) && (
             <div id="about" className="card scroll-mt-28 p-6">
-              <h2 className="font-display text-2xl font-bold">About</h2>
-              <div
-                className="rich-text mt-3 text-muted"
-                // Cleaned by richTextHtml (lib/rich-text.ts) to simple formatting only.
-                dangerouslySetInnerHTML={{ __html: richTextHtml(studio.bio) }}
-              />
+              {headshotUrl ? (
+                // The photographer's headshot beside "Meet …", so clients see who they'll work with.
+                <div className="flex items-center gap-4">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={headshotUrl}
+                    alt={studio.name}
+                    className="size-24 shrink-0 rounded-full object-cover shadow-lg ring-4 ring-lime/40 sm:size-28"
+                  />
+                  <div>
+                    <h2 className="font-display text-2xl font-bold">About</h2>
+                    <p className="mt-0.5 font-semibold text-muted">Meet {studio.name}</p>
+                  </div>
+                </div>
+              ) : (
+                <h2 className="font-display text-2xl font-bold">About</h2>
+              )}
+              {studio.bio && (
+                <div
+                  className="rich-text mt-3 text-muted"
+                  // Cleaned by richTextHtml (lib/rich-text.ts) to simple formatting only.
+                  dangerouslySetInnerHTML={{ __html: richTextHtml(studio.bio) }}
+                />
+              )}
             </div>
           )}
           <StudioReviews reviews={studioReviews} />
