@@ -8,7 +8,15 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { db } from "@/db";
-import { blackoutDates, bookingHours, bookings, contractTemplates, photographers, sessionTypes } from "@/db/schema";
+import {
+  blackoutDates,
+  bookingHours,
+  bookingInspoPhotos,
+  bookings,
+  contractTemplates,
+  photographers,
+  sessionTypes,
+} from "@/db/schema";
 import { isOverlapError } from "@/lib/booking/availability";
 import { isValidTimeZone } from "@/lib/booking/time";
 import { cleanRichTextInput, richTextToPlain } from "@/lib/rich-text";
@@ -429,4 +437,31 @@ export async function moveSessionType(sessionTypeId: string, by: -1 | 1): Promis
   });
   revalidatePath("/dashboard/bookings", "layout");
   revalidatePath("/studio/[slug]", "layout");
+}
+
+// Deletes a booking for good (e.g. a test or a duplicate), with its extras,
+// signed contract, payment records, and inspiration photos. Any session
+// credit it used goes back to the client first. The client isn't emailed:
+// cancel first if they need to know.
+export async function deleteBooking(bookingId: string): Promise<{ message?: string }> {
+  const photographer = await requirePhotographer();
+  if (!isUuid(bookingId)) return { message: "That booking could not be found." };
+  const [booking] = await db
+    .select({ id: bookings.id })
+    .from(bookings)
+    .where(and(eq(bookings.id, bookingId), eq(bookings.photographerId, photographer.id)));
+  if (!booking) return { message: "That booking could not be found." };
+
+  await returnBookingCredit(bookingId);
+  const inspo = await db
+    .select({ fileKey: bookingInspoPhotos.fileKey })
+    .from(bookingInspoPhotos)
+    .where(eq(bookingInspoPhotos.bookingId, bookingId));
+  await db.delete(bookings).where(and(eq(bookings.id, bookingId), eq(bookings.photographerId, photographer.id)));
+  // The inspiration photos' files, once the booking no longer points at them.
+  await Promise.all(inspo.map((photo) => deletePrefix(photo.fileKey).catch(() => undefined)));
+
+  revalidatePath("/dashboard", "layout");
+  revalidatePath("/studio/[slug]", "layout");
+  redirect("/dashboard/bookings");
 }
