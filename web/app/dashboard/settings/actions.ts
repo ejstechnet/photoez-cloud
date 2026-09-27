@@ -17,6 +17,7 @@ import { OFFERABLE_TYPES, SHOOT_LOCATIONS } from "@/lib/session-types";
 import { MAX_STUDIO_PHOTOS, isAllowedSlug } from "@/lib/studio";
 import { moveInList } from "@/lib/reorder";
 import { parseAmountList } from "@/lib/gift-card-rules";
+import { lookupZip } from "@/lib/geo/zips";
 
 // Step 1 of replacing the watermark: a one-time link to upload the new PNG.
 export async function prepareWatermarkUpload(
@@ -526,4 +527,33 @@ export async function removeHeadshot(): Promise<void> {
   await db.update(photographers).set({ headshotKey: null }).where(eq(photographers.id, photographer.id));
   revalidatePath("/dashboard/settings");
   revalidatePath("/studio/[slug]", "page");
+}
+
+// ---- Photographer directory ----
+
+export type DirectoryFormState = { errors?: { zip?: string }; message?: string; saved?: boolean };
+
+export async function saveDirectoryListing(_prev: DirectoryFormState, formData: FormData): Promise<DirectoryFormState> {
+  const photographer = await requirePhotographer();
+  const zip = String(formData.get("zip") ?? "").trim();
+  const listed = formData.get("listed") === "on";
+  const place = zip ? lookupZip(zip) : null;
+  if (zip && !place) return { errors: { zip: "We couldn't find that ZIP code. Use a 5-digit US ZIP." } };
+  if (listed && !place) return { errors: { zip: "Add your ZIP code so clients nearby can find you." } };
+
+  await db
+    .update(photographers)
+    .set({
+      directoryListed: listed,
+      directoryZip: place?.zip ?? null,
+      directoryCity: place?.city ?? null,
+      directoryState: place?.state ?? null,
+      directoryLat: place?.lat ?? null,
+      directoryLng: place?.lng ?? null,
+      updatedAt: new Date(),
+    })
+    .where(eq(photographers.id, photographer.id));
+  revalidatePath("/dashboard/settings");
+  revalidatePath("/photographers", "layout");
+  return { saved: true };
 }

@@ -111,7 +111,7 @@ export async function submitInquiry(
     .insert(inquiries)
     .values({
       photographerId: studio.id,
-      source: "form",
+      source: formData.get("from") === "directory" ? "directory" : "form",
       fromName: data.name,
       fromEmail: data.email,
       message,

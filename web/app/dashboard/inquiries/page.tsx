@@ -99,6 +99,11 @@ export default async function InquiriesPage() {
                           Web form
                         </span>
                       )}
+                      {inquiry.source === "directory" && (
+                        <span className="rounded-full bg-lime/25 px-2.5 py-0.5 text-[11px] font-bold tracking-wider text-lime-ink uppercase">
+                          From directory
+                        </span>
+                      )}
                       <span className="text-xs text-muted">
                         {inquiry.createdAt.toLocaleDateString("en-US", { month: "short", day: "numeric" })}
                       </span>

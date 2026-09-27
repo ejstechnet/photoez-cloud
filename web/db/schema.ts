@@ -3,6 +3,7 @@ import {
   uuid,
   text,
   boolean,
+  doublePrecision,
   integer,
   timestamp,
   index,
@@ -83,6 +84,14 @@ export const photographers = pgTable("photographers", {
   cancelAtPeriodEnd: boolean("cancel_at_period_end").notNull().default(false),
   // Studio plan: hide "Powered by PhotoEZ Cloud" on the studio's pages.
   hideBranding: boolean("hide_branding").notNull().default(false),
+  // Photographer directory (/photographers): opted in, and where the studio
+  // is. City, state, and map position come from the ZIP (lib/geo/zips.ts).
+  directoryListed: boolean("directory_listed").notNull().default(false),
+  directoryZip: text("directory_zip"),
+  directoryCity: text("directory_city"),
+  directoryState: text("directory_state"),
+  directoryLat: doublePrecision("directory_lat"),
+  directoryLng: doublePrecision("directory_lng"),
   // Price per photo a client selects beyond a gallery's included number
   // (PhotoEZ's "global extra price"; galleries can override it).
   extraPhotoPriceCents: integer("extra_photo_price_cents").notNull().default(1000),
@@ -643,8 +652,9 @@ export const inquiries = pgTable(
     status: text("status", { enum: ["new", "replied", "converted", "archived"] })
       .notNull()
       .default("new"),
-    // "form" = sent from the public studio page; "pasted" = added by the photographer.
-    source: text("source", { enum: ["pasted", "form"] }).notNull().default("pasted"),
+    // "form" = sent from the public studio page; "directory" = the same form,
+    // reached from the photographer directory; "pasted" = added by the photographer.
+    source: text("source", { enum: ["pasted", "form", "directory"] }).notNull().default("pasted"),
     fromName: text("from_name"),
     fromEmail: text("from_email"),
     message: text("message").notNull(),

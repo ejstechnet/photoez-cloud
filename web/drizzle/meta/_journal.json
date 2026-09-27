@@ -232,6 +232,13 @@
       "when": 1790547252467,
       "tag": "0032_dear_power_pack",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1790550281644,
+      "tag": "0033_dusty_beast",
+      "breakpoints": true
     }
   ]
 }

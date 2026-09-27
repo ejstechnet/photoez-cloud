@@ -118,6 +118,12 @@ export default async function Home() {
               <Link href="/" className="text-sm font-bold tracking-wider text-white/90 uppercase hover:text-lime">
                 Home
               </Link>
+              <Link
+                href="/photographers"
+                className="hidden text-sm font-bold tracking-wider text-white/90 uppercase hover:text-lime sm:block"
+              >
+                Find a photographer
+              </Link>
               <Link href="/pricing" className="text-sm font-bold tracking-wider text-white/90 uppercase hover:text-lime">
                 Pricing
               </Link>
@@ -349,6 +355,10 @@ export default async function Home() {
             </a>
             <Link href="/pricing" className="hover:text-foreground">
               Pricing
+            </Link>
+            <span />
+            <Link href="/photographers" className="hover:text-foreground">
+              Find a photographer
             </Link>
             <a href={PHOTOEZ_LINKS.liteWordPressOrg} className="hover:text-foreground">
               PhotoEZ Lite on WordPress.org
