@@ -72,6 +72,14 @@ export const photographers = pgTable("photographers", {
   photoNotesEnabled: boolean("photo_notes_enabled").notNull().default(true),
   // How long new session credits last, in months; null = they never expire.
   creditValidMonths: integer("credit_valid_months").default(12),
+  // Email: where studio notices go (null = the account email), and whether the
+  // AI's replies to inquiries it fully handled go out on their own.
+  notifyEmail: text("notify_email"),
+  autoSendReplies: boolean("auto_send_replies").notNull().default(false),
+  // Automatic reminders, like PhotoEZ for WordPress; null turns one off.
+  sessionReminderHours: integer("session_reminder_hours").default(24),
+  balanceReminderDays: integer("balance_reminder_days").default(2),
+  galleryExpiryReminderDays: integer("gallery_expiry_reminder_days").default(3),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
@@ -172,6 +180,8 @@ export const galleries = pgTable(
     submittedAt: timestamp("submitted_at", { withTimezone: true }),
     deliveredAt: timestamp("delivered_at", { withTimezone: true }),
     expiresAt: timestamp("expires_at", { withTimezone: true }),
+    // When the "your gallery closes soon" reminder went out.
+    expiryReminderSentAt: timestamp("expiry_reminder_sent_at", { withTimezone: true }),
     // Large photo across the top of the client's gallery page (a storage key).
     headerImageKey: text("header_image_key"),
     // This gallery's price per extra photo; null uses the studio's price.
@@ -412,6 +422,9 @@ export const bookings = pgTable(
     creditDue: boolean("credit_due").notNull().default(false),
     // A pending_payment booking frees its time after this.
     holdExpiresAt: timestamp("hold_expires_at", { withTimezone: true }),
+    // When the session and balance reminders went out (cleared on reschedule).
+    reminderSentAt: timestamp("reminder_sent_at", { withTimezone: true }),
+    balanceReminderSentAt: timestamp("balance_reminder_sent_at", { withTimezone: true }),
     // Total of the extras the client added; the booking total is priceCents + addonsCents.
     addonsCents: integer("addons_cents").notNull().default(0),
     // A coupon's discount off the total, and session credit the client used.
@@ -601,6 +614,9 @@ export const inquiries = pgTable(
     inputTokens: integer("input_tokens"),
     outputTokens: integer("output_tokens"),
     triagedAt: timestamp("triaged_at", { withTimezone: true }),
+    // When the reply was emailed, and whether it went out on its own.
+    repliedAt: timestamp("replied_at", { withTimezone: true }),
+    autoReplied: boolean("auto_replied").notNull().default(false),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index("inquiries_photographer_idx").on(t.photographerId, t.createdAt)],
@@ -620,4 +636,29 @@ export const favorites = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [unique("favorites_photo_unique").on(t.photoId)],
+);
+
+// Every email the app sends (or tried to), with the message itself, so the
+// photographer can see what went out (PhotoEZ Booking's email log).
+export const emailLog = pgTable(
+  "email_log",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    photographerId: uuid("photographer_id")
+      .notNull()
+      .references(() => photographers.id, { onDelete: "cascade" }),
+    // What it was, e.g. "booking_confirmed" (see lib/email/kinds.ts).
+    kind: text("kind").notNull(),
+    toEmail: text("to_email").notNull(),
+    subject: text("subject").notNull(),
+    html: text("html").notNull(),
+    // skipped: email sending isn't set up (e.g. on a developer's computer).
+    status: text("status", { enum: ["sent", "failed", "skipped"] }).notNull(),
+    error: text("error"),
+    bookingId: uuid("booking_id").references(() => bookings.id, { onDelete: "set null" }),
+    galleryId: uuid("gallery_id").references(() => galleries.id, { onDelete: "set null" }),
+    inquiryId: uuid("inquiry_id").references(() => inquiries.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("email_log_photographer_idx").on(t.photographerId, t.createdAt)],
 );

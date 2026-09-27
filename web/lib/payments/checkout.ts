@@ -1,3 +1,5 @@
+import { emailBookingConfirmed, emailPaymentReceived, emailSelectionsSubmitted } from "@/lib/email/notify";
+import { afterResponse } from "@/lib/email/send";
 import { and, asc, eq, lt, sql } from "drizzle-orm";
 import type Stripe from "stripe";
 import { db } from "@/db";
@@ -93,6 +95,9 @@ export async function applyCheckoutSession(session: Stripe.Checkout.Session) {
   if (!payment) return null;
 
   if (session.payment_status === "paid" && payment.status !== "paid") {
+    // What this payment just changed, for the emails sent afterwards.
+    let confirmedNow = false;
+    let submittedNow = false;
     await db.transaction(async (tx) => {
       await tx
         .update(payments)
@@ -103,14 +108,16 @@ export async function applyCheckoutSession(session: Stripe.Checkout.Session) {
         })
         .where(eq(payments.id, payment.id));
       if (payment.bookingId) {
-        await tx
+        const confirmed = await tx
           .update(bookings)
           .set({ status: "confirmed", holdExpiresAt: null })
-          .where(and(eq(bookings.id, payment.bookingId), eq(bookings.status, "pending_payment")));
+          .where(and(eq(bookings.id, payment.bookingId), eq(bookings.status, "pending_payment")))
+          .returning({ id: bookings.id });
+        confirmedNow = confirmed.length > 0;
       }
       if (payment.galleryId) {
         // The client paid for their extra photos: their selections are in.
-        await tx
+        const submitted = await tx
           .update(galleries)
           .set({
             status: "paid_and_submitted",
@@ -119,9 +126,18 @@ export async function applyCheckoutSession(session: Stripe.Checkout.Session) {
             extrasCount: sql`(select coalesce(sum(quantity), 0) from payments where gallery_id = ${payment.galleryId} and status = 'paid')`,
             extrasCents: sql`(select coalesce(sum(amount_cents), 0) from payments where gallery_id = ${payment.galleryId} and status = 'paid')`,
           })
-          .where(and(eq(galleries.id, payment.galleryId), eq(galleries.status, "pending")));
+          .where(and(eq(galleries.id, payment.galleryId), eq(galleries.status, "pending")))
+          .returning({ id: galleries.id });
+        submittedNow = submitted.length > 0;
       }
     });
+
+    const { bookingId, galleryId } = payment;
+    if (bookingId && confirmedNow) afterResponse(() => emailBookingConfirmed(bookingId));
+    else if (bookingId && payment.kind === "balance") {
+      afterResponse(() => emailPaymentReceived(bookingId, payment.amountCents));
+    }
+    if (galleryId && submittedNow) afterResponse(() => emailSelectionsSubmitted(galleryId));
   } else if (session.status === "expired" && payment.status === "pending") {
     await db.update(payments).set({ status: "expired" }).where(eq(payments.id, payment.id));
     if (payment.bookingId) await releaseHold(payment.bookingId);

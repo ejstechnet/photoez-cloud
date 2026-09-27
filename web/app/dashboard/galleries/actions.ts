@@ -11,6 +11,8 @@ import { MAX_PHOTO_BYTES, MAX_PHOTOS_PER_BATCH, PHOTO_KINDS, PHOTO_TYPES } from 
 import { staleProof } from "@/lib/proofs";
 import { GALLERY_STATUSES, type GalleryStatus } from "@/lib/gallery-status";
 import { requirePhotographer } from "@/lib/session";
+import { emailFinalsReady, emailGalleryLink } from "@/lib/email/notify";
+import { afterResponse } from "@/lib/email/send";
 import { studioPlan } from "@/lib/studio-plan";
 import {
   deletePrefix,
@@ -242,9 +244,22 @@ export async function deliverGallery(galleryId: string): Promise<{ ok: true } | 
     .where(and(eq(photos.galleryId, galleryId), eq(photos.kind, "final")));
   if (finals === 0) return { error: "Upload your final photos before delivering." };
 
-  await db.update(galleries).set({ status: "delivered", deliveredAt: new Date() }).where(eq(galleries.id, galleryId));
+  const delivered = await db
+    .update(galleries)
+    .set({ status: "delivered", deliveredAt: new Date() })
+    .where(and(eq(galleries.id, galleryId), ne(galleries.status, "delivered")))
+    .returning({ id: galleries.id });
+  if (delivered.length > 0) afterResponse(() => emailFinalsReady(galleryId));
   revalidatePath("/dashboard", "layout");
   return { ok: true };
+}
+
+// "Email link to client": the proofing invitation, or the download email
+// once the gallery is delivered.
+export async function emailGalleryToClient(galleryId: string): Promise<{ ok: true; to: string } | { error: string }> {
+  const photographer = await requirePhotographer();
+  if (!(await findOwnedGallery(galleryId, photographer.id))) return { error: "That gallery could not be found." };
+  return emailGalleryLink(galleryId);
 }
 
 // Take a delivery back (e.g. delivered too soon). The client returns to

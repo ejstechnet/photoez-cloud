@@ -1,5 +1,7 @@
 "use server";
 
+import { emailBookingConfirmed } from "@/lib/email/notify";
+import { afterResponse } from "@/lib/email/send";
 import { randomBytes } from "node:crypto";
 import { and, count, eq, gt, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
@@ -322,6 +324,9 @@ export async function createBooking(
     }
     redirect(checkoutUrl);
   }
+
+  // No deposit: the booking is confirmed now, so the emails go out.
+  if (saved) afterResponse(() => emailBookingConfirmed(saved.id));
 
   // Straight to signing when this session has a contract, like PhotoEZ Contracts.
   const needsContract = saved ? (await contractTemplateFor(saved)) !== null : false;

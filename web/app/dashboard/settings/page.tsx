@@ -8,6 +8,7 @@ import { richTextHtml } from "@/lib/rich-text";
 import { signedViewUrl } from "@/lib/storage";
 import { syncStripeStatus } from "@/lib/payments/connect";
 import { stripeConfigured } from "@/lib/stripe";
+import { EmailCard } from "./email-card";
 import { FaqForm } from "./faq-form";
 import { PaymentsCard } from "./payments-card";
 import { NotesToggle } from "./notes-toggle";
@@ -38,6 +39,12 @@ export default async function SettingsPage() {
       stripeAccountId: photographers.stripeAccountId,
       stripeReady: photographers.stripeChargesEnabled,
       photoNotesEnabled: photographers.photoNotesEnabled,
+      email: photographers.email,
+      notifyEmail: photographers.notifyEmail,
+      autoSendReplies: photographers.autoSendReplies,
+      sessionReminderHours: photographers.sessionReminderHours,
+      balanceReminderDays: photographers.balanceReminderDays,
+      galleryExpiryReminderDays: photographers.galleryExpiryReminderDays,
     })
     .from(photographers)
     .where(eq(photographers.id, user.id));
@@ -112,6 +119,15 @@ export default async function SettingsPage() {
         </div>
         <div className="space-y-8">
           <PaymentsCard configured={stripeConfigured()} accountId={settings.stripeAccountId} ready={stripeReady} />
+          <EmailCard
+            accountEmail={settings.email}
+            notifyEmail={settings.notifyEmail}
+            autoSendReplies={settings.autoSendReplies}
+            sessionReminderHours={settings.sessionReminderHours}
+            balanceReminderDays={settings.balanceReminderDays}
+            galleryExpiryReminderDays={settings.galleryExpiryReminderDays}
+            paymentsReady={stripeReady}
+          />
           <PlanCard
             planLabel={PLAN_LABELS[plan.plan]}
             upsells={plan.upsells}

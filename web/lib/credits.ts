@@ -57,7 +57,7 @@ export async function issueCredit(options: {
   sourceBookingId?: string | null;
   expiresOn?: string | null;
 }) {
-  if (options.amountCents <= 0) return;
+  if (options.amountCents <= 0) return null;
   let expiresOn = options.expiresOn;
   if (expiresOn === undefined) {
     const [studio] = await db
@@ -75,6 +75,7 @@ export async function issueCredit(options: {
     sourceBookingId: options.sourceBookingId ?? null,
     expiresOn,
   });
+  return { amountCents: options.amountCents, expiresOn: expiresOn ?? null };
 }
 
 // When a booking that used credit is cancelled, the client gets it back as a

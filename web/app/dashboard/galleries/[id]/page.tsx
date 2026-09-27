@@ -136,6 +136,8 @@ export default async function GalleryPage({ params }: PageProps<"/dashboard/gall
         <ClientLink
           galleryId={gallery.id}
           url={`${siteUrl}/g/${gallery.shareToken}`}
+          clientEmail={gallery.clientEmail}
+          delivered={gallery.status === "delivered" || gallery.status === "completed"}
           submitted={gallery.status === "submitted" || gallery.status === "paid_and_submitted"}
           canReopen={gallery.status !== "pending"}
           selectedNames={proofs.filter((tile) => tile.selected).map((tile) => tile.name)}

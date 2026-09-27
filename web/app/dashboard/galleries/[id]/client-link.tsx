@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { reopenProofing } from "../actions";
+import { emailGalleryToClient, reopenProofing } from "../actions";
 
 // The gallery's private client link, with copy and preview buttons, and a
 // summary of what the client has picked so far.
@@ -13,6 +13,8 @@ export function ClientLink({
   selectedNames,
   notes,
   freeLimit,
+  clientEmail,
+  delivered,
 }: {
   galleryId: string;
   url: string;
@@ -23,9 +25,25 @@ export function ClientLink({
   // The client's notes on their picks, by file name.
   notes: { name: string; note: string }[];
   freeLimit: number;
+  // Where "Email to client" sends the link; null when the client has no email.
+  clientEmail: string | null;
+  delivered: boolean;
 }) {
   const [copied, setCopied] = useState<"link" | "names" | null>(null);
   const [reopening, startReopen] = useTransition();
+  const [emailing, startEmail] = useTransition();
+  const [emailResult, setEmailResult] = useState<{ ok: boolean; text: string } | null>(null);
+
+  function emailClient() {
+    if (!clientEmail) return;
+    const what = delivered ? "the download link for their final photos" : "their gallery link";
+    if (!confirm(`Email ${what} to ${clientEmail}?`)) return;
+    setEmailResult(null);
+    startEmail(async () => {
+      const result = await emailGalleryToClient(galleryId);
+      setEmailResult("ok" in result ? { ok: true, text: `Emailed to ${result.to}.` } : { ok: false, text: result.error });
+    });
+  }
 
   async function copy(text: string, what: "link" | "names") {
     await navigator.clipboard.writeText(text);
@@ -41,7 +59,16 @@ export function ClientLink({
           <p className="mt-1 truncate font-mono text-sm">{url}</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <button type="button" onClick={() => copy(url, "link")} className="btn-primary px-5 py-2.5">
+          <button
+            type="button"
+            onClick={emailClient}
+            disabled={!clientEmail || emailing}
+            title={clientEmail ? undefined : "Add the client's email address to send the link"}
+            className="btn-primary px-5 py-2.5"
+          >
+            {emailing ? "Sending…" : "Email to client"}
+          </button>
+          <button type="button" onClick={() => copy(url, "link")} className="btn-secondary">
             {copied === "link" ? "Copied!" : "Copy link"}
           </button>
           <a href={`${url}?preview=1`} target="_blank" rel="noreferrer" className="btn-secondary">
@@ -49,6 +76,13 @@ export function ClientLink({
           </a>
         </div>
       </div>
+
+      {emailResult && (
+        <p role="status" className={`mt-3 text-sm font-semibold ${emailResult.ok ? "text-lime-ink" : "text-danger"}`}>
+          {emailResult.ok ? "✓ " : ""}
+          {emailResult.text}
+        </p>
+      )}
 
       <div className="mt-4 flex flex-col gap-3 border-t border-border pt-4 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-sm">

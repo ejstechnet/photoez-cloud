@@ -3,7 +3,8 @@ import { notFound } from "next/navigation";
 import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db";
-import { inquiries } from "@/db/schema";
+import { inquiries, photographers } from "@/db/schema";
+import { formatDate, formatTime } from "@/lib/booking/time";
 import { requirePhotographer } from "@/lib/session";
 import { SESSION_LABELS, STATUS_STYLES, URGENCY_STYLES, formatBudget, formatEventDate, handoffBadge } from "../labels";
 import { DraftReply } from "./draft-reply";
@@ -19,6 +20,10 @@ export default async function InquiryPage({ params }: PageProps<"/dashboard/inqu
     .from(inquiries)
     .where(and(eq(inquiries.id, id), eq(inquiries.photographerId, user.id)));
   if (!inquiry) notFound();
+  const [studio] = await db
+    .select({ timeZone: photographers.timeZone })
+    .from(photographers)
+    .where(eq(photographers.id, user.id));
 
   const t = inquiry.triage;
   const status = STATUS_STYLES[inquiry.status];
@@ -123,9 +128,23 @@ export default async function InquiryPage({ params }: PageProps<"/dashboard/inqu
 
           <section className="card p-6">
             <h2 className="font-display text-xl font-bold">Draft reply</h2>
-            <p className="mt-1 text-sm text-muted">Written by AI in your voice. Read it over and edit before sending.</p>
+            <p className="mt-1 text-sm text-muted">
+              Written by AI in your voice. Read it over and edit before sending. Replies from the client come to your
+              email.
+            </p>
             <div className="mt-4">
-              <DraftReply key={inquiry.triagedAt?.toISOString()} draft={t.draftReply} to={contact} />
+              <DraftReply
+                key={inquiry.triagedAt?.toISOString()}
+                inquiryId={inquiry.id}
+                draft={t.draftReply}
+                to={contact}
+                sentAt={
+                  inquiry.repliedAt
+                    ? `${formatDate(inquiry.repliedAt, studio.timeZone, "short")} at ${formatTime(inquiry.repliedAt, studio.timeZone)}`
+                    : null
+                }
+                autoSent={inquiry.autoReplied}
+              />
             </div>
           </section>
         </div>

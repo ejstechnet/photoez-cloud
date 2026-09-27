@@ -1,7 +1,9 @@
 "use server";
 
+import { emailBookingCancelled } from "@/lib/email/notify";
+import { afterResponse } from "@/lib/email/send";
 import { randomBytes } from "node:crypto";
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, ne } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
@@ -374,15 +376,25 @@ export async function setBookingStatus(
 ): Promise<{ message?: string }> {
   const photographer = await requirePhotographer();
   if (!isUuid(bookingId)) return { message: "That booking could not be found." };
+  let cancelledUpcoming = false;
   try {
-    await db
+    const changed = await db
       .update(bookings)
       .set(
         status === "cancelled"
           ? { status, cancelledAt: new Date(), cancelledBy: "studio", creditDue: false }
           : { status, cancelledAt: null, cancelledBy: null, creditDue: false },
       )
-      .where(and(eq(bookings.id, bookingId), eq(bookings.photographerId, photographer.id)));
+      .where(
+        and(
+          eq(bookings.id, bookingId),
+          eq(bookings.photographerId, photographer.id),
+          status === "cancelled" ? ne(bookings.status, "cancelled") : undefined,
+        ),
+      )
+      .returning({ startsAt: bookings.startsAt });
+    // The client hears about it only for a session still ahead of them.
+    cancelledUpcoming = status === "cancelled" && changed.some((b) => b.startsAt > new Date());
   } catch (error) {
     // Restoring a cancelled booking whose time has since been taken.
     if (isOverlapError(error)) return { message: "Another booking now takes that time, so it can't be restored." };
@@ -390,6 +402,7 @@ export async function setBookingStatus(
   }
   // You cancelled: any session credit the client used goes back to them.
   if (status === "cancelled") await returnBookingCredit(bookingId);
+  if (cancelledUpcoming) afterResponse(() => emailBookingCancelled(bookingId, "studio", { cents: 0, expiresOn: null }));
   revalidatePath("/dashboard", "layout");
   revalidatePath("/studio/[slug]", "layout");
   return {};

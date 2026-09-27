@@ -9,6 +9,8 @@ import { photographers, studioFaqs } from "@/db/schema";
 import { MAX_FAQS } from "@/lib/faq";
 import { cleanRichTextInput, richTextToPlain } from "@/lib/rich-text";
 import { requirePhotographer } from "@/lib/session";
+import { testEmail } from "@/lib/email/messages";
+import { sendToStudio, studioSender } from "@/lib/email/send";
 import { deletePrefix, signedUploadUrl, storedSize, studioLogoKey, watermarkKey } from "@/lib/storage";
 import { MAX_WATERMARK_BYTES, WATERMARK_POSITIONS } from "@/lib/watermark";
 import { OFFERABLE_TYPES, SHOOT_LOCATIONS } from "@/lib/session-types";
@@ -294,4 +296,56 @@ export async function savePhotoNotes(enabled: boolean): Promise<void> {
   const photographer = await requirePhotographer();
   await db.update(photographers).set({ photoNotesEnabled: enabled }).where(eq(photographers.id, photographer.id));
   revalidatePath("/dashboard", "layout");
+}
+
+// ---- Email ----
+
+export type EmailFormState = { message?: string; saved?: boolean };
+
+const reminderValue = (allowed: number[]) =>
+  z
+    .string()
+    .transform((v) => (v === "off" ? null : Number(v)))
+    .refine((v) => v === null || allowed.includes(v));
+
+const emailSettingsSchema = z.object({
+  notifyEmail: z
+    .string()
+    .trim()
+    .transform((v) => v || null)
+    .refine((v) => v === null || z.email().safeParse(v).success, "Enter a valid email address, or leave it blank."),
+  autoSendReplies: z.boolean(),
+  sessionReminderHours: reminderValue([12, 24, 48, 72]),
+  balanceReminderDays: reminderValue([1, 2, 3, 7]),
+  galleryExpiryReminderDays: reminderValue([1, 3, 7]),
+});
+
+export async function saveEmailSettings(_prev: EmailFormState, formData: FormData): Promise<EmailFormState> {
+  const photographer = await requirePhotographer();
+  const parsed = emailSettingsSchema.safeParse({
+    notifyEmail: String(formData.get("notifyEmail") ?? ""),
+    autoSendReplies: formData.get("autoSendReplies") === "on",
+    sessionReminderHours: String(formData.get("sessionReminderHours") ?? "off"),
+    balanceReminderDays: String(formData.get("balanceReminderDays") ?? "off"),
+    galleryExpiryReminderDays: String(formData.get("galleryExpiryReminderDays") ?? "off"),
+  });
+  if (!parsed.success) return { message: parsed.error.issues[0]?.message ?? "Please check the fields." };
+  await db.update(photographers).set(parsed.data).where(eq(photographers.id, photographer.id));
+  revalidatePath("/dashboard", "layout");
+  return { saved: true };
+}
+
+// Sends a test to the studio's notice address, so the photographer can see
+// that email works and how it looks.
+export async function sendTestEmail(): Promise<{ ok: string } | { error: string }> {
+  const photographer = await requirePhotographer();
+  const studio = await studioSender(photographer.id);
+  if (!studio) return { error: "Your studio could not be found." };
+  const sent = await sendToStudio(photographer.id, "test", testEmail(studio.studioName));
+  if (sent) return { ok: `Sent to ${studio.inbox}. Check your inbox (and spam).` };
+  return {
+    error: process.env.SMTP_HOST
+      ? "It couldn't be sent. The Email log has the details."
+      : "Email isn't set up on this computer, so it was saved to the Email log instead of sent.",
+  };
 }
