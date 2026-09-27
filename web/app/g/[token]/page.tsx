@@ -1,3 +1,4 @@
+import { designForGalleryToken } from "@/lib/studio-design";
 import { StudioNav } from "@/app/studio/[slug]/studio-nav";
 import type { Metadata } from "next";
 import Link from "next/link";
@@ -33,6 +34,7 @@ export default async function ClientGalleryPage({ params, searchParams }: PagePr
   const headerUrl = gallery.headerImageKey ? await signedViewUrl(gallery.headerImageKey) : null;
   const logoUrl = gallery.logoKey ? await signedViewUrl(gallery.logoKey) : null;
   const isPreview = preview === "1";
+  const design = await designForGalleryToken(token);
 
   const delivered = isDelivered(gallery);
   const finals = await clientFinals(gallery);
@@ -83,7 +85,7 @@ export default async function ClientGalleryPage({ params, searchParams }: PagePr
         {gallery.studioSlug && (
           <Link
             href={`/studio/${gallery.studioSlug}/book`}
-            className="ml-1 rounded-full bg-lime px-4 py-2 text-xs font-bold tracking-wider whitespace-nowrap text-brand-deep uppercase transition hover:-translate-y-0.5"
+            className="ml-1 rounded-full bg-lime px-4 py-2 text-xs font-bold tracking-wider whitespace-nowrap text-on-accent uppercase transition hover:-translate-y-0.5"
           >
             Book a session
           </Link>
@@ -128,6 +130,7 @@ export default async function ClientGalleryPage({ params, searchParams }: PagePr
             <Notice title="Your gallery is being prepared!">{studio} is finishing your photos. Check back soon.</Notice>
           ) : (
             <DeliveryGallery
+              layout={design.galleryLayout}
               token={token}
               preview={isPreview}
               tiles={finalTiles}
@@ -153,6 +156,7 @@ export default async function ClientGalleryPage({ params, searchParams }: PagePr
             </p>
           )}
           <ProofingGallery
+            layout={design.galleryLayout}
             token={token}
             tiles={tiles}
             freeLimit={gallery.freeLimit}

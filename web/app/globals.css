@@ -25,6 +25,8 @@
   --primary: #1a3a6b;
   --primary-foreground: #ffffff;
   --link: #1a3a6b;
+  /* Text on the accent color (the Page Designer changes it per studio). */
+  --on-accent: #0f2548;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -137,4 +139,20 @@ body {
   .rich-text hr {
     @apply border-border;
   }
+}
+
+/* Text that sits on the accent color (e.g. "Book now" buttons). */
+@utility text-on-accent {
+  color: var(--on-accent);
+}
+
+/* Page Designer corners: pill buttons and chips follow the studio's style.
+   Dots, avatars, and photos (not links/buttons) stay round. */
+[data-corners="soft"] :is(a, button, label, .btn-primary, .btn-secondary).rounded-full,
+[data-corners="soft"] :is(.btn-primary, .btn-secondary) {
+  border-radius: 0.625rem;
+}
+[data-corners="square"] :is(a, button, label, .btn-primary, .btn-secondary).rounded-full,
+[data-corners="square"] :is(.btn-primary, .btn-secondary) {
+  border-radius: 0.25rem;
 }

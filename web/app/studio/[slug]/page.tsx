@@ -17,6 +17,8 @@ import { signedViewUrl } from "@/lib/storage";
 import { InquiryForm } from "./inquiry-form";
 import { PortfolioGallery } from "./portfolio-gallery";
 import { StudioNav, barIsDark } from "./studio-nav";
+import { bannerBackground, textOn } from "@/lib/design";
+import { designForSlug } from "@/lib/studio-design";
 import { ReviewsJsonLd, StudioReviews, loadStudioReviews } from "./studio-reviews";
 
 // A photographer's public studio page: who they are, what they shoot, and an
@@ -62,6 +64,11 @@ export default async function StudioPage({ params }: PageProps<"/studio/[slug]">
   const name = studio.businessName ?? studio.name;
   const logoUrl = studio.logoKey ? await signedViewUrl(studio.logoKey) : null;
   const headshotUrl = studio.headshotKey ? await signedViewUrl(studio.headshotKey) : null;
+  const design = await designForSlug(slug);
+  const bannerPhotoUrl =
+    design.banner === "photo" && design.bannerImageKey ? await signedViewUrl(design.bannerImageKey) : null;
+  // White text on dark banners (and on photos, which get a dark shade).
+  const bannerDark = Boolean(bannerPhotoUrl) || textOn(design.bannerColor) === "#ffffff";
   // Keep the photographer's offered sessions in a consistent order.
   const sessions = OFFERABLE_TYPES.filter((type) => studio.offeredTypes.includes(type)).map((type) => ({
     type,
@@ -139,28 +146,48 @@ export default async function StudioPage({ params }: PageProps<"/studio/[slug]">
         {bookingOpen ? (
           <Link
             href={bookHref}
-            className="ml-1 rounded-full bg-lime px-4 py-2 text-xs font-bold tracking-wider whitespace-nowrap text-brand-deep uppercase transition hover:-translate-y-0.5"
+            className="ml-1 rounded-full bg-lime px-4 py-2 text-xs font-bold tracking-wider whitespace-nowrap text-on-accent uppercase transition hover:-translate-y-0.5"
           >
             Book now
           </Link>
         ) : (
           <a
             href="#contact"
-            className="ml-1 rounded-full bg-lime px-4 py-2 text-xs font-bold tracking-wider whitespace-nowrap text-brand-deep uppercase transition hover:-translate-y-0.5"
+            className="ml-1 rounded-full bg-lime px-4 py-2 text-xs font-bold tracking-wider whitespace-nowrap text-on-accent uppercase transition hover:-translate-y-0.5"
           >
             Get in touch
           </a>
         )}
       </StudioNav>
 
-      <header id="top" className="relative overflow-hidden bg-black text-white">
-        <div className="relative mx-auto flex max-w-7xl flex-col gap-6 px-4 py-14 sm:flex-row sm:items-center">
+      {/* The banner, in the Page Designer's style: a color, a gradient, or a photo. */}
+      <header
+        id="top"
+        className={`relative overflow-hidden ${bannerDark ? "text-white" : "text-[#111111]"}`}
+        style={{ background: bannerBackground(design) }}
+      >
+        {bannerPhotoUrl && (
+          <>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={bannerPhotoUrl} alt="" className="absolute inset-0 size-full object-cover" />
+            <div className="absolute inset-0 bg-gradient-to-r from-black/75 via-black/45 to-black/10" />
+          </>
+        )}
+        <div
+          className={`relative mx-auto flex max-w-7xl flex-col gap-6 px-4 sm:flex-row sm:items-center ${
+            bannerPhotoUrl ? "py-24 sm:py-32" : "py-14"
+          }`}
+        >
           <div className="min-w-0">
             {studio.serviceArea && (
-              <p className="text-sm font-bold tracking-wider text-sky-light uppercase">{studio.serviceArea}</p>
+              <p className={`text-sm font-bold tracking-wider uppercase ${bannerDark ? "text-white/75" : "text-black/60"}`}>
+                {studio.serviceArea}
+              </p>
             )}
             <h1 className="mt-2 font-display text-5xl font-bold tracking-tight break-words sm:text-6xl">{name}</h1>
-            {studio.tagline && <p className="mt-4 max-w-2xl text-xl text-white/80">{studio.tagline}</p>}
+            {studio.tagline && (
+              <p className={`mt-4 max-w-2xl text-xl ${bannerDark ? "text-white/80" : "text-black/70"}`}>{studio.tagline}</p>
+            )}
           </div>
         </div>
       </header>
@@ -192,7 +219,7 @@ export default async function StudioPage({ params }: PageProps<"/studio/[slug]">
                           <s className="block text-xs text-muted">{formatPrice(currentPrice(s, today).wasCents!)}</s>
                         )}
                       </span>
-                      <span className="rounded-full bg-lime px-3 py-1 text-[11px] font-bold tracking-wider text-brand-deep uppercase">
+                      <span className="rounded-full bg-lime px-3 py-1 text-[11px] font-bold tracking-wider text-on-accent uppercase">
                         Book
                       </span>
                     </Link>

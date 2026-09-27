@@ -43,7 +43,7 @@ export default async function GiftCardPage({ params, searchParams }: PageProps<"
       >
         <Link
           href={`/studio/${slug}/book`}
-          className="ml-1 rounded-full bg-lime px-4 py-2 text-xs font-bold tracking-wider whitespace-nowrap text-brand-deep uppercase transition hover:-translate-y-0.5"
+          className="ml-1 rounded-full bg-lime px-4 py-2 text-xs font-bold tracking-wider whitespace-nowrap text-on-accent uppercase transition hover:-translate-y-0.5"
         >
           Book a session
         </Link>

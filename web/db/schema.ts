@@ -41,6 +41,8 @@ export const photographers = pgTable("photographers", {
   studioLogoKey: text("studio_logo_key"),
   // The photographer's own photo, shown in About on the studio page.
   headshotKey: text("headshot_key"),
+  // The Page Designer's choices (lib/design.ts); null = PhotoEZ Cloud's own look.
+  design: jsonb("design").$type<Partial<import("../lib/design").Design>>(),
   // Card color behind the logo on the studio page: a hex color or "transparent".
   studioLogoBg: text("studio_logo_bg").notNull().default("#ffffff"),
   studioTagline: text("studio_tagline"),

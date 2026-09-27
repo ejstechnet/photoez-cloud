@@ -99,7 +99,7 @@ export default async function ReschedulePage({ params, searchParams }: PageProps
                             aria-current={chosen ? "true" : undefined}
                             className={`block rounded-xl border-2 px-3 py-2 text-center font-semibold transition ${
                               chosen
-                                ? "border-lime-ink bg-lime text-brand-deep"
+                                ? "border-lime-ink bg-lime text-on-accent"
                                 : "border-border hover:border-lime-ink hover:bg-lime/15"
                             }`}
                           >

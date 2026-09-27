@@ -128,7 +128,7 @@ export function ReviewForm({
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={photo.url} alt="" className="size-full object-cover" />
                   {selected && (
-                    <span className="absolute top-1.5 right-1.5 grid size-6 place-items-center rounded-full bg-lime text-sm font-bold text-brand-deep">
+                    <span className="absolute top-1.5 right-1.5 grid size-6 place-items-center rounded-full bg-lime text-sm font-bold text-on-accent">
                       ✓
                     </span>
                   )}

@@ -239,7 +239,7 @@ export default async function BookPage({ params, searchParams }: PageProps<"/stu
                                   aria-current={chosen ? "true" : undefined}
                                   className={`block rounded-xl border-2 px-3 py-2 text-center font-semibold transition ${
                                     chosen
-                                      ? "border-lime-ink bg-lime text-brand-deep"
+                                      ? "border-lime-ink bg-lime text-on-accent"
                                       : "border-border hover:border-lime-ink hover:bg-lime/15"
                                   }`}
                                 >
@@ -312,7 +312,7 @@ function StepTitle({ n, done, children }: { n: number; done: boolean; children: 
     <h2 className="flex items-center gap-3 font-display text-2xl font-bold">
       <span
         className={`grid size-8 shrink-0 place-items-center rounded-full font-sans text-sm font-bold ${
-          done ? "bg-lime text-brand-deep" : "bg-brand text-white"
+          done ? "bg-lime text-on-accent" : "bg-brand text-white"
         }`}
       >
         {done ? "✓" : n}
