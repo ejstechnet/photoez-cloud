@@ -85,6 +85,12 @@ export const photographers = pgTable("photographers", {
   // offered to happy reviewers after they submit.
   reviewRequestDays: integer("review_request_days").default(3),
   googleReviewUrl: text("google_review_url"),
+  // Gift cards clients can buy on the studio page: on/off, the preset amounts
+  // offered, and the range for a custom amount (null = no custom amount).
+  giftCardsEnabled: boolean("gift_cards_enabled").notNull().default(false),
+  giftCardAmounts: jsonb("gift_card_amounts").$type<number[]>().notNull().default([5000, 10000, 25000]),
+  giftCardMinCents: integer("gift_card_min_cents").default(2500),
+  giftCardMaxCents: integer("gift_card_max_cents").default(100000),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
@@ -437,6 +443,9 @@ export const bookings = pgTable(
     couponCode: text("coupon_code"),
     discountCents: integer("discount_cents").notNull().default(0),
     creditCents: integer("credit_cents").notNull().default(0),
+    // A gift card put toward the booking (counts as paid, like credit).
+    giftCardId: uuid("gift_card_id"),
+    giftCardCents: integer("gift_card_cents").notNull().default(0),
     // The client's answers to the studio's custom booking questions, copied
     // with each question's wording so later edits don't change past bookings.
     answers: jsonb("answers").$type<BookingAnswer[]>().notNull().default([]),
@@ -549,7 +558,9 @@ export const payments = pgTable(
     // A payment is for a booking or for a gallery's extra photos.
     bookingId: uuid("booking_id").references(() => bookings.id, { onDelete: "cascade" }),
     galleryId: uuid("gallery_id").references(() => galleries.id, { onDelete: "cascade" }),
-    kind: text("kind", { enum: ["deposit", "balance", "gallery_extras"] }).notNull(),
+    kind: text("kind", { enum: ["deposit", "balance", "gallery_extras", "gift_card"] }).notNull(),
+    // For a gift card purchase: the card being bought.
+    giftCardId: uuid("gift_card_id"),
     // How many extra photos a gallery_extras payment covers.
     quantity: integer("quantity"),
     amountCents: integer("amount_cents").notNull(),
@@ -718,4 +729,34 @@ export const studioPhotos = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index("studio_photos_photographer_idx").on(t.photographerId, t.position)],
+);
+
+// A studio gift card: bought on the studio page (Stripe, on the
+// photographer's account) or issued free by the photographer. Its code is
+// entered at booking; whatever isn't used stays on the card.
+export const giftCards = pgTable(
+  "gift_cards",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    photographerId: uuid("photographer_id")
+      .notNull()
+      .references(() => photographers.id, { onDelete: "cascade" }),
+    // e.g. "GIFT-7KQ2-M9XD" (no look-alike letters or digits).
+    code: text("code").notNull().unique(),
+    amountCents: integer("amount_cents").notNull(),
+    balanceCents: integer("balance_cents").notNull(),
+    // pending_payment: waiting on Stripe; void: cancelled by the studio.
+    status: text("status", { enum: ["pending_payment", "active", "void"] }).notNull().default("pending_payment"),
+    source: text("source", { enum: ["purchased", "issued"] }).notNull().default("purchased"),
+    buyerName: text("buyer_name"),
+    buyerEmail: text("buyer_email"),
+    recipientName: text("recipient_name").notNull(),
+    recipientEmail: text("recipient_email"),
+    message: text("message"),
+    // The studio-calendar day to email the recipient (null = right away).
+    deliverOn: date("deliver_on"),
+    deliveredAt: timestamp("delivered_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("gift_cards_photographer_idx").on(t.photographerId, t.createdAt)],
 );

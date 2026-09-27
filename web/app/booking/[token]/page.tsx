@@ -95,6 +95,9 @@ export default async function ClientBookingPage({ params, searchParams }: PagePr
     ...(extras.length > 0 || booking.discountCents > 0
       ? [["Total", <strong key="t">{formatPrice(totalCents)}</strong>] as [string, React.ReactNode]]
       : []),
+    ...(booking.giftCardCents > 0
+      ? [["Gift card", `−${formatPrice(booking.giftCardCents)} applied`] as [string, React.ReactNode]]
+      : []),
     ...(booking.creditCents > 0
       ? [["Session credit", `−${formatPrice(booking.creditCents)} applied`] as [string, React.ReactNode]]
       : []),

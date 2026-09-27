@@ -13,7 +13,8 @@ export const PLACEHOLDERS = {
   STUDIO_EMAIL: "Studio email",
   TOTAL_AMOUNT: "Total (session + extras)",
   DEPOSIT_AMOUNT: "Deposit",
-  BALANCE_DUE: "Balance after the deposit",
+  CREDIT_APPLIED: "Session credit & gift cards applied",
+  BALANCE_DUE: "Balance after the deposit, credit & gift cards",
   TODAY_DATE: "Date signed",
 } as const;
 

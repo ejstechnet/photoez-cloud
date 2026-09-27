@@ -1,6 +1,7 @@
 import { and, eq, gt, inArray, isNotNull, isNull, lte, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { bookings, galleries, photographers } from "@/db/schema";
+import { sendDueGiftCards } from "@/lib/gift-cards";
 import { sendDueReviewRequests } from "@/lib/review-requests";
 import { emailBalanceReminder, emailGalleryExpiring, emailSessionReminder } from "./notify";
 
@@ -13,7 +14,7 @@ import { emailBalanceReminder, emailGalleryExpiring, emailSessionReminder } from
 const HOUR = 60 * 60 * 1000;
 
 export async function runReminders(now = new Date()) {
-  const sent = { session: 0, balance: 0, gallery: 0, reviews: 0 };
+  const sent = { session: 0, balance: 0, gallery: 0, reviews: 0, giftCards: 0 };
 
   // Session reminder: N hours before, for confirmed bookings.
   const sessionDue = await db
@@ -83,6 +84,9 @@ export async function runReminders(now = new Date()) {
 
   // Review requests a few days after delivery.
   sent.reviews = await sendDueReviewRequests(now);
+
+  // Gift cards scheduled for a day that has come.
+  sent.giftCards = await sendDueGiftCards(now);
 
   return sent;
 }

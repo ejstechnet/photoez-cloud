@@ -1,8 +1,8 @@
 import { and, asc, count, eq, gt, gte, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { bookings, clients, galleries, inquiries, payments, reviews } from "@/db/schema";
+import { bookings, clients, galleries, giftCards, inquiries, payments, reviews } from "@/db/schema";
 import { contractTemplateFor, signedContractFor } from "@/lib/contracts/for-booking";
-import { bookingTotal } from "@/lib/payments/amounts";
+import { bookingTotal, prepaid } from "@/lib/payments/amounts";
 import { monthRange, periodStart, type Period } from "@/lib/dashboard-periods";
 
 // Everything the dashboard overview shows, like PhotoEZ for WordPress's
@@ -16,7 +16,7 @@ const SOON_DAYS = 14;
 export async function dashboardStats(photographerId: string, timeZone: string, period: Period, now = new Date()) {
   const start = periodStart(period, now, timeZone);
   const month = monthRange(now, timeZone);
-  const owner = sql`coalesce(${bookings.photographerId}, ${galleries.photographerId}) = ${photographerId}`;
+  const owner = sql`coalesce(${bookings.photographerId}, ${galleries.photographerId}, ${giftCards.photographerId}) = ${photographerId}`;
 
   const [revenueRows, galleryRows, readyRows, bookingCounts, inquiryCounts, [{ toApprove }], [{ clientCount }], openBookings, owedGalleries] =
     await Promise.all([
@@ -26,6 +26,7 @@ export async function dashboardStats(photographerId: string, timeZone: string, p
         .from(payments)
         .leftJoin(bookings, eq(bookings.id, payments.bookingId))
         .leftJoin(galleries, eq(galleries.id, payments.galleryId))
+        .leftJoin(giftCards, eq(giftCards.id, payments.giftCardId))
         .where(and(eq(payments.status, "paid"), owner, start ? gte(payments.paidAt, start) : undefined))
         .groupBy(payments.kind),
       // Galleries by stage.
@@ -85,9 +86,10 @@ export async function dashboardStats(photographerId: string, timeZone: string, p
         .where(and(eq(galleries.photographerId, photographerId), gt(galleries.extrasCents, 0))),
     ]);
 
-  const revenue = { booking: 0, gallery: 0 };
+  const revenue = { booking: 0, gallery: 0, giftCards: 0 };
   for (const row of revenueRows) {
     if (row.kind === "gallery_extras") revenue.gallery += row.cents;
+    else if (row.kind === "gift_card") revenue.giftCards += row.cents;
     else revenue.booking += row.cents;
   }
 
@@ -102,7 +104,7 @@ export async function dashboardStats(photographerId: string, timeZone: string, p
 
   const withBalance = openBookings.map(({ booking, paidCents }) => ({
     booking,
-    dueCents: Math.max(0, bookingTotal(booking) - paidCents - booking.creditCents),
+    dueCents: Math.max(0, bookingTotal(booking) - paidCents - prepaid(booking)),
   }));
   const owedCents = withBalance.reduce((sum, b) => sum + b.dueCents, 0) + (owedGalleries[0]?.owed ?? 0);
   const upcoming = withBalance.filter((b) => b.booking.startsAt > now);
@@ -173,7 +175,7 @@ export async function dashboardStats(photographerId: string, timeZone: string, p
   }
 
   return {
-    revenue: { ...revenue, total: revenue.booking + revenue.gallery, owedCents },
+    revenue: { ...revenue, total: revenue.booking + revenue.gallery + revenue.giftCards, owedCents },
     galleryCounts,
     bookingCounts: bookingCounts[0] ?? { upcoming: 0, thisMonth: 0 },
     newInquiries: inquiryRow.newCount,

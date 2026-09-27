@@ -1,9 +1,10 @@
 import { emailBookingConfirmed, emailPaymentReceived, emailSelectionsSubmitted } from "@/lib/email/notify";
+import { activatePurchasedCard } from "@/lib/gift-cards";
 import { afterResponse } from "@/lib/email/send";
 import { and, asc, eq, lt, sql } from "drizzle-orm";
 import type Stripe from "stripe";
 import { db } from "@/db";
-import { bookings, galleries, payments, photographers } from "@/db/schema";
+import { bookings, galleries, giftCards, payments, photographers } from "@/db/schema";
 import { PAYMENT_HOLD_MINUTES } from "@/lib/booking/status";
 import { siteUrl } from "@/lib/site";
 import { stripe, stripeConfigured } from "@/lib/stripe";
@@ -138,9 +139,19 @@ export async function applyCheckoutSession(session: Stripe.Checkout.Session) {
       afterResponse(() => emailPaymentReceived(bookingId, payment.amountCents));
     }
     if (galleryId && submittedNow) afterResponse(() => emailSelectionsSubmitted(galleryId));
+    // A gift card purchase: the card turns on and goes out.
+    const { giftCardId } = payment;
+    if (giftCardId) afterResponse(() => activatePurchasedCard(giftCardId));
   } else if (session.status === "expired" && payment.status === "pending") {
     await db.update(payments).set({ status: "expired" }).where(eq(payments.id, payment.id));
     if (payment.bookingId) await releaseHold(payment.bookingId);
+    // An abandoned gift card purchase never becomes a usable card.
+    if (payment.giftCardId) {
+      await db
+        .update(giftCards)
+        .set({ status: "void" })
+        .where(and(eq(giftCards.id, payment.giftCardId), eq(giftCards.status, "pending_payment")));
+    }
   }
   return payment;
 }

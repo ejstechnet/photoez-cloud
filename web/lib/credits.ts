@@ -2,6 +2,7 @@ import { and, asc, eq, gte, isNull, or, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { bookings, photographers, sessionCredits } from "@/db/schema";
 import { addDays, localDateOf } from "@/lib/booking/time";
+import { restoreBookingGiftCard } from "@/lib/gift-cards";
 
 // Session credits (like PhotoEZ Booking's): money a client can put toward a
 // future booking with the same studio, matched by email.
@@ -82,6 +83,8 @@ export async function issueCredit(options: {
 // new credit. Clearing the booking's creditCents first (only if unchanged)
 // makes this safe to call twice.
 export async function returnBookingCredit(bookingId: string) {
+  // A gift card it used goes back onto the card too.
+  await restoreBookingGiftCard(bookingId);
   const [booking] = await db
     .select({
       photographerId: bookings.photographerId,

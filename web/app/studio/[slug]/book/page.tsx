@@ -3,7 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { and, asc, eq } from "drizzle-orm";
 import { db } from "@/db";
-import { bookingFields, photographers, sessionTypes } from "@/db/schema";
+import { bookingFields, giftCards, photographers, sessionTypes } from "@/db/schema";
 import { fieldsForSession } from "@/lib/booking/fields";
 import { addonsForSession } from "@/lib/booking/session-addons";
 import { loadRules, openDatesInMonth, slotsForDate } from "@/lib/booking/availability";
@@ -34,6 +34,7 @@ async function findStudio(slug: string) {
       logoKey: photographers.studioLogoKey,
       logoBg: photographers.studioLogoBg,
       inspoMode: photographers.inspoMode,
+      giftCardsEnabled: photographers.giftCardsEnabled,
     })
     .from(photographers)
     .where(eq(photographers.studioSlug, slug.toLowerCase()));
@@ -56,6 +57,16 @@ export default async function BookPage({ params, searchParams }: PageProps<"/stu
   if (!studio) notFound();
 
   const name = studio.businessName ?? studio.name;
+  // The gift card field shows when the studio sells cards or has any active ones.
+  const giftCardsOn =
+    studio.giftCardsEnabled ||
+    (
+      await db
+        .select({ id: giftCards.id })
+        .from(giftCards)
+        .where(and(eq(giftCards.photographerId, studio.id), eq(giftCards.status, "active")))
+        .limit(1)
+    ).length > 0;
   const [rules, sessions, logoUrl] = await Promise.all([
     loadRules(studio.id),
     db
@@ -262,6 +273,7 @@ export default async function BookPage({ params, searchParams }: PageProps<"/stu
                 addons={sessionAddons}
                 questions={questions}
                 inspoMode={studio.inspoMode}
+                giftCardsOn={giftCardsOn}
                 summary={
                   <>
                     <p className="font-semibold">

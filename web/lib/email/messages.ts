@@ -408,3 +408,69 @@ export function reviewSubmittedStudio(o: {
     button: { label: "Review and approve", url: o.dashboardUrl },
   };
 }
+
+// ---- Gift cards ----
+
+export type GiftCardFacts = {
+  studioName: string;
+  code: string;
+  amountCents: number;
+  recipientName: string;
+  buyerName: string | null;
+  message: string | null;
+  bookUrl: string;
+};
+
+export function giftCardRecipient(g: GiftCardFacts): EmailContent {
+  const from = g.buyerName ? `${g.buyerName} sent you` : "You've received";
+  return {
+    subject: `${g.buyerName ? `${g.buyerName} sent you` : "You've received"} a ${formatPrice(g.amountCents)} gift card to ${g.studioName}`,
+    heading: "You've got a gift! 🎁",
+    intro: [
+      `Hi ${firstName(g.recipientName)}, ${from} a ${formatPrice(g.amountCents)} gift card for a photo session with ${g.studioName}.`,
+      ...(g.message ? [`“${g.message}”${g.buyerName ? ` — ${g.buyerName}` : ""}`] : []),
+    ],
+    details: [
+      ["Gift card code", g.code],
+      ["Value", formatPrice(g.amountCents)],
+    ],
+    button: { label: "Book a session", url: g.bookUrl },
+    outro: [
+      "Enter your code when you book. If your session costs less, the rest stays on your card for next time.",
+      `Questions? Reply to this email to reach ${g.studioName}.`,
+    ],
+  };
+}
+
+export function giftCardReceipt(g: GiftCardFacts & { recipientEmail: string; deliverOn: string | null }): EmailContent {
+  return {
+    subject: `Your ${formatPrice(g.amountCents)} gift card to ${g.studioName}`,
+    heading: "Thank you for your gift!",
+    intro: [
+      g.deliverOn
+        ? `Your gift card for ${g.recipientName} will be emailed to ${g.recipientEmail} on ${g.deliverOn}.`
+        : `Your gift card has been emailed to ${g.recipientName} at ${g.recipientEmail}.`,
+      "Here are the details, in case you'd like to print it or share it yourself:",
+    ],
+    details: [
+      ["Gift card code", g.code],
+      ["Value", formatPrice(g.amountCents)],
+      ["For", g.recipientName],
+      ...(g.message ? ([["Your message", g.message]] as [string, string][]) : []),
+    ],
+    button: { label: `Visit ${g.studioName}`, url: g.bookUrl },
+  };
+}
+
+export function giftCardSoldStudio(g: GiftCardFacts & { dashboardUrl: string }): EmailContent {
+  return {
+    subject: `Gift card sold: ${formatPrice(g.amountCents)}${g.buyerName ? ` from ${g.buyerName}` : ""}`,
+    heading: "You sold a gift card",
+    intro: [`${g.buyerName ?? "Someone"} bought a ${formatPrice(g.amountCents)} gift card for ${g.recipientName}.`],
+    details: [
+      ["Code", g.code],
+      ["Value", formatPrice(g.amountCents)],
+    ],
+    button: { label: "See gift cards", url: g.dashboardUrl },
+  };
+}

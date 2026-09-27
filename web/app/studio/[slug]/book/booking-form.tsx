@@ -6,7 +6,7 @@ import { Field, FormError, SelectField, SubmitButton, TextAreaField, inputClass 
 import type { BookingFieldType } from "@/lib/booking/fields";
 import { depositCents, formatPrice } from "@/lib/booking/format";
 import { couponDiscount } from "@/lib/coupons";
-import { createBooking, hasCredit, previewCoupon, type BookingFormState } from "./actions";
+import { createBooking, creditAvailable, previewCoupon, previewGiftCard, type BookingFormState } from "./actions";
 import { InspoUploader } from "./inspo-uploader";
 
 export type BookingQuestion = {
@@ -40,6 +40,7 @@ export function BookingForm({
   addons,
   questions,
   inspoMode,
+  giftCardsOn,
 }: {
   slug: string;
   sessionTypeId: string;
@@ -51,6 +52,8 @@ export function BookingForm({
   addons: BookingAddon[];
   questions: BookingQuestion[];
   inspoMode: "off" | "optional" | "required";
+  // Show the gift card field (the studio sells gift cards or has issued some).
+  giftCardsOn: boolean;
 }) {
   const [state, formAction, pending] = useActionState<BookingFormState, FormData>(
     createBooking.bind(null, slug, sessionTypeId, startsAt),
@@ -64,9 +67,28 @@ export function BookingForm({
   const [couponInput, setCouponInput] = useState("");
   const [couponMessage, setCouponMessage] = useState<string | null>(null);
   const [checkingCoupon, setCheckingCoupon] = useState(false);
-  const [creditOffered, setCreditOffered] = useState(false);
+  // The client's session credit here (0 = none), and whether they're using it.
+  const [creditCents, setCreditCents] = useState(0);
+  const [useCredit, setUseCredit] = useState(true);
   const discountCents = coupon ? couponDiscount(coupon, priceCents + extrasCents) : 0;
   const totalCents = priceCents + extrasCents - discountCents;
+  const [giftCard, setGiftCard] = useState<{ code: string; balanceCents: number } | null>(null);
+  const [giftInput, setGiftInput] = useState("");
+  const [giftMessage, setGiftMessage] = useState<string | null>(null);
+  const [checkingGift, setCheckingGift] = useState(false);
+  // Credit comes off first, then the gift card (the same order as booking).
+  const creditApplied = useCredit ? Math.min(creditCents, totalCents) : 0;
+  const giftCents = giftCard ? Math.min(giftCard.balanceCents, totalCents - creditApplied) : 0;
+  const leftCents = totalCents - creditApplied - giftCents;
+
+  async function applyGiftCard() {
+    setGiftMessage(null);
+    setCheckingGift(true);
+    const result = await previewGiftCard(slug, giftInput);
+    setCheckingGift(false);
+    if (result.ok) setGiftCard(result);
+    else setGiftMessage(result.message);
+  }
 
   async function applyCoupon() {
     setCouponMessage(null);
@@ -201,10 +223,28 @@ export function BookingForm({
               <dt>Total</dt>
               <dd>{formatPrice(totalCents)}</dd>
             </div>
-            {depositPercent > 0 && depositPercent < 100 && (
+            {creditApplied > 0 && (
+              <div className="flex justify-between gap-4 text-lime-ink">
+                <dt>Session credit</dt>
+                <dd>−{formatPrice(creditApplied)}</dd>
+              </div>
+            )}
+            {giftCents > 0 && (
+              <div className="flex justify-between gap-4 text-lime-ink">
+                <dt>Gift card {giftCard?.code}</dt>
+                <dd>−{formatPrice(giftCents)}</dd>
+              </div>
+            )}
+            {leftCents < totalCents && (
+              <div className="flex justify-between gap-4 font-semibold">
+                <dt>Left to pay</dt>
+                <dd>{formatPrice(leftCents)}</dd>
+              </div>
+            )}
+            {depositPercent > 0 && depositPercent < 100 && leftCents > 0 && (
               <div className="flex justify-between gap-4 text-muted">
-                <dt>Deposit ({depositPercent}%)</dt>
-                <dd>{formatPrice(depositCents(totalCents, depositPercent))}</dd>
+                <dt>Deposit ({depositPercent}%{leftCents < totalCents ? " of what's left" : ""})</dt>
+                <dd>{formatPrice(depositCents(leftCents, depositPercent))}</dd>
               </div>
             )}
           </dl>
@@ -227,16 +267,23 @@ export function BookingForm({
               autoComplete="email"
               error={errors.email}
               required
-              // Only yes/no comes back, never the amount (see hasCredit).
-              onBlur={async (e) => setCreditOffered(await hasCredit(slug, e.currentTarget.value))}
+              onBlur={async (e) => setCreditCents(await creditAvailable(slug, e.currentTarget.value))}
             />
           </div>
-          {creditOffered && (
+          {creditCents > 0 && (
             <label className="flex items-start gap-3 rounded-xl border-2 border-lime/60 bg-lime/10 px-3.5 py-3">
-              <input type="checkbox" name="useCredit" defaultChecked className="mt-1 size-4 accent-lime-ink" />
+              <input
+                type="checkbox"
+                name="useCredit"
+                checked={useCredit}
+                onChange={(e) => setUseCredit(e.target.checked)}
+                className="mt-1 size-4 accent-lime-ink"
+              />
               <span className="text-sm">
-                <span className="block font-semibold">You have a session credit with this studio.</span>
-                Use it for this booking? It comes off what you owe, and your booking page will show the amount.
+                <span className="block font-semibold">You have a {formatPrice(creditCents)} session credit with this studio.</span>
+                {creditCents > totalCents
+                  ? `Use it for this booking? It covers the whole ${formatPrice(totalCents)}, and ${formatPrice(creditCents - totalCents)} stays for next time.`
+                  : `Use it for this booking? ${formatPrice(creditCents)} comes off your total, and the deposit is figured on what's left.`}
               </span>
             </label>
           )}
@@ -275,6 +322,50 @@ export function BookingForm({
             )}
             {coupon && <input type="hidden" name="couponCode" value={coupon.code} />}
           </div>
+          {giftCardsOn && (
+            <div>
+              <span className="text-sm font-semibold">Gift card</span>
+              <div className="mt-1.5 flex gap-2">
+                <input
+                  value={giftCard ? giftCard.code : giftInput}
+                  onChange={(e) => {
+                    setGiftCard(null);
+                    setGiftInput(e.target.value);
+                  }}
+                  aria-label="Gift card code"
+                  autoCapitalize="characters"
+                  placeholder="GIFT-XXXX-XXXX (optional)"
+                  className={`${inputClass} uppercase`}
+                />
+                {giftCard ? (
+                  <button type="button" onClick={() => setGiftCard(null)} className="btn-secondary shrink-0">
+                    Remove
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={applyGiftCard}
+                    disabled={checkingGift || giftInput.trim() === ""}
+                    className="btn-secondary shrink-0"
+                  >
+                    {checkingGift ? "Checking…" : "Apply"}
+                  </button>
+                )}
+              </div>
+              {giftCard && (
+                <p className="mt-1.5 text-xs font-semibold text-lime-ink">
+                  Gift card applied: {formatPrice(giftCard.balanceCents)} on the card
+                  {giftCard.balanceCents > giftCents &&
+                    `, ${formatPrice(giftCard.balanceCents - giftCents)} stays on it for next time`}
+                  .
+                </p>
+              )}
+              {(giftMessage || state.giftCardError) && (
+                <p className="mt-1.5 text-xs font-medium text-danger">{giftMessage ?? state.giftCardError}</p>
+              )}
+              {giftCard && <input type="hidden" name="giftCardCode" value={giftCard.code} />}
+            </div>
+          )}
           <Field label="Phone" name="phone" type="tel" autoComplete="tel" error={errors.phone} hint="Optional" />
           <TextAreaField
             label="Anything we should know?"

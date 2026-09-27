@@ -4,10 +4,10 @@ import { and, asc, eq } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db";
 import { bookingInspoPhotos, bookings, photographers } from "@/db/schema";
-import { depositCents, formatDuration, formatPrice } from "@/lib/booking/format";
+import { formatDuration, formatPrice } from "@/lib/booking/format";
 import { formatDate, formatTime } from "@/lib/booking/time";
 import { bookingExtras } from "@/lib/booking/session-addons";
-import { amountPaid, balanceDue, bookingTotal } from "@/lib/payments/amounts";
+import { amountPaid, balanceDue, bookingDeposit, bookingTotal } from "@/lib/payments/amounts";
 import { bookingPayments } from "@/lib/payments/checkout";
 import { contractTemplateFor, signedContractFor } from "@/lib/contracts/for-booking";
 import { requirePhotographer } from "@/lib/session";
@@ -71,6 +71,9 @@ export default async function BookingPage({ params }: PageProps<"/dashboard/book
     ...(extras.length > 0 || booking.discountCents > 0
       ? [["Total", <strong key="t">{formatPrice(totalCents)}</strong>] as [string, React.ReactNode]]
       : []),
+    ...(booking.giftCardCents > 0
+      ? [["Gift card", `−${formatPrice(booking.giftCardCents)} applied`] as [string, React.ReactNode]]
+      : []),
     ...(booking.creditCents > 0
       ? [["Session credit", `−${formatPrice(booking.creditCents)} applied`] as [string, React.ReactNode]]
       : []),
@@ -78,7 +81,7 @@ export default async function BookingPage({ params }: PageProps<"/dashboard/book
       "Deposit",
       booking.depositPercent === 0
         ? "None"
-        : `${formatPrice(depositCents(totalCents, booking.depositPercent))} (${booking.depositPercent}%)`,
+        : `${formatPrice(bookingDeposit(booking))} (${booking.depositPercent}%)`,
     ],
     ["Paid", paidCents > 0 ? <strong key="p">{formatPrice(paidCents)}</strong> : "Nothing yet"],
     ...(booking.status !== "cancelled" && balanceDue(booking, paymentRows) > 0
