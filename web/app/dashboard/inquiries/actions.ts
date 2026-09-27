@@ -7,6 +7,7 @@ import { z } from "zod";
 import { db } from "@/db";
 import { clients, inquiries } from "@/db/schema";
 import { runTriage } from "@/lib/inquiries";
+import { sendInquiryReply } from "@/lib/email/notify";
 import { requirePhotographer } from "@/lib/session";
 
 // Inquiry actions. Every one re-checks who is logged in and only touches that
@@ -116,4 +117,17 @@ export async function convertToClient(inquiryId: string): Promise<void> {
   await db.update(inquiries).set({ clientId: client.id, status: "converted" }).where(eq(inquiries.id, inquiry.id));
   revalidatePath("/dashboard", "layout");
   redirect(`/dashboard/clients/${client.id}`);
+}
+
+// Emails the (possibly edited) reply to the client and marks it replied.
+export async function sendReply(inquiryId: string, body: string): Promise<{ ok: true } | { error: string }> {
+  const photographer = await requirePhotographer();
+  const inquiry = await findOwnedInquiry(inquiryId, photographer.id);
+  if (!inquiry) return { error: "That inquiry could not be found." };
+  const text = body.trim();
+  if (text.length < 2) return { error: "Write a reply first." };
+  if (text.length > 10_000) return { error: "That reply is too long." };
+  const result = await sendInquiryReply(inquiry.id, text, false);
+  revalidatePath("/dashboard/inquiries", "layout");
+  return result;
 }

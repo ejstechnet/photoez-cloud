@@ -14,6 +14,8 @@ import { localDateOf } from "@/lib/booking/time";
 import { issueCredit } from "@/lib/credits";
 import { amountPaid } from "@/lib/payments/amounts";
 import { bookingPayments } from "@/lib/payments/checkout";
+import { emailBookingCancelled, emailBookingRescheduled, emailContractSigned } from "@/lib/email/notify";
+import { afterResponse } from "@/lib/email/send";
 
 // Client self-service from the private booking link. The link's token is the
 // only key, so every action re-checks the studio's rules on the server; the
@@ -45,6 +47,9 @@ export async function rescheduleBooking(token: string, startsAtIso: string): Pro
         startsAt,
         endsAt: new Date(startsAt.getTime() + minutes * 60_000),
         rescheduleCount: booking.rescheduleCount + 1,
+        // New time, so the reminders go out again before it.
+        reminderSentAt: null,
+        balanceReminderSentAt: null,
       })
       // Only if nothing changed since the page loaded (e.g. a second tab).
       .where(
@@ -61,6 +66,7 @@ export async function rescheduleBooking(token: string, startsAtIso: string): Pro
     throw error;
   }
 
+  afterResponse(() => emailBookingRescheduled(booking.id, booking.startsAt));
   revalidatePath("/dashboard", "layout");
   redirect(`/booking/${token}?changed=rescheduled`);
 }
@@ -82,10 +88,11 @@ export async function cancelBooking(token: string): Promise<ChangeState> {
 
   // Early enough for a credit: everything they paid (online, plus any credit
   // they'd used) becomes a session credit for a future booking.
+  let credit: { amountCents: number; expiresOn: string | null } | null = null;
   if (cancelled.length > 0 && options.cancel.creditDue) {
     const paidOnline = amountPaid(await bookingPayments(booking.id));
     await db.update(bookings).set({ creditCents: 0 }).where(eq(bookings.id, booking.id));
-    await issueCredit({
+    credit = await issueCredit({
       photographerId: booking.photographerId,
       clientEmail: booking.clientEmail,
       clientName: booking.clientName,
@@ -95,6 +102,11 @@ export async function cancelBooking(token: string): Promise<ChangeState> {
     });
   }
 
+  if (cancelled.length > 0) {
+    afterResponse(() =>
+      emailBookingCancelled(booking.id, "client", { cents: credit?.amountCents ?? 0, expiresOn: credit?.expiresOn ?? null }),
+    );
+  }
   revalidatePath("/dashboard", "layout");
   revalidatePath("/studio/[slug]", "layout");
   redirect(`/booking/${token}?changed=cancelled`);
@@ -151,6 +163,7 @@ export async function signContract(
     throw new Error("The signature couldn't be saved.");
   }
 
+  afterResponse(() => emailContractSigned(booking.id));
   revalidatePath("/dashboard", "layout");
   redirect(`/booking/${token}/contract?signed=1`);
 }

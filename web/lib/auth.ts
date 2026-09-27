@@ -3,6 +3,8 @@ import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { nextCookies } from "better-auth/next-js";
 import { db } from "@/db";
 import * as schema from "@/db/schema";
+import { passwordReset } from "@/lib/email/messages";
+import { sendEmail } from "@/lib/email/send";
 
 // Server-side auth setup. BETTER_AUTH_SECRET and BETTER_AUTH_URL are read
 // from web/.env automatically.
@@ -12,6 +14,20 @@ export const auth = betterAuth({
   emailAndPassword: {
     enabled: true,
     minPasswordLength: 10,
+    // "Forgot password?": emails a one-hour link to /reset-password.
+    sendResetPassword: async ({ user, url }) => {
+      await sendEmail({
+        photographerId: user.id,
+        kind: "password_reset",
+        to: user.email,
+        content: passwordReset(user.name, url),
+        fromName: "PhotoEZ Cloud",
+        studioName: "PhotoEZ Cloud",
+        footer: "PhotoEZ Cloud account email.",
+      });
+    },
+    // A reset signs out every other browser, in case someone else was in.
+    revokeSessionsOnPasswordReset: true,
   },
   // Point Better Auth's built-in models at our table names.
   user: {

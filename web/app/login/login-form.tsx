@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { authClient } from "@/lib/auth-client";
 import { Field, FormError, SubmitButton } from "@/components/form";
@@ -35,6 +36,11 @@ export function LoginForm({ redirectTo }: { redirectTo: string }) {
     <form onSubmit={handleSubmit} className="space-y-4">
       <Field label="Email" name="email" type="email" autoComplete="email" required />
       <PasswordField label="Password" name="password" autoComplete="current-password" required />
+      <p className="-mt-2 text-right text-sm">
+        <Link href="/forgot-password" className="font-semibold text-muted hover:text-foreground">
+          Forgot password?
+        </Link>
+      </p>
       <FormError message={error} />
       <SubmitButton pending={pending}>Log in</SubmitButton>
     </form>

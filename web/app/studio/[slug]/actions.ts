@@ -1,5 +1,6 @@
 "use server";
 
+import { handleNewInquiry } from "@/lib/email/notify";
 import { and, count, eq, gt } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { after } from "next/server";
@@ -120,6 +121,8 @@ export async function submitInquiry(
   // The client sees the thank-you right away; triage runs after the response.
   after(async () => {
     await runTriage(inquiry, studio);
+    // Sends the AI's reply when allowed, and tells the studio either way.
+    await handleNewInquiry(inquiry.id).catch((error) => console.error("Inquiry emails failed", error));
     revalidatePath("/dashboard", "layout");
   });
 

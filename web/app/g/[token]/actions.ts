@@ -9,6 +9,8 @@ import { findGalleryByToken, isOverLimit } from "@/lib/client-gallery";
 import { extrasFor } from "@/lib/gallery-extras";
 import { paymentAccount } from "@/lib/payments/checkout";
 import { paidGalleryExtras, startGalleryCheckout } from "@/lib/payments/gallery-checkout";
+import { emailSelectionsSubmitted } from "@/lib/email/notify";
+import { afterResponse } from "@/lib/email/send";
 
 // Actions a client can take from their gallery link. The token is re-checked
 // on every call, and changes are only allowed while the gallery is in proofing.
@@ -84,7 +86,7 @@ export async function submitSelections(
   }
 
   // Only move forward if the gallery is still in proofing (guards a double submit).
-  await db
+  const submitted = await db
     .update(galleries)
     .set({
       // Every extra already paid for (after proofing was reopened): paid & submitted.
@@ -93,7 +95,9 @@ export async function submitSelections(
       extrasCount: extras.count,
       extrasCents: alreadyPaid.cents + toPay * (gallery.extraPriceCents ?? 0),
     })
-    .where(and(eq(galleries.id, gallery.id), eq(galleries.status, "pending")));
+    .where(and(eq(galleries.id, gallery.id), eq(galleries.status, "pending")))
+    .returning({ id: galleries.id });
+  if (submitted.length > 0) afterResponse(() => emailSelectionsSubmitted(gallery.id));
 
   revalidatePath(`/g/${token}`);
   revalidatePath(`/dashboard/galleries/${gallery.id}`);

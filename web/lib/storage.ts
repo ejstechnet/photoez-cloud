@@ -136,3 +136,14 @@ export async function deletePrefix(prefix: string) {
     continuationToken = page.IsTruncated ? page.NextContinuationToken : undefined;
   } while (continuationToken);
 }
+
+// The bytes of a stored file, or null if it doesn't exist.
+export async function readObject(key: string): Promise<Uint8Array | null> {
+  try {
+    const object = await s3.send(new GetObjectCommand({ Bucket: bucket, Key: key }));
+    return object.Body ? await object.Body.transformToByteArray() : null;
+  } catch (error) {
+    if (error instanceof Error && (error.name === "NotFound" || error.name === "NoSuchKey")) return null;
+    throw error;
+  }
+}
