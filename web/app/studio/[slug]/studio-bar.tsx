@@ -1,10 +1,12 @@
 import Link from "next/link";
 import { PhotoEZCloudMark } from "@/components/brand";
 import { StudioNav } from "./studio-nav";
+import { studioLinks } from "@/lib/studio-links";
 
-// Top bar for the studio's inner pages (booking, booking confirmation):
-// the studio's menu, linking back to its studio page.
-export function StudioBar({
+// Top bar for the studio's inner pages (booking, booking confirmation,
+// contract, reschedule): the same menu as the studio page, each link jumping
+// back to that section of it.
+export async function StudioBar({
   slug,
   name,
   logoUrl,
@@ -24,7 +26,7 @@ export function StudioBar({
       name={name}
       logoUrl={logoUrl}
       logoBg={logoBg}
-      links={[{ href: `/studio/${slug}#contact`, label: "Contact" }]}
+      links={await studioLinks(slug)}
     >
       {bookButton && (
         <Link

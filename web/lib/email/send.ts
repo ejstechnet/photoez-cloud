@@ -27,6 +27,7 @@ export type EmailKind =
   | "selections_submitted"
   | "inquiry_reply"
   | "inquiry_new"
+  | "assistant_email"
   | "gift_card"
   | "gift_card_receipt"
   | "gift_card_sold"

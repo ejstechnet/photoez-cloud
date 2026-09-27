@@ -30,3 +30,7 @@ export function planFor(feature: Feature): Plan {
 // Measured 2026-09-27: ~790 input + ~91 output tokens per photo with Claude
 // Haiku 4.5, about $0.00125 a photo ($12.50 for a full Studio month).
 export const AI_PHOTO_ALLOWANCE: Record<Plan, number> = { free: 0, pro: 3000, studio: 10000 };
+
+// Studio Assistant questions a studio can ask each month (Claude Sonnet 5,
+// roughly 1–3 cents a question).
+export const AI_ASSISTANT_ALLOWANCE: Record<Plan, number> = { free: 0, pro: 300, studio: 1000 };

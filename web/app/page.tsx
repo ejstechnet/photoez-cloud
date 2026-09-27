@@ -1,3 +1,10 @@
+import { headers } from "next/headers";
+import { eq } from "drizzle-orm";
+import { db } from "@/db";
+import { photographers } from "@/db/schema";
+import { auth } from "@/lib/auth";
+import { NavMenu } from "@/app/dashboard/nav-menu";
+import { SignOutButton } from "@/app/dashboard/sign-out-button";
 import Link from "next/link";
 import Image from "next/image";
 import { Logo, WorkflowPills } from "@/components/brand";
@@ -45,7 +52,15 @@ const cloudFeatures = [
   { title: "Page Designer", body: "Your colors, fonts, banner, and gallery style." },
 ];
 
-export default function Home() {
+export default async function Home() {
+  // Logged-in photographers get their own menu and buttons here.
+  const session = await auth.api.getSession({ headers: await headers() });
+  const studioSlug = session
+    ? ((
+        await db.select({ slug: photographers.studioSlug }).from(photographers).where(eq(photographers.id, session.user.id))
+      )[0]?.slug ?? null)
+    : null;
+
   return (
     <main className="flex flex-1 flex-col">
       <section className="relative overflow-hidden bg-brand-deep text-white">
@@ -70,14 +85,43 @@ export default function Home() {
 
         <header className="relative mx-auto flex max-w-7xl items-center justify-between px-4 py-5">
           <Logo />
-          <nav className="flex items-center gap-6">
-            <Link href="/" className="text-sm font-bold tracking-wider text-white/90 uppercase hover:text-lime">
-              Home
-            </Link>
-            <Link href="/login" className="text-sm font-bold tracking-wider text-white/90 uppercase hover:text-lime">
-              Log in
-            </Link>
-          </nav>
+          {session ? (
+            <nav className="flex flex-wrap items-center justify-end gap-1 sm:gap-2" aria-label="Your studio">
+              <Link href="/" className="hidden rounded-full px-3 py-2 text-xs font-bold tracking-wider text-white/90 uppercase hover:text-lime sm:block">
+                Home
+              </Link>
+              {studioSlug && (
+                <Link
+                  href={`/studio/${studioSlug}`}
+                  className="hidden rounded-full px-3 py-2 text-xs font-bold tracking-wider text-white/90 uppercase hover:text-lime md:block"
+                >
+                  My studio page
+                </Link>
+              )}
+              <NavMenu
+                label="Dashboard"
+                items={[
+                  { href: "/dashboard", label: "Overview", exact: true },
+                  { href: "/dashboard/bookings", label: "Bookings" },
+                  { href: "/dashboard/galleries", label: "Galleries" },
+                  { href: "/dashboard/clients", label: "Clients" },
+                  { href: "/dashboard/assistant", label: "Studio Assistant" },
+                  { href: "/dashboard/settings", label: "Settings" },
+                  ...(studioSlug ? [{ href: `/studio/${studioSlug}`, label: "My studio page" }] : []),
+                ]}
+              />
+              <SignOutButton />
+            </nav>
+          ) : (
+            <nav className="flex items-center gap-6">
+              <Link href="/" className="text-sm font-bold tracking-wider text-white/90 uppercase hover:text-lime">
+                Home
+              </Link>
+              <Link href="/login" className="text-sm font-bold tracking-wider text-white/90 uppercase hover:text-lime">
+                Log in
+              </Link>
+            </nav>
+          )}
         </header>
 
         <div className="relative mx-auto max-w-7xl px-4 pt-10 pb-20 lg:pt-16 lg:pb-28">
@@ -106,12 +150,30 @@ export default function Home() {
               busywork so you can get back behind the camera.
             </p>
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-              <Link href="/signup" className="btn-primary bg-lime text-brand-deep">
-                Start your studio <ArrowRightIcon size={18} />
-              </Link>
-              <Link href="/login" className="btn-secondary border-white/30 bg-transparent text-white hover:border-lime">
-                I have an account
-              </Link>
+              {session ? (
+                <>
+                  <Link href="/dashboard" className="btn-primary bg-lime text-brand-deep">
+                    Go to your dashboard <ArrowRightIcon size={18} />
+                  </Link>
+                  {studioSlug && (
+                    <Link
+                      href={`/studio/${studioSlug}`}
+                      className="btn-secondary border-white/30 bg-transparent text-white hover:border-lime"
+                    >
+                      View your studio page
+                    </Link>
+                  )}
+                </>
+              ) : (
+                <>
+                  <Link href="/signup" className="btn-primary bg-lime text-brand-deep">
+                    Start your studio <ArrowRightIcon size={18} />
+                  </Link>
+                  <Link href="/login" className="btn-secondary border-white/30 bg-transparent text-white hover:border-lime">
+                    I have an account
+                  </Link>
+                </>
+              )}
             </div>
           </div>
           {/* On phones and tablets, the image sits under the text instead. */}
@@ -167,12 +229,14 @@ export default function Home() {
                 designed to look like your brand.
               </p>
               <div className="mt-8 flex flex-wrap gap-3">
-                <Link href="/signup" className="btn-primary">
-                  Start your studio <ArrowRightIcon size={18} />
+                <Link href={session ? "/dashboard" : "/signup"} className="btn-primary">
+                  {session ? "Go to your dashboard" : "Start your studio"} <ArrowRightIcon size={18} />
                 </Link>
-                <Link href="/login" className="btn-secondary">
-                  Log in
-                </Link>
+                {!session && (
+                  <Link href="/login" className="btn-secondary">
+                    Log in
+                  </Link>
+                )}
               </div>
             </div>
             {/* A photography studio (Elle's image, 1536×1024). */}
@@ -261,15 +325,21 @@ export default function Home() {
           <nav className="grid grid-cols-2 gap-x-10 gap-y-2" aria-label="More from PhotoEZ">
             <p className="font-bold tracking-wider text-foreground uppercase">PhotoEZ Cloud</p>
             <p className="font-bold tracking-wider text-foreground uppercase">PhotoEZ for WordPress</p>
-            <Link href="/signup" className="hover:text-foreground">
-              Start your studio
+            <Link href={session ? "/dashboard" : "/signup"} className="hover:text-foreground">
+              {session ? "Your dashboard" : "Start your studio"}
             </Link>
             <a href={PHOTOEZ_LINKS.site} className="hover:text-foreground">
               photoez.net
             </a>
-            <Link href="/login" className="hover:text-foreground">
-              Log in
-            </Link>
+            {session && studioSlug ? (
+              <Link href={`/studio/${studioSlug}`} className="hover:text-foreground">
+                Your studio page
+              </Link>
+            ) : (
+              <Link href="/login" className="hover:text-foreground">
+                Log in
+              </Link>
+            )}
             <a href={PHOTOEZ_LINKS.demos} className="hover:text-foreground">
               Plugin demos
             </a>

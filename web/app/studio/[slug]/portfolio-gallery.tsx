@@ -11,8 +11,8 @@ export function PortfolioGallery({ studioName, photos }: { studioName: string; p
   const items = photos.map((photo, i) => ({ id: photo.id, number: i + 1, url: photo.url }));
 
   return (
-    <section id="work" className="mx-auto w-full max-w-7xl scroll-mt-28 px-4 pt-12">
-      <h2 className="font-display text-3xl font-bold">Examples of work</h2>
+    <section id="work" className="mx-auto w-full max-w-7xl scroll-mt-28 px-4 pb-16">
+      <h2 className="font-display text-3xl font-bold">Examples of my work</h2>
       <div
         className={`mt-4 grid gap-2 sm:gap-3 ${
           photos.length <= 3 ? "grid-cols-2 sm:grid-cols-3" : photos.length === 4 ? "grid-cols-2 sm:grid-cols-4" : "grid-cols-2 sm:grid-cols-3 lg:grid-cols-5"

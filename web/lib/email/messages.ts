@@ -474,3 +474,9 @@ export function giftCardSoldStudio(g: GiftCardFacts & { dashboardUrl: string }):
     button: { label: "See gift cards", url: g.dashboardUrl },
   };
 }
+
+// ---- A message the photographer wrote (or approved from the Studio Assistant) ----
+
+export function studioMessage(subject: string, body: string): EmailContent {
+  return { subject, intro: toParagraphs(body) };
+}
