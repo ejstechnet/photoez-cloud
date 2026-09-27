@@ -14,6 +14,8 @@ import { requirePhotographer } from "@/lib/session";
 import { emailFinalsReady, emailGalleryLink } from "@/lib/email/notify";
 import { requestReview } from "@/lib/review-requests";
 import { isCullMetrics, type CullMetrics } from "@/lib/culling";
+import { tagNextPhotos } from "@/lib/gallery-tagging";
+import { searchGalleryPhotos } from "@/lib/photo-search";
 import { afterResponse } from "@/lib/email/send";
 import { studioPlan } from "@/lib/studio-plan";
 import {
@@ -599,4 +601,23 @@ export async function saveCullResults(
   }
   revalidatePath(`/dashboard/galleries/${galleryId}`);
   return { ok: true };
+}
+
+// Gallery search: describe the next few photos (the dashboard calls this
+// until none are left). Plan and monthly allowance are checked inside.
+export async function makeGallerySearchable(
+  galleryId: string,
+): Promise<{ tagged: number; failed: number; remaining: number } | { error: string }> {
+  const photographer = await requirePhotographer();
+  if (!(await findOwnedGallery(galleryId, photographer.id))) return { error: "That gallery could not be found." };
+  const result = await tagNextPhotos(galleryId, photographer.id);
+  if ("remaining" in result && result.remaining === 0) revalidatePath(`/dashboard/galleries/${galleryId}`);
+  return result;
+}
+
+// The photographer trying a search on their own gallery.
+export async function searchOwnGallery(galleryId: string, query: string): Promise<string[]> {
+  const photographer = await requirePhotographer();
+  if (!(await findOwnedGallery(galleryId, photographer.id))) return [];
+  return searchGalleryPhotos(galleryId, query);
 }

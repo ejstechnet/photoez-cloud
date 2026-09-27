@@ -1,5 +1,6 @@
 "use client";
 
+import { SearchBox } from "./search-box";
 import { galleryItemClass, galleryListClass, galleryTileAspect, type GalleryLayout } from "@/lib/gallery-layout";
 import { useState } from "react";
 import { DownloadIcon } from "@/components/icons";
@@ -18,6 +19,7 @@ export type FinalTile = {
 // The PhotoEZ "Final delivery" page: clean, unwatermarked finals in the
 // masonry grid, a download on every photo, and one ZIP for everything.
 export function DeliveryGallery({
+  canSearch = false,
   layout = "masonry",
   token,
   preview = false,
@@ -26,6 +28,8 @@ export function DeliveryGallery({
   clientFirstName,
   totalSize,
 }: {
+  // Gallery search is on (the studio's plan, and photos described).
+  canSearch?: boolean;
   // The studio's gallery layout from the Page Designer.
   layout?: GalleryLayout;
   token: string;
@@ -37,6 +41,9 @@ export function DeliveryGallery({
   totalSize: string;
 }) {
   const [open, setOpen] = useState<number | null>(null);
+  // Gallery search results (null = show everything).
+  const [found, setFound] = useState<Set<string> | null>(null);
+  const shown = found ? tiles.filter((tile) => found.has(tile.id)) : tiles;
 
   return (
     <>
@@ -54,13 +61,19 @@ export function DeliveryGallery({
         </a>
       </div>
 
+      {canSearch && (
+        <div className="mt-6">
+          <SearchBox token={token} onResults={(ids) => setFound(ids ? new Set(ids) : null)} />
+        </div>
+      )}
+
       <ul className={`mt-8 ${galleryListClass(layout)}`}>
-        {tiles.map((tile, i) => (
+        {shown.map((tile) => (
           <li key={tile.id} className={galleryItemClass(layout)}>
             <div className="group relative overflow-hidden rounded-2xl bg-brand-deep">
               <button
                 type="button"
-                onClick={() => setOpen(i)}
+                onClick={() => setOpen(tiles.indexOf(tile))}
                 className="block w-full"
                 style={{ aspectRatio: galleryTileAspect(layout, tile.aspect) }}
                 aria-label={`View photo ${tile.number}`}

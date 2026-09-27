@@ -256,6 +256,10 @@ export const photos = pgTable(
     proofMadeAt: timestamp("proof_made_at", { withTimezone: true }),
     // Culling help's measurements (lib/culling.ts); null = not checked yet.
     cull: jsonb("cull").$type<import("../lib/culling").CullMetrics>(),
+    // Gallery search: what the AI saw in the photo (lib/ai/photo-tags.ts).
+    aiDescription: text("ai_description"),
+    aiTags: jsonb("ai_tags").$type<string[]>(),
+    aiTaggedAt: timestamp("ai_tagged_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index("photos_gallery_idx").on(t.galleryId, t.kind, t.position)],
@@ -765,4 +769,23 @@ export const giftCards = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index("gift_cards_photographer_idx").on(t.photographerId, t.createdAt)],
+);
+
+// Every AI call the app makes for a studio, with its token counts, so costs
+// can be tracked and each plan's monthly allowance enforced.
+export const aiUsage = pgTable(
+  "ai_usage",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    photographerId: uuid("photographer_id")
+      .notNull()
+      .references(() => photographers.id, { onDelete: "cascade" }),
+    // e.g. "photo_tag", "assistant".
+    feature: text("feature").notNull(),
+    model: text("model").notNull(),
+    inputTokens: integer("input_tokens").notNull().default(0),
+    outputTokens: integer("output_tokens").notNull().default(0),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("ai_usage_photographer_idx").on(t.photographerId, t.feature, t.createdAt)],
 );

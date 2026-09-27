@@ -20,6 +20,9 @@ import { paidGalleryExtras } from "@/lib/payments/gallery-checkout";
 import { formatPrice } from "@/lib/booking/format";
 import { PhotoGrid } from "./photo-grid";
 import { CullingGrid } from "./culling-grid";
+import { SearchCard } from "./search-card";
+import { photoAllowance } from "@/lib/gallery-tagging";
+import { PLAN_LABELS, planFor } from "@/lib/plans";
 import { isCullMetrics } from "@/lib/culling";
 import { ProofRefresher } from "./proof-refresher";
 import { Uploader } from "./uploader";
@@ -60,6 +63,7 @@ export default async function GalleryPage({ params }: PageProps<"/dashboard/gall
       favoriteId: favorites.id,
       note: favorites.note,
       cull: photos.cull,
+      aiTaggedAt: photos.aiTaggedAt,
     })
     .from(photos)
     .leftJoin(favorites, eq(favorites.photoId, photos.id))
@@ -86,6 +90,7 @@ export default async function GalleryPage({ params }: PageProps<"/dashboard/gall
       selected: photo.favoriteId !== null,
       note: photo.note,
       cull: isCullMetrics(photo.cull) ? photo.cull : null,
+      searchable: photo.aiTaggedAt !== null,
       thumbUrl: await signedViewUrl(photoKey(photo.fileKey, "thumb")),
       previewUrl: await signedViewUrl(photoKey(photo.fileKey, "preview")),
     })),
@@ -94,6 +99,7 @@ export default async function GalleryPage({ params }: PageProps<"/dashboard/gall
   const paidExtras = await paidGalleryExtras(gallery.id);
   const extrasOwedCents = Math.max(0, gallery.extrasCents - paidExtras.cents);
   const proofs = tiles.filter((tile) => tile.kind === "proof");
+  const allowance = await photoAllowance(user.id);
   const finals = tiles.filter((tile) => tile.kind === "final");
 
   return (
@@ -172,6 +178,17 @@ export default async function GalleryPage({ params }: PageProps<"/dashboard/gall
               : `${formatPrice(extrasOwedCents)} owed. Stripe wasn't connected, so collect it your own way.`}
         </p>
       )}
+
+      <div className="mt-8">
+        <SearchCard
+          galleryId={gallery.id}
+          total={tiles.length}
+          searchable={tiles.filter((t) => t.searchable).length}
+          allowance={allowance}
+          upgradeLabel={PLAN_LABELS[planFor("aiSearch")]}
+          photos={tiles.map((t) => ({ id: t.id, name: t.name, thumbUrl: t.thumbUrl }))}
+        />
+      </div>
 
       {/* Step 1: proofs the client chooses from (watermarked for them). */}
       <section className="mt-12">

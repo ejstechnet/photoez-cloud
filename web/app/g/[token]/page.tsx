@@ -1,3 +1,7 @@
+import { and, eq, isNotNull } from "drizzle-orm";
+import { db } from "@/db";
+import { photos as photoRows } from "@/db/schema";
+import { hasFeature } from "@/lib/plans";
 import { designForGalleryToken } from "@/lib/studio-design";
 import { StudioNav } from "@/app/studio/[slug]/studio-nav";
 import type { Metadata } from "next";
@@ -35,6 +39,23 @@ export default async function ClientGalleryPage({ params, searchParams }: PagePr
   const logoUrl = gallery.logoKey ? await signedViewUrl(gallery.logoKey) : null;
   const isPreview = preview === "1";
   const design = await designForGalleryToken(token);
+  // Gallery search shows when the studio's plan has it and some photos the
+  // client is looking at (proofs, or finals once delivered) are described.
+  const canSearch =
+    hasFeature(gallery.plan, "aiSearch") &&
+    (
+      await db
+        .select({ id: photoRows.id })
+        .from(photoRows)
+        .where(
+          and(
+            eq(photoRows.galleryId, gallery.id),
+            eq(photoRows.kind, isDelivered(gallery) ? "final" : "proof"),
+            isNotNull(photoRows.aiTaggedAt),
+          ),
+        )
+        .limit(1)
+    ).length > 0;
 
   const delivered = isDelivered(gallery);
   const finals = await clientFinals(gallery);
@@ -130,6 +151,7 @@ export default async function ClientGalleryPage({ params, searchParams }: PagePr
             <Notice title="Your gallery is being prepared!">{studio} is finishing your photos. Check back soon.</Notice>
           ) : (
             <DeliveryGallery
+              canSearch={canSearch}
               layout={design.galleryLayout}
               token={token}
               preview={isPreview}
@@ -156,6 +178,7 @@ export default async function ClientGalleryPage({ params, searchParams }: PagePr
             </p>
           )}
           <ProofingGallery
+            canSearch={canSearch}
             layout={design.galleryLayout}
             token={token}
             tiles={tiles}

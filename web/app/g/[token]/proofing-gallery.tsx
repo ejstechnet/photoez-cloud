@@ -1,5 +1,6 @@
 "use client";
 
+import { SearchBox } from "./search-box";
 import { galleryItemClass, galleryListClass, galleryTileAspect, type GalleryLayout } from "@/lib/gallery-layout";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
@@ -25,6 +26,7 @@ export type Tile = {
 // favorites up to the free limit (or past it, for a price per extra photo,
 // when the studio offers extras), and a sticky bar to submit selections.
 export function ProofingGallery({
+  canSearch = false,
   layout = "masonry",
   token,
   tiles,
@@ -36,6 +38,8 @@ export function ProofingGallery({
   studio,
   clientFirstName,
 }: {
+  // Gallery search is on (the studio's plan, and photos described).
+  canSearch?: boolean;
   // The studio's gallery layout from the Page Designer.
   layout?: GalleryLayout;
   token: string;
@@ -61,7 +65,11 @@ export function ProofingGallery({
   const canSelect = !locked && !preview;
   const limitText = freeLimit > 0 ? `${selected.size} of ${freeLimit}` : `${selected.size}`;
   const extras = extrasFor(selected.size, freeLimit, extraPriceCents);
-  const shown = onlySelected ? tiles.filter((tile) => selected.has(tile.id)) : tiles;
+  // Gallery search results (null = no search), on top of the picks filter.
+  const [found, setFound] = useState<Set<string> | null>(null);
+  const shown = (onlySelected ? tiles.filter((tile) => selected.has(tile.id)) : tiles).filter(
+    (tile) => !found || found.has(tile.id),
+  );
 
   async function toggle(photoId: string) {
     if (preview) {
@@ -154,6 +162,12 @@ That includes ${extras.count} extra ${extras.count === 1 ? "photo" : "photos"} f
             </>
           )}
         </p>
+      )}
+
+      {canSearch && (
+        <div className="mt-6">
+          <SearchBox token={token} onResults={(ids) => setFound(ids ? new Set(ids) : null)} />
+        </div>
       )}
 
       {selected.size > 0 && (
