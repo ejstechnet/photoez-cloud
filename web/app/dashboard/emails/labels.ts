@@ -17,6 +17,8 @@ export const KIND_LABELS: Record<EmailKind, string> = {
   selections_submitted: "Picks submitted (to you)",
   inquiry_reply: "Inquiry reply",
   inquiry_new: "New inquiry (to you)",
+  review_request: "Review request",
+  review_new: "New review (to you)",
   password_reset: "Password reset",
   test: "Test email",
 };

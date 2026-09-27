@@ -21,6 +21,7 @@ export default async function DashboardLayout({ children }: LayoutProps<"/dashbo
             <NavLink href="/dashboard/bookings">Bookings</NavLink>
             <NavLink href="/dashboard/galleries">Galleries</NavLink>
             <NavLink href="/dashboard/clients">Clients</NavLink>
+            <NavLink href="/dashboard/reviews">Reviews</NavLink>
             <NavLink href="/dashboard/settings">
               <GearIcon size={15} strokeWidth={2.25} /> Settings
             </NavLink>

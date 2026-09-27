@@ -371,3 +371,40 @@ export function testEmail(studioName: string): EmailContent {
     ],
   };
 }
+
+// ---- Reviews ----
+
+export function reviewRequestClient(o: { studioName: string; clientName: string; galleryTitle: string | null; url: string }): EmailContent {
+  return {
+    subject: `How were your photos? ${o.studioName} would love your review`,
+    heading: "How did we do?",
+    intro: [
+      `Hi ${firstName(o.clientName)}, thank you for choosing ${o.studioName}. It was a pleasure working with you.`,
+      `${o.galleryTitle ? `Now that you have your photos from "${o.galleryTitle}", w` : "W"}e'd love to hear what you think. It only takes a minute, and it helps other clients find us.`,
+    ],
+    button: { label: "Leave a review", url: o.url },
+    outro: ["You can add one of your favorite photos to your review too, if you'd like."],
+  };
+}
+
+export function reviewSubmittedStudio(o: {
+  clientName: string;
+  rating: number;
+  body: string;
+  withPhoto: boolean;
+  dashboardUrl: string;
+}): EmailContent {
+  const stars = "★".repeat(o.rating) + "☆".repeat(5 - o.rating);
+  return {
+    subject: `New ${o.rating}-star review from ${o.clientName}`,
+    heading: "You have a new review",
+    intro: [
+      `${o.clientName} left a review${o.withPhoto ? " with one of their photos" : ""}. It won't show on your studio page until you approve it.`,
+    ],
+    details: [
+      ["Rating", stars],
+      ["Review", o.body.length > 600 ? `${o.body.slice(0, 600).trimEnd()}…` : o.body],
+    ],
+    button: { label: "Review and approve", url: o.dashboardUrl },
+  };
+}

@@ -80,6 +80,11 @@ export const photographers = pgTable("photographers", {
   sessionReminderHours: integer("session_reminder_hours").default(24),
   balanceReminderDays: integer("balance_reminder_days").default(2),
   galleryExpiryReminderDays: integer("gallery_expiry_reminder_days").default(3),
+  // Reviews (like PhotoEZ Reviews): ask this many days after delivery
+  // (null = don't ask automatically), and an optional Google review link
+  // offered to happy reviewers after they submit.
+  reviewRequestDays: integer("review_request_days").default(3),
+  googleReviewUrl: text("google_review_url"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
@@ -661,4 +666,40 @@ export const emailLog = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index("email_log_photographer_idx").on(t.photographerId, t.createdAt)],
+);
+
+// A client's review of the studio, from a private link emailed after their
+// gallery is delivered. Screened by the photographer before it shows on the
+// studio page (requested → submitted → approved or rejected).
+export const reviews = pgTable(
+  "reviews",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    photographerId: uuid("photographer_id")
+      .notNull()
+      .references(() => photographers.id, { onDelete: "cascade" }),
+    // One review per gallery; kept if the gallery is later deleted.
+    galleryId: uuid("gallery_id")
+      .unique()
+      .references(() => galleries.id, { onDelete: "set null" }),
+    clientName: text("client_name").notNull(),
+    clientEmail: text("client_email").notNull(),
+    // Random, unguessable token in the review link.
+    token: text("token").notNull().unique(),
+    status: text("status", { enum: ["requested", "submitted", "approved", "rejected"] })
+      .notNull()
+      .default("requested"),
+    // The name shown with the review, e.g. "Jasmine L."
+    displayName: text("display_name"),
+    rating: integer("rating"),
+    body: text("body"),
+    // A photo from their gallery to show with the review, only with their OK.
+    photoId: uuid("photo_id").references(() => photos.id, { onDelete: "set null" }),
+    photoConsent: boolean("photo_consent").notNull().default(false),
+    requestedAt: timestamp("requested_at", { withTimezone: true }).notNull().defaultNow(),
+    submittedAt: timestamp("submitted_at", { withTimezone: true }),
+    approvedAt: timestamp("approved_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("reviews_photographer_idx").on(t.photographerId, t.status)],
 );

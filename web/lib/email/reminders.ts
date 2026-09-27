@@ -1,17 +1,19 @@
 import { and, eq, gt, inArray, isNotNull, isNull, lte, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { bookings, galleries, photographers } from "@/db/schema";
+import { sendDueReviewRequests } from "@/lib/review-requests";
 import { emailBalanceReminder, emailGalleryExpiring, emailSessionReminder } from "./notify";
 
 // The scheduled reminders (PhotoEZ for WordPress sends these from WP-Cron):
-// the session reminder, the balance reminder, and "your gallery closes soon".
+// the session reminder, the balance reminder, "your gallery closes soon",
+// and review requests.
 // The server runs this every 15 minutes (see app/api/cron/reminders). Each
 // reminder is claimed before it's sent, so two runs at once can't send twice.
 
 const HOUR = 60 * 60 * 1000;
 
 export async function runReminders(now = new Date()) {
-  const sent = { session: 0, balance: 0, gallery: 0 };
+  const sent = { session: 0, balance: 0, gallery: 0, reviews: 0 };
 
   // Session reminder: N hours before, for confirmed bookings.
   const sessionDue = await db
@@ -78,6 +80,9 @@ export async function runReminders(now = new Date()) {
       .returning({ id: galleries.id });
     if (claimed && (await emailGalleryExpiring(g.id))) sent.gallery++;
   }
+
+  // Review requests a few days after delivery.
+  sent.reviews = await sendDueReviewRequests(now);
 
   return sent;
 }
