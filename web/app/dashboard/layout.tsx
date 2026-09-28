@@ -58,6 +58,7 @@ export default async function DashboardLayout({ children }: LayoutProps<"/dashbo
                 { href: "/dashboard/settings", label: "Settings" },
                 { href: "/dashboard/design", label: "Design" },
                 { href: "/dashboard/billing", label: "Billing" },
+                { href: "/dashboard/billing#refer", label: "Refer a photographer" },
                 { href: "/dashboard/emails", label: "Email log" },
               ]}
             />

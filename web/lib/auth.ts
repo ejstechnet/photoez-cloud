@@ -6,6 +6,7 @@ import * as schema from "@/db/schema";
 import { passwordReset } from "@/lib/email/messages";
 import { sendEmail } from "@/lib/email/send";
 import { TRIAL_DAYS } from "@/lib/plans";
+import { referrerFromCookieHeader } from "@/lib/referrals";
 
 // Server-side auth setup. BETTER_AUTH_SECRET and BETTER_AUTH_URL are read
 // from web/.env automatically.
@@ -37,14 +38,20 @@ export const auth = betterAuth({
       businessName: { type: "string", required: false },
       // Set below on sign-up; never taken from the sign-up form.
       trialEndsAt: { type: "date", required: false, input: false },
+      referredById: { type: "string", required: false, input: false },
     },
   },
-  // Every new studio starts with a free Pro trial (lib/plans.ts).
+  // Every new studio starts with a free Pro trial (lib/plans.ts), and
+  // remembers who referred it, from the /r link's cookie (lib/referrals.ts).
   databaseHooks: {
     user: {
       create: {
-        before: async (user) => ({
-          data: { ...user, trialEndsAt: new Date(Date.now() + TRIAL_DAYS * 24 * 60 * 60 * 1000) },
+        before: async (user, context) => ({
+          data: {
+            ...user,
+            trialEndsAt: new Date(Date.now() + TRIAL_DAYS * 24 * 60 * 60 * 1000),
+            referredById: await referrerFromCookieHeader(context?.headers?.get("cookie")).catch(() => null),
+          },
         }),
       },
     },

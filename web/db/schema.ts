@@ -92,6 +92,10 @@ export const photographers = pgTable("photographers", {
   directoryState: text("directory_state"),
   directoryLat: doublePrecision("directory_lat"),
   directoryLng: doublePrecision("directory_lng"),
+  // Photographer referrals (lib/referrals.ts): this studio's link code
+  // (/r/<code>), and who referred this studio, if anyone.
+  referralCode: text("referral_code").unique(),
+  referredById: uuid("referred_by_id"),
   // Price per photo a client selects beyond a gallery's included number
   // (PhotoEZ's "global extra price"; galleries can override it).
   extraPhotoPriceCents: integer("extra_photo_price_cents").notNull().default(1000),
@@ -858,4 +862,27 @@ export const assistantConversations = pgTable(
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index("assistant_conversations_photographer_idx").on(t.photographerId, t.updatedAt)],
+);
+
+// A photographer referral that paid off: once the referred studio's first
+// plan payment goes through, the referrer gets a month of credit on their
+// PhotoEZ Cloud bill (lib/referrals.ts). One row per referred studio.
+export const referralRewards = pgTable(
+  "referral_rewards",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    referrerId: uuid("referrer_id")
+      .notNull()
+      .references(() => photographers.id, { onDelete: "cascade" }),
+    referredId: uuid("referred_id")
+      .notNull()
+      .unique()
+      .references(() => photographers.id, { onDelete: "cascade" }),
+    // "credited" = added to the referrer's Stripe balance; "capped" = past
+    // the yearly limit, so no credit.
+    status: text("status", { enum: ["credited", "capped"] }).notNull(),
+    amountCents: integer("amount_cents").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("referral_rewards_referrer_idx").on(t.referrerId, t.createdAt)],
 );

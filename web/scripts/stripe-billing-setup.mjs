@@ -79,4 +79,17 @@ if (mine) {
   });
   console.log("Created billing portal settings");
 }
+// Referred studios' 20% off their first plan payment (lib/plans.ts).
+try {
+  await stripe.coupons.retrieve("photoez_referral_20");
+} catch {
+  await stripe.coupons.create({
+    id: "photoez_referral_20",
+    name: "Referred by a photographer: 20% off",
+    percent_off: 20,
+    duration: "once",
+    metadata: { app: "photoez_cloud" },
+  });
+  console.log("Created referral coupon (20% off the first payment)");
+}
 console.log("Done.");

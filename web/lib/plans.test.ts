@@ -47,3 +47,10 @@ test("what each plan includes and allows", () => {
   assert.equal(formatStorage(3 * 1024 ** 3), "3 GB");
   assert.equal(formatStorage(250 * 1024 ** 2), "250 MB");
 });
+
+test("a referral earns a month of the referrer's plan, or of Pro on Free", async () => {
+  const { referralRewardCents } = await import("./plans.ts");
+  assert.equal(referralRewardCents("studio"), 3900);
+  assert.equal(referralRewardCents("pro"), 1900);
+  assert.equal(referralRewardCents("free"), 1900);
+});
