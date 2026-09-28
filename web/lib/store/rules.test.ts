@@ -63,9 +63,18 @@ test("totals add shipping and handling once per order", () => {
       ],
       settings,
     ),
-    { subtotalCents: 7500, shippingCents: 800, handlingCents: 300, totalCents: 8600 },
+    { subtotalCents: 7500, shippingCents: 800, selfShippingCents: 800, labShippingCents: 0, handlingCents: 300, totalCents: 8600 },
   );
   assert.equal(cartTotals([], settings).totalCents, 0);
+  // SwaggPress items only: the chosen rate, not the studio's shipping.
+  assert.deepEqual(cartTotals([{ unitCents: 2400, quantity: 1, fulfillment: "swaggpress" }], settings, 540), {
+    subtotalCents: 2400, shippingCents: 540, selfShippingCents: 0, labShippingCents: 540, handlingCents: 300, totalCents: 3240,
+  });
+  // Mixed: both shipments, handling once.
+  assert.equal(
+    cartTotals([{ unitCents: 3000, quantity: 1 }, { unitCents: 2400, quantity: 1, fulfillment: "swaggpress" }], settings, 540).totalCents,
+    3000 + 2400 + 800 + 540 + 300,
+  );
 });
 
 test("order numbers and tracking links", () => {

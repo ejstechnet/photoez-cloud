@@ -12,6 +12,7 @@ import { photoKey, signedViewUrl } from "@/lib/storage";
 import { trackingUrl } from "@/lib/store/rules";
 import { StoreOrderPill } from "../status-pill";
 import { ShipForm } from "./ship-form";
+import { RetryLab } from "./retry-lab";
 
 export const metadata: Metadata = { title: "Store order" };
 
@@ -41,6 +42,9 @@ export default async function StoreOrderPage({ params }: PageProps<"/dashboard/s
     ).map(async ({ item, fileKey }) => ({ ...item, thumbUrl: fileKey ? await signedViewUrl(photoKey(fileKey, "thumb")) : null })),
   );
   const track = trackingUrl(order.carrier, order.trackingNumber);
+  const labTrack = trackingUrl(order.labCarrier, order.labTracking);
+  const hasSelf = items.some((i) => i.fulfillment === "self");
+  const hasLab = items.some((i) => i.fulfillment === "swaggpress");
 
   return (
     <div className="max-w-4xl">
@@ -86,6 +90,9 @@ export default async function StoreOrderPage({ params }: PageProps<"/dashboard/s
               <div className="min-w-0 flex-1">
                 <p className="font-semibold">
                   {item.quantity} × {item.productName} · {item.variantLabel}
+                  {item.fulfillment === "swaggpress" && (
+                    <span className="ml-2 rounded-full bg-coral/15 px-2 py-0.5 text-xs font-bold text-coral uppercase">SwaggPress</span>
+                  )}
                 </p>
                 <p className="truncate text-sm text-muted">
                   {item.photoName}
@@ -107,7 +114,7 @@ export default async function StoreOrderPage({ params }: PageProps<"/dashboard/s
             <dd>{formatPrice(order.subtotalCents)}</dd>
           </div>
           <div className="flex justify-between">
-            <dt>Shipping</dt>
+            <dt>Shipping{order.labShippingService ? ` (incl. ${order.labShippingService})` : ""}</dt>
             <dd>{formatPrice(order.shippingCents)}</dd>
           </div>
           {order.handlingCents > 0 && (
@@ -150,35 +157,83 @@ export default async function StoreOrderPage({ params }: PageProps<"/dashboard/s
             <p className="mt-3 text-muted">No address yet.</p>
           )}
         </section>
-        <section className="card p-6">
-          <h2 className="font-display text-xl font-bold">Shipping</h2>
-          {order.status === "shipped" ? (
-            <p className="mt-3">
-              Shipped {order.shippedAt ? formatDate(order.shippedAt, studio.timeZone, "short") : ""}
-              {order.carrier && ` by ${order.carrier}`}
-              {order.trackingNumber && (
-                <>
-                  <br />
-                  Tracking:{" "}
-                  {track ? (
-                    <a href={track} target="_blank" rel="noreferrer" className="link">
-                      {order.trackingNumber}
-                    </a>
-                  ) : (
-                    order.trackingNumber
+        <div className="space-y-6">
+          {hasSelf && (
+            <section className="card p-6">
+              <h2 className="font-display text-xl font-bold">{hasLab ? "Your items" : "Shipping"}</h2>
+              {order.shippedAt ? (
+                <p className="mt-3">
+                  Shipped {formatDate(order.shippedAt, studio.timeZone, "short")}
+                  {order.carrier && ` by ${order.carrier}`}
+                  {order.trackingNumber && (
+                    <>
+                      <br />
+                      Tracking:{" "}
+                      {track ? (
+                        <a href={track} target="_blank" rel="noreferrer" className="link">
+                          {order.trackingNumber}
+                        </a>
+                      ) : (
+                        order.trackingNumber
+                      )}
+                    </>
                   )}
-                </>
+                </p>
+              ) : order.status === "paid" ? (
+                <div className="mt-3">
+                  <p className="mb-4 text-sm text-muted">
+                    When {hasLab ? "your items are" : "it\u2019s"} on the way, the client gets an email with the tracking link.
+                  </p>
+                  <ShipForm orderId={order.id} />
+                </div>
+              ) : (
+                <p className="mt-3 text-muted">This order wasn&rsquo;t paid.</p>
               )}
-            </p>
-          ) : order.status === "paid" ? (
-            <div className="mt-3">
-              <p className="mb-4 text-sm text-muted">When it&rsquo;s on its way, the client gets an email with the tracking link.</p>
-              <ShipForm orderId={order.id} />
-            </div>
-          ) : (
-            <p className="mt-3 text-muted">This order wasn&rsquo;t paid.</p>
+            </section>
           )}
-        </section>
+          {hasLab && (
+            <section className="card p-6">
+              <h2 className="font-display text-xl font-bold">SwaggPress</h2>
+              <p className="mt-1 text-xs text-muted">Printed and shipped for you. Charged to your SwaggPress card at wholesale.</p>
+              {order.labStatus === "shipped" ? (
+                <p className="mt-3">
+                  Shipped {order.labShippedAt ? formatDate(order.labShippedAt, studio.timeZone, "short") : ""}
+                  {order.labCarrier && ` by ${order.labCarrier}`}
+                  {order.labTracking && (
+                    <>
+                      <br />
+                      Tracking:{" "}
+                      {labTrack ? (
+                        <a href={labTrack} target="_blank" rel="noreferrer" className="link">
+                          {order.labTracking}
+                        </a>
+                      ) : (
+                        order.labTracking
+                      )}
+                    </>
+                  )}
+                  <br />
+                  <span className="text-sm text-muted">Your client was emailed the tracking link.</span>
+                </p>
+              ) : order.labStatus === "sent" ? (
+                <p className="mt-3">
+                  Sent to SwaggPress{order.labOrderNumber && <> as order <strong>{order.labOrderNumber}</strong></>}
+                  {order.labSubmittedAt && ` on ${formatDate(order.labSubmittedAt, studio.timeZone, "short")}`}. We&rsquo;ll email
+                  your client the tracking link when it ships.
+                </p>
+              ) : order.labStatus === "failed" ? (
+                <div className="mt-3">
+                  <p className="rounded-xl bg-coral/15 px-4 py-3 text-sm font-semibold text-danger">{order.labError ?? "Sending failed."}</p>
+                  <RetryLab orderId={order.id} />
+                </div>
+              ) : order.status === "paid" ? (
+                <p className="mt-3 text-muted">Sending to SwaggPress…</p>
+              ) : (
+                <p className="mt-3 text-muted">Sent once the client pays.</p>
+              )}
+            </section>
+          )}
+        </div>
       </div>
     </div>
   );

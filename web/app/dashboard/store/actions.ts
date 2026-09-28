@@ -1,12 +1,14 @@
 "use server";
 
 import { randomBytes } from "node:crypto";
-import { and, count, eq } from "drizzle-orm";
+import { and, count, eq, isNull } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { db } from "@/db";
 import { photographers, storeOrders, storeProducts, type StoreVariant } from "@/db/schema";
 import { emailStoreOrderShipped } from "@/lib/email/notify";
+import { refreshOrderShipped, submitLabOrder } from "@/lib/swaggpress/orders";
+import { addSwaggProduct, connectSwaggPress, disconnectSwaggPress, syncSwaggProducts } from "@/lib/swaggpress/catalog";
 import { requirePhotographer } from "@/lib/session";
 import { MAX_PRODUCT_PHOTOS, MAX_VARIANTS, STARTER_PRINTS, parsePrice } from "@/lib/store/rules";
 import { deletePrefix, signedUploadUrl, storedSize, storeProductPhotoKey } from "@/lib/storage";
@@ -80,17 +82,48 @@ function readVariants(formData: FormData, existing: StoreVariant[]) {
   return { variants };
 }
 
+// New retail prices for a SwaggPress product's sizes (variantPrice.<id>),
+// each above its wholesale price so an order never loses money.
+function readSwaggPrices(formData: FormData, variants: StoreVariant[]) {
+  const next: StoreVariant[] = [];
+  for (const v of variants) {
+    const raw = formData.get(`variantPrice.${v.id}`);
+    if (raw === null) {
+      next.push(v);
+      continue;
+    }
+    const priceCents = parsePrice(String(raw));
+    if (priceCents === null) return { error: `Enter a price for ${v.label}, from $0.50 up.` };
+    if (v.wholesaleCents != null && priceCents <= v.wholesaleCents && v.available !== false) {
+      return { error: `${v.label} must cost more than its $${(v.wholesaleCents / 100).toFixed(2)} wholesale price.` };
+    }
+    next.push({ ...v, priceCents });
+  }
+  return { variants: next };
+}
+
 async function saveProduct(photographerId: string, productId: string | null, formData: FormData): Promise<ProductFormState> {
   const name = String(formData.get("name") ?? "").trim().slice(0, 80);
   if (!name) return { message: "Give the product a name, like Photo Prints." };
   const description = String(formData.get("description") ?? "").trim().slice(0, 200) || null;
   const [current] = productId
     ? await db
-        .select({ variants: storeProducts.variants })
+        .select({ variants: storeProducts.variants, fulfillment: storeProducts.fulfillment })
         .from(storeProducts)
         .where(and(eq(storeProducts.id, productId), eq(storeProducts.photographerId, photographerId)))
     : [];
   if (productId && !current) return { message: "That product could not be found." };
+  if (current?.fulfillment === "swaggpress") {
+    // SwaggPress products: sizes come from SwaggPress; only prices are the studio's.
+    const priced = readSwaggPrices(formData, current.variants);
+    if ("error" in priced) return { message: priced.error };
+    await db
+      .update(storeProducts)
+      .set({ name, description, variants: priced.variants, active: formData.get("active") === "on" })
+      .where(eq(storeProducts.id, productId!));
+    revalidatePath("/dashboard/store");
+    redirect("/dashboard/store");
+  }
   const read = readVariants(formData, current?.variants ?? []);
   if ("error" in read) return { message: read.error };
   // Cropping now follows each size's width and height (lib/store/rules.ts).
@@ -157,13 +190,23 @@ export async function markOrderShipped(orderId: string, formData: FormData): Pro
   if (!isUuid(orderId)) return { message: "That order could not be found." };
   const carrier = String(formData.get("carrier") ?? "").trim().slice(0, 40) || null;
   const tracking = String(formData.get("tracking") ?? "").trim().slice(0, 80) || null;
+  // The studio's own items; SwaggPress items are tracked on their own, and
+  // the order counts as shipped once both are on their way.
   const updated = await db
     .update(storeOrders)
-    .set({ status: "shipped", shippedAt: new Date(), carrier, trackingNumber: tracking })
-    .where(and(eq(storeOrders.id, orderId), eq(storeOrders.photographerId, photographer.id), eq(storeOrders.status, "paid")))
+    .set({ shippedAt: new Date(), carrier, trackingNumber: tracking })
+    .where(
+      and(
+        eq(storeOrders.id, orderId),
+        eq(storeOrders.photographerId, photographer.id),
+        eq(storeOrders.status, "paid"),
+        isNull(storeOrders.shippedAt),
+      ),
+    )
     .returning({ id: storeOrders.id });
   if (updated.length === 0) return { message: "Only paid orders can be marked shipped." };
-  await emailStoreOrderShipped(orderId);
+  await refreshOrderShipped(orderId);
+  await emailStoreOrderShipped(orderId, "self");
   revalidatePath("/dashboard/store/orders", "layout");
   return {};
 }
@@ -233,4 +276,55 @@ export async function moveProductPhoto(productId: string, key: string, by: -1 | 
   if (!order) return;
   await db.update(storeProducts).set({ imageKeys: order }).where(eq(storeProducts.id, productId));
   revalidatePath(`/dashboard/store/products/${productId}`);
+}
+
+// ---- SwaggPress (lib/swaggpress) ----
+
+export type SwaggConnectState = { message?: string; connected?: string };
+
+export async function connectSwagg(_prev: SwaggConnectState, formData: FormData): Promise<SwaggConnectState> {
+  const photographer = await requirePhotographer();
+  const result = await connectSwaggPress(photographer.id, String(formData.get("apiKey") ?? ""));
+  if ("error" in result) return { message: result.error };
+  revalidatePath("/dashboard/store", "layout");
+  return { connected: result.business };
+}
+
+export async function disconnectSwagg(): Promise<void> {
+  const photographer = await requirePhotographer();
+  await disconnectSwaggPress(photographer.id);
+  revalidatePath("/dashboard/store", "layout");
+}
+
+// "Add to my store" from the SwaggPress catalog, then on to its prices.
+export async function addSwaggToStore(labProductId: number): Promise<{ message?: string }> {
+  const photographer = await requirePhotographer();
+  if (!Number.isInteger(labProductId) || labProductId < 1) return { message: "That product could not be found." };
+  const result = await addSwaggProduct(photographer.id, labProductId);
+  if ("error" in result) return { message: result.error };
+  revalidatePath("/dashboard/store", "layout");
+  redirect(`/dashboard/store/products/${result.id}?added=swaggpress`);
+}
+
+// "Refresh prices": pulls SwaggPress's current sizes and wholesale prices now.
+export async function refreshSwagg(): Promise<{ message: string; ok: boolean }> {
+  const photographer = await requirePhotographer();
+  const error = await syncSwaggProducts(photographer.id, undefined, true);
+  revalidatePath("/dashboard/store", "layout");
+  return error ? { ok: false, message: error } : { ok: true, message: "Updated from SwaggPress just now." };
+}
+
+// The order page's "Send to SwaggPress again" after a failure.
+export async function retryLabOrder(orderId: string): Promise<{ message?: string }> {
+  const photographer = await requirePhotographer();
+  if (!isUuid(orderId)) return { message: "That order could not be found." };
+  const [order] = await db
+    .select({ id: storeOrders.id })
+    .from(storeOrders)
+    .where(and(eq(storeOrders.id, orderId), eq(storeOrders.photographerId, photographer.id)));
+  if (!order) return { message: "That order could not be found." };
+  await db.update(storeOrders).set({ labStatus: "pending" }).where(and(eq(storeOrders.id, orderId), eq(storeOrders.labStatus, "failed")));
+  const result = await submitLabOrder(orderId);
+  revalidatePath(`/dashboard/store/orders/${orderId}`);
+  return "error" in result ? { message: result.error } : {};
 }

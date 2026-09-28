@@ -109,6 +109,13 @@ export const photographers = pgTable("photographers", {
   storeEnabled: boolean("store_enabled").notNull().default(false),
   storeShippingCents: integer("store_shipping_cents").notNull().default(0),
   storeHandlingCents: integer("store_handling_cents").notNull().default(0),
+  // SwaggPress Creations, the store's print and merch partner (lib/swaggpress):
+  // the studio's partner API key, sealed (lib/secret-box.ts), and what we
+  // last heard about the partner account.
+  swaggpressKey: text("swaggpress_key"),
+  swaggpressBusiness: text("swaggpress_business"),
+  swaggpressCardOnFile: boolean("swaggpress_card_on_file").notNull().default(false),
+  swaggpressSyncedAt: timestamp("swaggpress_synced_at", { withTimezone: true }),
   // Price per photo a client selects beyond a gallery's included number
   // (PhotoEZ's "global extra price"; galleries can override it).
   extraPhotoPriceCents: integer("extra_photo_price_cents").notNull().default(1000),
@@ -928,7 +935,18 @@ export const referralRewards = pgTable(
 
 // One size or option of a store product, e.g. "8×10" at $25. For prints,
 // widthIn × heightIn is the shape the client crops their photo to.
-export type StoreVariant = { id: string; label: string; priceCents: number; widthIn: number | null; heightIn: number | null };
+export type StoreVariant = {
+  id: string;
+  label: string;
+  priceCents: number;
+  widthIn: number | null;
+  heightIn: number | null;
+  // SwaggPress products: the partner's variant and its wholesale price, and
+  // whether SwaggPress still offers it (lib/swaggpress/catalog.ts).
+  labVariantId?: number | null;
+  wholesaleCents?: number | null;
+  available?: boolean;
+};
 
 // Something clients can order with one of their photos: a print, canvas,
 // mug, tee… "self" = the studio makes and ships it; lab partners like
@@ -948,7 +966,12 @@ export const storeProducts = pgTable(
     // Pictures of the product itself (a sample canvas, the tee), in order;
     // storage keys (lib/storage.ts storeProductPhotoKey), up to 6.
     imageKeys: jsonb("image_keys").$type<string[]>().notNull().default([]),
-    fulfillment: text("fulfillment", { enum: ["self"] }).notNull().default("self"),
+    fulfillment: text("fulfillment", { enum: ["self", "swaggpress"] }).notNull().default("self"),
+    // SwaggPress products: which catalog product, its photos (their URLs),
+    // and whether SwaggPress stopped offering it.
+    labProductId: integer("lab_product_id"),
+    labImageUrls: jsonb("lab_image_urls").$type<string[]>().notNull().default([]),
+    labUnavailable: boolean("lab_unavailable").notNull().default(false),
     active: boolean("active").notNull().default(true),
     sortOrder: integer("sort_order").notNull().default(0),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
@@ -984,10 +1007,23 @@ export const storeOrders = pgTable(
     shippingCents: integer("shipping_cents").notNull().default(0),
     handlingCents: integer("handling_cents").notNull().default(0),
     totalCents: integer("total_cents").notNull(),
+    // The studio's own items: how they were shipped (carrier/tracking/shippedAt).
     carrier: text("carrier"),
     trackingNumber: text("tracking_number"),
     paidAt: timestamp("paid_at", { withTimezone: true }),
     shippedAt: timestamp("shipped_at", { withTimezone: true }),
+    // SwaggPress items (lib/swaggpress/orders.ts): the shipping the client
+    // chose, and the partner order's progress once sent.
+    labShippingCents: integer("lab_shipping_cents").notNull().default(0),
+    labShippingService: text("lab_shipping_service"),
+    labRateId: text("lab_rate_id"),
+    labStatus: text("lab_status", { enum: ["none", "pending", "sent", "failed", "shipped"] }).notNull().default("none"),
+    labOrderNumber: text("lab_order_number"),
+    labError: text("lab_error"),
+    labCarrier: text("lab_carrier"),
+    labTracking: text("lab_tracking"),
+    labSubmittedAt: timestamp("lab_submitted_at", { withTimezone: true }),
+    labShippedAt: timestamp("lab_shipped_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index("store_orders_photographer_idx").on(t.photographerId, t.createdAt)],
@@ -1012,7 +1048,29 @@ export const storeOrderItems = pgTable(
     quantity: integer("quantity").notNull(),
     crop: jsonb("crop").$type<StoreCrop>(),
     photoName: text("photo_name"),
-    fulfillment: text("fulfillment", { enum: ["self"] }).notNull().default("self"),
+    fulfillment: text("fulfillment", { enum: ["self", "swaggpress"] }).notNull().default("self"),
+    // SwaggPress items: which partner variant to send.
+    labVariantId: integer("lab_variant_id"),
+    labProductId: integer("lab_product_id"),
   },
   (t) => [index("store_order_items_order_idx").on(t.orderId)],
 );
+
+// Shipping options quoted in a gallery cart for SwaggPress items (live
+// Shippo rates via SwaggPress), kept so checkout charges exactly what was
+// shown. Expire after a day.
+export type StoreShipTo = { name: string; line1: string; line2: string; city: string; state: string; zip: string; phone: string };
+export type StoreQuotedRate = { id: string; carrier: string; service: string; amountCents: number; days: number | null };
+
+export const storeShippingQuotes = pgTable("store_shipping_quotes", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  galleryId: uuid("gallery_id")
+    .notNull()
+    .references(() => galleries.id, { onDelete: "cascade" }),
+  shipTo: jsonb("ship_to").$type<StoreShipTo>().notNull(),
+  rates: jsonb("rates").$type<StoreQuotedRate[]>().notNull(),
+  // The SwaggPress lines quoted (variant:qty…), so a changed cart needs a new quote.
+  itemsKey: text("items_key").notNull(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
