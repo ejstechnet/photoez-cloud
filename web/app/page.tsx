@@ -8,7 +8,18 @@ import { SignOutButton } from "@/app/dashboard/sign-out-button";
 import Link from "next/link";
 import Image from "next/image";
 import { Logo, WorkflowPills } from "@/components/brand";
-import { ArrowRightIcon, ChatIcon, InboxIcon, SearchIcon, WandIcon } from "@/components/icons";
+import {
+  ArrowRightIcon,
+  CalendarIcon,
+  CameraIcon,
+  ChatIcon,
+  ContractIcon,
+  ImagesIcon,
+  InboxIcon,
+  SearchIcon,
+  StarIcon,
+  WandIcon,
+} from "@/components/icons";
 import { PHOTOEZ_LINKS, WORDPRESS_PLUGINS } from "@/lib/photoez-links";
 import { WordPressMockup } from "@/components/marketing-mockups";
 
@@ -51,6 +62,15 @@ const cloudFeatures = [
   { title: "Emails & reminders", body: "Confirmations, reminders, and gallery emails sent for you." },
   { title: "Page Designer", body: "Your colors, fonts, banner, and gallery style." },
 ];
+
+// An icon and color for each plugin in "Meet PhotoEZ for WordPress".
+const PLUGIN_ICONS: Record<(typeof WORDPRESS_PLUGINS)[number]["name"], { icon: React.ReactNode; tint: string }> = {
+  PhotoEZ: { icon: <ImagesIcon size={20} />, tint: "bg-violet/15 text-violet" },
+  "PhotoEZ Booking": { icon: <CalendarIcon size={20} />, tint: "bg-sky/20 text-brand" },
+  "PhotoEZ Photography Contracts": { icon: <ContractIcon size={20} />, tint: "bg-coral/15 text-coral" },
+  "PhotoEZ Event Gallery": { icon: <CameraIcon size={20} />, tint: "bg-sun/25 text-brand-deep" },
+  "PhotoEZ Reviews": { icon: <StarIcon size={20} />, tint: "bg-lime/20 text-lime-ink" },
+};
 
 export default async function Home() {
   // Logged-in photographers get their own menu and buttons here.
@@ -313,8 +333,10 @@ export default async function Home() {
           <ul className="grid gap-3">
             {WORDPRESS_PLUGINS.map((plugin) => (
               <li key={plugin.name} className="card flex items-start gap-4 p-5">
-                <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-violet/15 font-display text-lg font-bold text-violet">
-                  {plugin.name.replace("PhotoEZ ", "").charAt(0)}
+                <span
+                  className={`grid size-10 shrink-0 place-items-center rounded-xl ${PLUGIN_ICONS[plugin.name].tint}`}
+                >
+                  {PLUGIN_ICONS[plugin.name].icon}
                 </span>
                 <span>
                   <span className="block font-semibold">{plugin.name}</span>

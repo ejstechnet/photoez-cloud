@@ -120,3 +120,25 @@ test("the studio's logo sits in the header; no logo means just the name", () => 
 
   assert.ok(!renderEmail(bookingConfirmedClient(booking), footer).html.includes("<img"));
 });
+
+test("referral emails: the credit thank-you and the share line in the finals email", async () => {
+  const { galleryFinalsClient, referralCreditClient } = await import("./messages.ts");
+  const share = { url: "https://example.com/studio/elle/friend/abc123", rewardCents: 2500, discountCents: 2500 };
+  const credit = referralCreditClient({
+    studioName: "Elle Jones Studios",
+    clientName: "Maya Brooks",
+    friendName: "Sara Embers",
+    amountCents: 2500,
+    expires: "March 28, 2027",
+    bookUrl: "https://example.com/studio/elle/book",
+    share,
+  });
+  assert.match(credit.subject, /\$25 toward your next session/);
+  assert.match(credit.intro[0], /Hi Maya, Sara just had their session/);
+  assert.deepEqual(credit.details?.[1], ["Use by", "March 28, 2027"]);
+  assert.match(credit.outro?.[0] ?? "", /friend\/abc123/);
+
+  const facts = { studioName: "Elle Jones Studios", clientName: "Maya", title: "Fall family", url: "https://x", expires: null };
+  assert.equal(galleryFinalsClient(facts, { photoCount: 3 }).outro?.length, 1);
+  assert.match(galleryFinalsClient(facts, { photoCount: 3, share }).outro?.[1] ?? "", /\$25 off their first session/);
+});

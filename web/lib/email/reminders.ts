@@ -3,18 +3,19 @@ import { db } from "@/db";
 import { bookings, galleries, photographers } from "@/db/schema";
 import { sendDueGiftCards } from "@/lib/gift-cards";
 import { sendDueReviewRequests } from "@/lib/review-requests";
+import { payDueClientReferrals } from "@/lib/client-referrals";
 import { emailBalanceReminder, emailGalleryExpiring, emailSessionReminder } from "./notify";
 
 // The scheduled reminders (PhotoEZ for WordPress sends these from WP-Cron):
 // the session reminder, the balance reminder, "your gallery closes soon",
-// and review requests.
+// and review requests; plus client referral credits.
 // The server runs this every 15 minutes (see app/api/cron/reminders). Each
 // reminder is claimed before it's sent, so two runs at once can't send twice.
 
 const HOUR = 60 * 60 * 1000;
 
 export async function runReminders(now = new Date()) {
-  const sent = { session: 0, balance: 0, gallery: 0, reviews: 0, giftCards: 0 };
+  const sent = { session: 0, balance: 0, gallery: 0, reviews: 0, giftCards: 0, referrals: 0 };
 
   // Session reminder: N hours before, for confirmed bookings.
   const sessionDue = await db
@@ -87,6 +88,9 @@ export async function runReminders(now = new Date()) {
 
   // Gift cards scheduled for a day that has come.
   sent.giftCards = await sendDueGiftCards(now);
+
+  // Client referrals: credit for the client who shared, once their friend's session has happened.
+  sent.referrals = await payDueClientReferrals(now);
 
   return sent;
 }

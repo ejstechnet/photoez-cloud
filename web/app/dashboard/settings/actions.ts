@@ -557,3 +557,31 @@ export async function saveDirectoryListing(_prev: DirectoryFormState, formData: 
   revalidatePath("/photographers", "layout");
   return { saved: true };
 }
+
+// ---- Client referrals ----
+
+export type ClientReferralsState = { message?: string; saved?: boolean };
+
+// Whole or half dollars from $1 to $500, in cents; null when not valid.
+function referralAmount(value: FormDataEntryValue | null) {
+  const dollars = Number(String(value ?? "").trim().replace(/^\$/, ""));
+  if (!Number.isFinite(dollars) || dollars < 1 || dollars > 500) return null;
+  return Math.round(dollars * 100);
+}
+
+export async function saveClientReferrals(_prev: ClientReferralsState, formData: FormData): Promise<ClientReferralsState> {
+  const photographer = await requirePhotographer();
+  const discount = referralAmount(formData.get("discount"));
+  const reward = referralAmount(formData.get("reward"));
+  if (discount === null || reward === null) return { message: "Use dollar amounts from $1 to $500." };
+  await db
+    .update(photographers)
+    .set({
+      clientReferralsEnabled: formData.get("enabled") === "on",
+      clientReferralDiscountCents: discount,
+      clientReferralRewardCents: reward,
+    })
+    .where(eq(photographers.id, photographer.id));
+  revalidatePath("/dashboard", "layout");
+  return { saved: true };
+}

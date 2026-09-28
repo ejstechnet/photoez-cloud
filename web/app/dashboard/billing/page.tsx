@@ -12,7 +12,7 @@ import { refreshSubscription } from "@/lib/billing";
 import { stripeConfigured } from "@/lib/stripe";
 import { manageBilling, subscribe } from "./actions";
 import { BrandingToggle } from "./branding-toggle";
-import { ReferralLink } from "./referral-link";
+import { CopyLink } from "@/components/copy-link";
 import { referralSummary } from "@/lib/referrals";
 import { siteUrl } from "@/lib/site";
 import { REFERRAL_DISCOUNT_PERCENT, REFERRAL_YEARLY_CAP, referralRewardCents } from "@/lib/plans";
@@ -201,7 +201,7 @@ export default async function BillingPage({ searchParams }: PageProps<"/dashboar
           months a year.
         </p>
         <div className="mt-5">
-          <ReferralLink url={`${siteUrl}/r/${referrals.code}`} />
+          <CopyLink url={`${siteUrl}/r/${referrals.code}`} label="Your referral link" />
         </div>
         <dl className="mt-6 grid grid-cols-3 gap-3 text-center">
           {[

@@ -96,6 +96,12 @@ export const photographers = pgTable("photographers", {
   // (/r/<code>), and who referred this studio, if anyone.
   referralCode: text("referral_code").unique(),
   referredById: uuid("referred_by_id"),
+  // Client referrals (lib/client-referrals.ts): the studio's clients share a
+  // link; a friend's first session gets a discount, and once it has happened
+  // the client who shared gets a session credit.
+  clientReferralsEnabled: boolean("client_referrals_enabled").notNull().default(false),
+  clientReferralRewardCents: integer("client_referral_reward_cents").notNull().default(2500),
+  clientReferralDiscountCents: integer("client_referral_discount_cents").notNull().default(2500),
   // Price per photo a client selects beyond a gallery's included number
   // (PhotoEZ's "global extra price"; galleries can override it).
   extraPhotoPriceCents: integer("extra_photo_price_cents").notNull().default(1000),
@@ -198,6 +204,8 @@ export const clients = pgTable(
     email: text("email"),
     phone: text("phone"),
     notes: text("notes"),
+    // This client's share-with-a-friend link code (/studio/<slug>/friend/<code>).
+    referralCode: text("referral_code").unique(),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index("clients_photographer_idx").on(t.photographerId)],
@@ -483,6 +491,13 @@ export const bookings = pgTable(
     // A gift card put toward the booking (counts as paid, like credit).
     giftCardId: uuid("gift_card_id"),
     giftCardCents: integer("gift_card_cents").notNull().default(0),
+    // A friend's booking through a client's referral link: who shared it,
+    // the friend's discount (already part of discountCents), the credit
+    // promised to the client who shared, and when it was given.
+    referredByClientId: uuid("referred_by_client_id").references(() => clients.id, { onDelete: "set null" }),
+    referralDiscountCents: integer("referral_discount_cents").notNull().default(0),
+    referralRewardCents: integer("referral_reward_cents").notNull().default(0),
+    referralRewardedAt: timestamp("referral_rewarded_at", { withTimezone: true }),
     // The client's answers to the studio's custom booking questions, copied
     // with each question's wording so later edits don't change past bookings.
     answers: jsonb("answers").$type<BookingAnswer[]>().notNull().default([]),

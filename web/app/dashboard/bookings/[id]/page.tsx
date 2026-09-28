@@ -65,8 +65,11 @@ export default async function BookingPage({ params }: PageProps<"/dashboard/book
           ] as [string, React.ReactNode],
         ]
       : []),
-    ...(booking.discountCents > 0
-      ? [[`Coupon ${booking.couponCode ?? ""}`.trim(), `−${formatPrice(booking.discountCents)}`] as [string, React.ReactNode]]
+    ...(booking.discountCents - booking.referralDiscountCents > 0
+      ? [[`Coupon ${booking.couponCode ?? ""}`.trim(), `−${formatPrice(booking.discountCents - booking.referralDiscountCents)}`] as [string, React.ReactNode]]
+      : []),
+    ...(booking.referralDiscountCents > 0
+      ? [["Friend discount", `−${formatPrice(booking.referralDiscountCents)}`] as [string, React.ReactNode]]
       : []),
     ...(extras.length > 0 || booking.discountCents > 0
       ? [["Total", <strong key="t">{formatPrice(totalCents)}</strong>] as [string, React.ReactNode]]

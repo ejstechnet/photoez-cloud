@@ -262,7 +262,15 @@ export function galleryProofsClient(g: GalleryFacts, o: { photoCount: number; fr
   };
 }
 
-export function galleryFinalsClient(g: GalleryFacts, o: { photoCount: number }): EmailContent {
+// The client's share-with-a-friend link (lib/client-referrals.ts), when the
+// studio has client referrals on.
+export type ShareFacts = { url: string; rewardCents: number; discountCents: number };
+
+function shareLine(share: ShareFacts, studioName: string) {
+  return `Know someone who'd love a session? Share your link and they get ${formatPrice(share.discountCents)} off their first session with ${studioName}. After their session, you get ${formatPrice(share.rewardCents)} toward your next one: ${share.url}`;
+}
+
+export function galleryFinalsClient(g: GalleryFacts, o: { photoCount: number; share?: ShareFacts | null }): EmailContent {
   return {
     subject: `Your final photos from ${g.studioName} are ready to download`,
     heading: "Your final photos are here!",
@@ -275,7 +283,10 @@ export function galleryFinalsClient(g: GalleryFacts, o: { photoCount: number }):
       ...(g.expires ? ([["Download by", g.expires]] as [string, string][]) : []),
     ],
     button: { label: "Download my photos", url: g.url },
-    outro: [g.expires ? "Please download them before the gallery closes." : "Enjoy your photos!"],
+    outro: [
+      g.expires ? "Please download them before the gallery closes." : "Enjoy your photos!",
+      ...(o.share ? [shareLine(o.share, g.studioName)] : []),
+    ],
   };
 }
 
@@ -479,4 +490,31 @@ export function giftCardSoldStudio(g: GiftCardFacts & { dashboardUrl: string }):
 
 export function studioMessage(subject: string, body: string): EmailContent {
   return { subject, intro: toParagraphs(body) };
+}
+
+// ---- Client referrals ----
+
+export function referralCreditClient(o: {
+  studioName: string;
+  clientName: string;
+  friendName: string;
+  amountCents: number;
+  expires: string | null;
+  bookUrl: string | null;
+  share: ShareFacts | null;
+}): EmailContent {
+  return {
+    subject: `You earned ${formatPrice(o.amountCents)} toward your next session with ${o.studioName}`,
+    heading: "Thank you for the referral! 🎉",
+    intro: [
+      `Hi ${firstName(o.clientName)}, ${firstName(o.friendName)} just had their session with ${o.studioName}, thanks to you. As a thank-you, you have ${formatPrice(o.amountCents)} of credit toward your next session.`,
+      "It's saved under this email address and comes off automatically when you book with it.",
+    ],
+    details: [
+      ["Credit", formatPrice(o.amountCents)],
+      ...(o.expires ? ([["Use by", o.expires]] as [string, string][]) : []),
+    ],
+    ...(o.bookUrl ? { button: { label: "Book a session", url: o.bookUrl } } : {}),
+    outro: o.share ? [shareLine(o.share, o.studioName)] : [],
+  };
 }
