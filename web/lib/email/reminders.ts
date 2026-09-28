@@ -4,6 +4,8 @@ import { bookings, galleries, photographers } from "@/db/schema";
 import { sendDueGiftCards } from "@/lib/gift-cards";
 import { sendDueReviewRequests } from "@/lib/review-requests";
 import { payDueClientReferrals } from "@/lib/client-referrals";
+import { runLabOrders } from "@/lib/swaggpress/orders";
+import { syncSwaggProducts } from "@/lib/swaggpress/catalog";
 import { emailBalanceReminder, emailGalleryExpiring, emailSessionReminder } from "./notify";
 
 // The scheduled reminders (PhotoEZ for WordPress sends these from WP-Cron):
@@ -15,7 +17,7 @@ import { emailBalanceReminder, emailGalleryExpiring, emailSessionReminder } from
 const HOUR = 60 * 60 * 1000;
 
 export async function runReminders(now = new Date()) {
-  const sent = { session: 0, balance: 0, gallery: 0, reviews: 0, giftCards: 0, referrals: 0 };
+  const sent = { session: 0, balance: 0, gallery: 0, reviews: 0, giftCards: 0, referrals: 0, labShipped: 0 };
 
   // Session reminder: N hours before, for confirmed bookings.
   const sessionDue = await db
@@ -91,6 +93,15 @@ export async function runReminders(now = new Date()) {
 
   // Client referrals: credit for the client who shared, once their friend's session has happened.
   sent.referrals = await payDueClientReferrals(now);
+
+  // SwaggPress: send paid orders, pick up tracking, and keep added products
+  // in step with the SwaggPress catalog (each studio at most every 6 hours).
+  sent.labShipped = await runLabOrders(now).catch((error) => {
+    console.error("SwaggPress orders job failed", error);
+    return 0;
+  });
+  const connected = await db.select({ id: photographers.id }).from(photographers).where(isNotNull(photographers.swaggpressKey));
+  for (const { id } of connected) await syncSwaggProducts(id).catch((error) => console.error("SwaggPress sync failed", error));
 
   return sent;
 }

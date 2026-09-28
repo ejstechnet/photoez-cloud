@@ -8,6 +8,9 @@ import { paymentAccount } from "@/lib/payments/checkout";
 import { requirePhotographer } from "@/lib/session";
 import { addStarterPrints } from "./actions";
 import { StoreSettingsForm } from "./settings-form";
+import { SwaggCard } from "./swagg-card";
+import { sellable } from "@/lib/swaggpress/mapping";
+import { formatDate, formatTime } from "@/lib/booking/time";
 
 export const metadata: Metadata = { title: "Store" };
 
@@ -20,6 +23,11 @@ export default async function StorePage() {
         enabled: photographers.storeEnabled,
         shippingCents: photographers.storeShippingCents,
         handlingCents: photographers.storeHandlingCents,
+        swaggKey: photographers.swaggpressKey,
+        swaggBusiness: photographers.swaggpressBusiness,
+        swaggCard: photographers.swaggpressCardOnFile,
+        swaggSyncedAt: photographers.swaggpressSyncedAt,
+        timeZone: photographers.timeZone,
       })
       .from(photographers)
       .where(eq(photographers.id, user.id)),
@@ -46,7 +54,7 @@ export default async function StorePage() {
       </div>
       <p className="mt-2 max-w-3xl text-muted">
         Clients order prints and products of their photos right from their delivered gallery and pay you through Stripe.
-        You make and ship these yourself for now; print partners like SwaggPress Creations are coming next.
+        Make and ship items yourself, or let SwaggPress Creations print and ship them for you.
       </p>
       {!account && (
         <p className="mt-6 rounded-2xl bg-sun/30 px-5 py-4 text-sm font-semibold">
@@ -59,12 +67,20 @@ export default async function StorePage() {
       )}
 
       <div className="mt-8 grid items-start gap-8 lg:grid-cols-[1fr_1.4fr]">
-        <section className="card p-6 sm:p-8">
-          <h2 className="font-display text-2xl font-bold">Settings</h2>
-          <div className="mt-5">
-            <StoreSettingsForm enabled={studio.enabled} shippingCents={studio.shippingCents} handlingCents={studio.handlingCents} />
-          </div>
-        </section>
+        <div className="space-y-8">
+          <section className="card p-6 sm:p-8">
+            <h2 className="font-display text-2xl font-bold">Settings</h2>
+            <p className="mt-1 text-sm text-muted">Shipping here is for items you ship yourself. SwaggPress items use live rates.</p>
+            <div className="mt-5">
+              <StoreSettingsForm enabled={studio.enabled} shippingCents={studio.shippingCents} handlingCents={studio.handlingCents} />
+            </div>
+          </section>
+          <SwaggCard
+            business={studio.swaggKey ? studio.swaggBusiness : null}
+            cardOnFile={studio.swaggCard}
+            syncedAt={studio.swaggSyncedAt ? `${formatDate(studio.swaggSyncedAt, studio.timeZone, "short")} at ${formatTime(studio.swaggSyncedAt, studio.timeZone)}` : null}
+          />
+        </div>
 
         <section className="card p-6 sm:p-8">
           <div className="flex flex-wrap items-center justify-between gap-3">
@@ -86,17 +102,28 @@ export default async function StorePage() {
             <ul className="mt-5 divide-y divide-border">
               {products.map((p) => {
                 const prices = p.variants.map((v) => v.priceCents);
+                const swagg = p.fulfillment === "swaggpress";
+                // SwaggPress sizes clients can't buy (dropped, or priced at/below wholesale).
+                const blocked = swagg ? p.variants.filter((v) => !sellable(v)).length : 0;
                 return (
                   <li key={p.id} className="flex flex-wrap items-center justify-between gap-3 py-3.5">
                     <div>
                       <p className="font-semibold">
                         {p.name}
                         {!p.active && <span className="ml-2 rounded-full bg-border px-2 py-0.5 text-xs font-bold text-muted uppercase">Hidden</span>}
+                        {swagg && <span className="ml-2 rounded-full bg-coral/15 px-2 py-0.5 text-xs font-bold text-coral uppercase">SwaggPress</span>}
                       </p>
                       <p className="text-sm text-muted">
                         {p.variants.map((v) => v.label).join(", ")}
                         {prices.length > 0 && ` · ${formatPrice(Math.min(...prices))}–${formatPrice(Math.max(...prices))}`}
                       </p>
+                      {swagg && (p.labUnavailable || blocked > 0) && (
+                        <p className="text-xs font-semibold text-danger">
+                          {p.labUnavailable
+                            ? "No longer offered by SwaggPress"
+                            : `${blocked} ${blocked === 1 ? "size is" : "sizes are"} hidden (dropped or priced at/below wholesale)`}
+                        </p>
+                      )}
                     </div>
                     <Link href={`/dashboard/store/products/${p.id}`} className="link text-sm">
                       Edit

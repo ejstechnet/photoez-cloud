@@ -468,20 +468,31 @@ export async function emailStoreOrderPaid(orderId: string) {
   );
 }
 
-export async function emailStoreOrderShipped(orderId: string) {
+// One part of a store order shipped: the studio's own items ("self", marked
+// shipped in the dashboard) or the items SwaggPress printed ("lab").
+export async function emailStoreOrderShipped(orderId: string, part: "self" | "lab" = "self") {
   const loaded = await loadStoreOrder(orderId);
   const to = loaded?.order.clientEmail;
   if (!loaded || !to) return false;
   const { order, facts } = loaded;
+  const carrier = part === "lab" ? order.labCarrier : order.carrier;
+  const tracking = part === "lab" ? order.labTracking : order.trackingNumber;
+  const partItems = await db
+    .select()
+    .from(storeOrderItems)
+    .where(and(eq(storeOrderItems.orderId, orderId), eq(storeOrderItems.fulfillment, part === "lab" ? "swaggpress" : "self")));
   return sendToClient(
     order.photographerId,
     "store_order_shipped",
     to,
     messages.storeOrderShippedClient({
       ...facts,
-      carrier: order.carrier,
-      trackingNumber: order.trackingNumber,
-      trackingUrl: trackingUrl(order.carrier, order.trackingNumber),
+      items: partItems.length
+        ? partItems.map((i) => `${i.quantity} × ${i.productName} ${i.variantLabel}${i.photoName ? ` (${i.photoName})` : ""}`)
+        : facts.items,
+      carrier,
+      trackingNumber: tracking,
+      trackingUrl: trackingUrl(carrier, tracking),
     }),
     { galleryId: order.galleryId ?? undefined },
   );

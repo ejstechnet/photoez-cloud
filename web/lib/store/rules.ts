@@ -74,14 +74,31 @@ export function cropPixels(crop: StoreCrop, photo: { width: number; height: numb
   return { left, top, width, height };
 }
 
-export type PricedLine = { unitCents: number; quantity: number };
+export type PricedLine = { unitCents: number; quantity: number; fulfillment?: "self" | "swaggpress" };
 
-// Totals for a cart: shipping and handling are once per order.
-export function cartTotals(lines: PricedLine[], settings: { shippingCents: number; handlingCents: number }) {
+// Totals for a cart. Handling is once per order. The studio's own shipping
+// applies when the cart has items the studio ships itself; SwaggPress items
+// add the shipping option the client chose (labShippingCents).
+export function cartTotals(
+  lines: PricedLine[],
+  settings: { shippingCents: number; handlingCents: number },
+  labShippingCents = 0,
+) {
   const subtotalCents = lines.reduce((sum, l) => sum + l.unitCents * l.quantity, 0);
-  const shippingCents = lines.length > 0 ? settings.shippingCents : 0;
+  const hasSelf = lines.some((l) => (l.fulfillment ?? "self") === "self");
+  const hasLab = lines.some((l) => l.fulfillment === "swaggpress");
+  const selfShippingCents = hasSelf ? settings.shippingCents : 0;
+  const lab = hasLab ? labShippingCents : 0;
+  const shippingCents = selfShippingCents + lab;
   const handlingCents = lines.length > 0 ? settings.handlingCents : 0;
-  return { subtotalCents, shippingCents, handlingCents, totalCents: subtotalCents + shippingCents + handlingCents };
+  return {
+    subtotalCents,
+    shippingCents,
+    selfShippingCents,
+    labShippingCents: lab,
+    handlingCents,
+    totalCents: subtotalCents + shippingCents + handlingCents,
+  };
 }
 
 const ORDER_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";

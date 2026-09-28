@@ -50,6 +50,11 @@ export function studioPhotoKey(photographerId: string, version: string) {
   return `photographers/${photographerId}/portfolio/${version}.jpg`;
 }
 
+// A store order item's print-ready file, made for a lab partner (lib/swaggpress/orders.ts).
+export function storeOrderFileKey(photographerId: string, orderId: string, itemId: string) {
+  return `photographers/${photographerId}/store-orders/${orderId}/${itemId}.jpg`;
+}
+
 // A picture of an Online Store product (lib/store).
 export function storeProductPhotoKey(photographerId: string, productId: string, version: string) {
   return `photographers/${photographerId}/store/${productId}/${version}.jpg`;
@@ -136,6 +141,11 @@ export async function storedSize(key: string): Promise<number | null> {
     if (error instanceof Error && (error.name === "NotFound" || error.name === "NoSuchKey")) return null;
     throw error;
   }
+}
+
+// Upload a file made on the server (not through a browser upload link).
+export async function putObject(key: string, body: Uint8Array, contentType: string) {
+  await s3.send(new PutObjectCommand({ Bucket: bucket, Key: key, Body: body, ContentType: contentType }));
 }
 
 // Delete every file whose key starts with `prefix` (e.g. a whole gallery).

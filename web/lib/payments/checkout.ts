@@ -12,6 +12,7 @@ import { returnBookingCredit } from "@/lib/credits";
 import { nextPayment } from "./amounts";
 import { createGalleryForBooking } from "@/lib/booking-gallery";
 import { cancelUnpaidStoreOrder, markStoreOrderPaid } from "@/lib/store/checkout";
+import { submitLabOrder } from "@/lib/swaggpress/orders";
 
 // Stripe Checkout for booking payments, always on the photographer's own
 // connected account. The database only changes when Stripe confirms a payment
@@ -148,7 +149,11 @@ export async function applyCheckoutSession(session: Stripe.Checkout.Session) {
     // A store order: paid, with the shipping address from Checkout.
     const { storeOrderId } = payment;
     if (storeOrderId && (await markStoreOrderPaid(storeOrderId, session))) {
-      afterResponse(() => emailStoreOrderPaid(storeOrderId));
+      afterResponse(async () => {
+        await emailStoreOrderPaid(storeOrderId);
+        // SwaggPress items go straight to SwaggPress (the 15-minute job retries).
+        await submitLabOrder(storeOrderId);
+      });
     }
     // A gift card purchase: the card turns on and goes out.
     const { giftCardId } = payment;

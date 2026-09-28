@@ -13,7 +13,7 @@ import { paymentAccount } from "@/lib/payments/checkout";
 import { paidGalleryExtras, startGalleryCheckout } from "@/lib/payments/gallery-checkout";
 import { emailSelectionsSubmitted } from "@/lib/email/notify";
 import { afterResponse } from "@/lib/email/send";
-import { startStoreCheckout } from "@/lib/store/checkout";
+import { quoteStoreShipping, startStoreCheckout } from "@/lib/store/checkout";
 
 // Actions a client can take from their gallery link. The token is re-checked
 // on every call, and changes are only allowed while the gallery is in proofing.
@@ -148,12 +148,18 @@ export async function searchGallery(token: string, query: string): Promise<strin
 
 // The gallery shop's checkout: the cart is checked and priced on the server,
 // then the client goes to Stripe to pay the studio (lib/store/checkout.ts).
-export async function checkoutStoreCart(token: string, cart: unknown): Promise<{ url: string } | { error: string }> {
+export async function checkoutStoreCart(
+  token: string,
+  cart: unknown,
+  // SwaggPress items: the shipping option chosen from quoteCartShipping.
+  shipping: { quoteId: string; rateId: string } | null = null,
+): Promise<{ url: string } | { error: string }> {
   const gallery = await findGalleryByToken(token);
   if (!gallery || (gallery.status !== "delivered" && gallery.status !== "completed")) {
     return { error: "This gallery's shop isn't open." };
   }
   return startStoreCheckout({
+    shipping: shipping && typeof shipping.quoteId === "string" && typeof shipping.rateId === "string" ? shipping : null,
     galleryId: gallery.id,
     token,
     photographerId: gallery.photographerId,
@@ -162,4 +168,13 @@ export async function checkoutStoreCart(token: string, cart: unknown): Promise<{
     clientEmail: gallery.clientEmail ?? null,
     cart,
   });
+}
+
+// Shipping options for the cart's SwaggPress items to the client's address.
+export async function quoteCartShipping(token: string, cart: unknown, shipTo: unknown) {
+  const gallery = await findGalleryByToken(token);
+  if (!gallery || (gallery.status !== "delivered" && gallery.status !== "completed")) {
+    return { error: "This gallery's shop isn't open." };
+  }
+  return quoteStoreShipping({ galleryId: gallery.id, photographerId: gallery.photographerId, cart, shipTo });
 }

@@ -4,13 +4,14 @@ import { useState, useTransition } from "react";
 import { formatPrice } from "@/lib/booking/format";
 import type { Storefront } from "@/lib/store/checkout";
 import { cartTotals } from "@/lib/store/rules";
-import { checkoutStoreCart } from "../actions";
+import { checkoutStoreCart, quoteCartShipping } from "../actions";
 import type { ShopPhoto } from "./shop-dialog";
 import type { useCart } from "./use-cart";
 
 // The floating cart button and the cart itself: each line with its photo,
-// quantity, and price, the order total, and Checkout (Stripe, where the
-// client also gives their shipping address).
+// quantity, and price, the order total, and Checkout. The studio's own items
+// get their address on Stripe's page; SwaggPress items need the address here
+// first, to pick a live shipping rate.
 export function CartPanel({
   token,
   store,
@@ -28,6 +29,14 @@ export function CartPanel({
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
+  const [shipTo, setShipTo] = useState({ name: "", line1: "", line2: "", city: "", state: "", zip: "" });
+  const [quote, setQuote] = useState<{
+    quoteId: string;
+    key: string;
+    rates: { id: string; label: string; amountCents: number; days: number | null }[];
+  } | null>(null);
+  const [rateId, setRateId] = useState<string | null>(null);
+  const [quoting, startQuote] = useTransition();
 
   // Lines whose product, size, or photo still exist.
   const lines = cart.items.flatMap((item) => {
@@ -37,23 +46,46 @@ export function CartPanel({
     return product && variant && photo ? [{ item, product, variant, photo }] : [];
   });
   const count = lines.reduce((sum, l) => sum + l.item.quantity, 0);
+  const labLines = lines.filter((l) => l.product.fulfillment === "swaggpress");
+  // A quote is for these SwaggPress items; changing them needs a new one.
+  const labKey = labLines.map((l) => `${l.variant.id}:${l.item.quantity}`).sort().join(",");
+  const liveQuote = quote && quote.key === labKey ? quote : null;
+  const rate = liveQuote?.rates.find((r) => r.id === rateId) ?? null;
+  const needsShipping = labLines.length > 0;
   const totals = cartTotals(
-    lines.map((l) => ({ unitCents: l.variant.priceCents, quantity: l.item.quantity })),
+    lines.map((l) => ({ unitCents: l.variant.priceCents, quantity: l.item.quantity, fulfillment: l.product.fulfillment })),
     store,
+    rate?.amountCents ?? 0,
   );
+  const cartForServer = () =>
+    lines.map(({ item }) => ({
+      productId: item.productId,
+      variantId: item.variantId,
+      photoId: item.photoId,
+      quantity: item.quantity,
+      crop: item.crop,
+    }));
+
+  function getRates() {
+    setError(null);
+    startQuote(async () => {
+      const result = await quoteCartShipping(token, cartForServer(), shipTo);
+      if ("error" in result) {
+        setError(result.error ?? "Shipping options couldn't be loaded.");
+        return;
+      }
+      setQuote({ quoteId: result.quoteId, key: labKey, rates: result.rates });
+      setRateId(result.rates[0]?.id ?? null);
+    });
+  }
 
   function checkout() {
     setError(null);
     start(async () => {
       const result = await checkoutStoreCart(
         token,
-        lines.map(({ item }) => ({
-          productId: item.productId,
-          variantId: item.variantId,
-          photoId: item.photoId,
-          quantity: item.quantity,
-          crop: item.crop,
-        })),
+        cartForServer(),
+        needsShipping && liveQuote && rate ? { quoteId: liveQuote.quoteId, rateId: rate.id } : null,
       );
       if ("url" in result) window.location.href = result.url;
       else setError(result.error);
@@ -113,6 +145,55 @@ export function CartPanel({
                 </ul>
               )}
             </div>
+            {lines.length > 0 && needsShipping && (
+              <div className="border-t border-border px-5 py-4">
+                <p className="font-semibold">Ship to</p>
+                <p className="mt-0.5 text-xs text-muted">Some items are printed and shipped by our print partner, so we need your address to show shipping options.</p>
+                <div className="mt-3 grid grid-cols-2 gap-2">
+                  {(
+                    [
+                      ["name", "Full name", "col-span-2"],
+                      ["line1", "Street address", "col-span-2"],
+                      ["line2", "Apt, suite (optional)", "col-span-2"],
+                      ["city", "City", "col-span-2"],
+                      ["state", "State (e.g. OR)", ""],
+                      ["zip", "ZIP code", ""],
+                    ] as const
+                  ).map(([field, label, span]) => (
+                    <input
+                      key={field}
+                      aria-label={label}
+                      placeholder={label}
+                      value={shipTo[field]}
+                      onChange={(e) => {
+                        setShipTo({ ...shipTo, [field]: e.target.value });
+                        setQuote(null);
+                      }}
+                      className={`h-10 rounded-xl border-2 border-border bg-background px-3 text-sm ${span}`}
+                    />
+                  ))}
+                </div>
+                {liveQuote ? (
+                  <fieldset className="mt-3 space-y-2">
+                    <legend className="sr-only">Shipping options</legend>
+                    {liveQuote.rates.map((r) => (
+                      <label key={r.id} className={`flex cursor-pointer items-center gap-3 rounded-xl border-2 px-3 py-2 text-sm ${r.id === rateId ? "border-lime bg-lime/10" : "border-border"}`}>
+                        <input type="radio" name="rate" checked={r.id === rateId} onChange={() => setRateId(r.id)} className="accent-lime-ink" />
+                        <span className="flex-1">
+                          {r.label}
+                          {r.days ? <span className="text-muted"> · {r.days} {r.days === 1 ? "day" : "days"}</span> : null}
+                        </span>
+                        <span className="font-semibold">{formatPrice(r.amountCents)}</span>
+                      </label>
+                    ))}
+                  </fieldset>
+                ) : (
+                  <button type="button" className="btn-secondary mt-3 w-full" disabled={quoting} onClick={getRates}>
+                    {quoting ? "Finding shipping options…" : "See shipping options"}
+                  </button>
+                )}
+              </div>
+            )}
             {lines.length > 0 && (
               <div className="border-t border-border px-5 py-4">
                 <dl className="space-y-1 text-sm">
@@ -122,7 +203,9 @@ export function CartPanel({
                   </div>
                   <div className="flex justify-between">
                     <dt>Shipping</dt>
-                    <dd>{totals.shippingCents > 0 ? formatPrice(totals.shippingCents) : "Free"}</dd>
+                    <dd>
+                      {needsShipping && !rate ? "Choose above" : totals.shippingCents > 0 ? formatPrice(totals.shippingCents) : "Free"}
+                    </dd>
                   </div>
                   {totals.handlingCents > 0 && (
                     <div className="flex justify-between">
@@ -136,10 +219,17 @@ export function CartPanel({
                   </div>
                 </dl>
                 {error && <p className="mt-3 text-sm font-semibold text-danger">{error}</p>}
-                <button type="button" className="btn-primary mt-4 w-full" disabled={pending || preview} onClick={checkout}>
-                  {preview ? "Checkout is off in preview" : pending ? "Opening checkout…" : "Checkout"}
+                <button
+                  type="button"
+                  className="btn-primary mt-4 w-full"
+                  disabled={pending || preview || (needsShipping && !rate)}
+                  onClick={checkout}
+                >
+                  {preview ? "Checkout is off in preview" : pending ? "Opening checkout…" : needsShipping && !rate ? "Choose shipping first" : "Checkout"}
                 </button>
-                <p className="mt-2 text-center text-xs text-muted">You&rsquo;ll add your shipping address on the secure payment page.</p>
+                <p className="mt-2 text-center text-xs text-muted">
+                  {needsShipping ? "You'll pay on the secure payment page." : "You'll add your shipping address on the secure payment page."}
+                </p>
               </div>
             )}
           </div>
