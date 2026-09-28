@@ -28,6 +28,7 @@ import { PAYMENT_HOLD_MINUTES } from "@/lib/booking/status";
 import { normalizeCode } from "@/lib/coupons";
 import { checkCouponCode } from "@/lib/coupon-lookup";
 import { creditBalance, useCredits } from "@/lib/credits";
+import { friendDiscountFor } from "@/lib/client-referrals";
 import { nextPayment } from "@/lib/payments/amounts";
 import { paymentAccount, releaseExpiredHolds, releaseHold, startCheckout } from "@/lib/payments/checkout";
 import { contractTemplateFor } from "@/lib/contracts/for-booking";
@@ -220,6 +221,16 @@ export async function createBooking(
     discountCents = coupon.discountCents;
   }
 
+  // A friend's discount from a client's share link, on a first booking only.
+  const friend = await friendDiscountFor({
+    photographerId: studio.id,
+    code: String(formData.get("friendCode") ?? "") || null,
+    email: data.email,
+    totalCents: currentPriceCents + extras.addonsCents - discountCents,
+  });
+  const friendCents = friend?.discountCents ?? 0;
+  discountCents += friendCents;
+
   // Session credit, when the client chose to use it: as much as the total needs.
   const totalCents = Math.max(0, currentPriceCents + extras.addonsCents - discountCents);
   const creditWanted =
@@ -297,6 +308,9 @@ export async function createBooking(
         creditCents,
         giftCardId: giftCardCents > 0 ? card!.id : null,
         giftCardCents,
+        ...(friend
+          ? { referredByClientId: friend.referrerId, referralDiscountCents: friendCents, referralRewardCents: friend.rewardCents }
+          : {}),
         answers: checked.answers,
       }).returning({ id: bookings.id });
 

@@ -12,6 +12,8 @@ import { formatDate, formatTime, zoneLabel } from "@/lib/booking/time";
 import { LOCATION_LABELS, type ShootLocation } from "@/lib/session-types";
 import { signedViewUrl } from "@/lib/storage";
 import { StudioBar, StudioFooter } from "@/app/studio/[slug]/studio-bar";
+import { CopyLink } from "@/components/copy-link";
+import { clientReferralLink } from "@/lib/client-referrals";
 import { CancelButton } from "./cancel-button";
 
 // A client's private booking page, reached by the unguessable link they get
@@ -59,6 +61,8 @@ export default async function ClientBookingPage({ params, searchParams }: PagePr
   const canPay = due !== null && (await paymentAccount(booking.photographerId)) !== null;
   // Contract: signed (with the date) or waiting; none when the session has no contract.
   const signedContract = await signedContractFor(booking.id);
+  // The client's share-with-a-friend link, when the studio has client referrals on.
+  const share = await clientReferralLink(booking.photographerId, booking.clientEmail);
   const contract = signedContract
     ? { signed: formatDate(signedContract.signedAt, tz, "short") }
     : !cancelled && (await contractTemplateFor(booking))
@@ -89,8 +93,11 @@ export default async function ClientBookingPage({ params, searchParams }: PagePr
           ] as [string, React.ReactNode],
         ]
       : []),
-    ...(booking.discountCents > 0
-      ? [[`Coupon ${booking.couponCode ?? ""}`.trim(), `−${formatPrice(booking.discountCents)}`] as [string, React.ReactNode]]
+    ...(booking.discountCents - booking.referralDiscountCents > 0
+      ? [[`Coupon ${booking.couponCode ?? ""}`.trim(), `−${formatPrice(booking.discountCents - booking.referralDiscountCents)}`] as [string, React.ReactNode]]
+      : []),
+    ...(booking.referralDiscountCents > 0
+      ? [["Friend discount", `−${formatPrice(booking.referralDiscountCents)}`] as [string, React.ReactNode]]
       : []),
     ...(extras.length > 0 || booking.discountCents > 0
       ? [["Total", <strong key="t">{formatPrice(totalCents)}</strong>] as [string, React.ReactNode]]
@@ -239,6 +246,19 @@ export default async function ClientBookingPage({ params, searchParams }: PagePr
                 </Link>
               </p>
             )}
+          </section>
+        )}
+        {share && booking.status !== "cancelled" && booking.status !== "pending_payment" && (
+          <section className="card mt-6 p-6 sm:p-8">
+            <h2 className="font-display text-2xl font-bold">Share with a friend</h2>
+            <p className="mt-2 text-muted">
+              Know someone who&rsquo;d love a session? They get {formatPrice(share.discountCents)} off their first
+              session with {name}, and after their session you get {formatPrice(share.rewardCents)} toward your next
+              one.
+            </p>
+            <div className="mt-4">
+              <CopyLink url={share.url} label="Your share link" />
+            </div>
           </section>
         )}
       </main>

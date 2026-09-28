@@ -2,8 +2,8 @@
 
 import { useState } from "react";
 
-// The studio's referral link with a Copy button.
-export function ReferralLink({ url }: { url: string }) {
+// A link in a read-only box with a Copy button (referral and share links).
+export function CopyLink({ url, label }: { url: string; label: string }) {
   const [copied, setCopied] = useState(false);
   return (
     <div className="flex flex-col gap-2 sm:flex-row">
@@ -11,7 +11,7 @@ export function ReferralLink({ url }: { url: string }) {
         readOnly
         value={url}
         onFocus={(e) => e.currentTarget.select()}
-        aria-label="Your referral link"
+        aria-label={label}
         className="h-11 min-w-0 flex-1 rounded-full border-2 border-border bg-background px-4 text-sm font-semibold"
       />
       <button

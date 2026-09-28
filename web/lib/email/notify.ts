@@ -7,6 +7,7 @@ import { contractTemplateFor, signedContractFor } from "@/lib/contracts/for-book
 import { amountPaid, bookingTotal } from "@/lib/payments/amounts";
 import { bookingPayments } from "@/lib/payments/checkout";
 import { siteUrl } from "@/lib/site";
+import { clientReferralLink } from "@/lib/client-referrals";
 import * as messages from "./messages";
 import { sendToClient, sendToStudio } from "./send";
 
@@ -246,7 +247,10 @@ export async function emailGalleryLink(galleryId: string): Promise<{ ok: true; t
         gallery.photographerId,
         "gallery_finals",
         clientEmail,
-        messages.galleryFinalsClient(facts, { photoCount: await photoCount(galleryId, "final") }),
+        messages.galleryFinalsClient(facts, {
+          photoCount: await photoCount(galleryId, "final"),
+          share: await clientReferralLink(gallery.photographerId, clientEmail),
+        }),
         { galleryId },
       )
     : await sendToClient(
@@ -268,7 +272,10 @@ export async function emailFinalsReady(galleryId: string) {
     gallery.photographerId,
     "gallery_finals",
     clientEmail,
-    messages.galleryFinalsClient(facts, { photoCount: await photoCount(galleryId, "final") }),
+    messages.galleryFinalsClient(facts, {
+      photoCount: await photoCount(galleryId, "final"),
+      share: await clientReferralLink(gallery.photographerId, clientEmail),
+    }),
     { galleryId },
   );
 }
@@ -374,3 +381,41 @@ export async function handleNewInquiry(inquiryId: string) {
   );
 }
 
+
+// ---- Client referrals ----
+
+// The client who shared their link earned a credit (lib/client-referrals.ts).
+export async function emailReferralCredit(o: {
+  photographerId: string;
+  to: string;
+  clientName: string;
+  friendName: string;
+  amountCents: number;
+  expiresOn: string | null;
+}) {
+  const [studio] = await db
+    .select({ name: photographers.name, businessName: photographers.businessName, slug: photographers.studioSlug })
+    .from(photographers)
+    .where(eq(photographers.id, o.photographerId));
+  if (!studio) return false;
+  return sendToClient(
+    o.photographerId,
+    "referral_credit",
+    o.to,
+    messages.referralCreditClient({
+      studioName: studio.businessName || studio.name,
+      clientName: o.clientName,
+      friendName: o.friendName,
+      amountCents: o.amountCents,
+      expires: o.expiresOn ? formatLocalDate(o.expiresOn) : null,
+      bookUrl: studio.slug ? `${siteUrl}/studio/${studio.slug}/book` : null,
+      share: await clientReferralLink(o.photographerId, o.to),
+    }),
+  );
+}
+
+// "2027-03-28" → "March 28, 2027".
+function formatLocalDate(date: string) {
+  const [y, m, d] = date.split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric", timeZone: "UTC" });
+}

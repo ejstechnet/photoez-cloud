@@ -1,3 +1,5 @@
+import { cookies } from "next/headers";
+import { FRIEND_COOKIE, referringClient } from "@/lib/client-referrals";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -57,6 +59,12 @@ export default async function BookPage({ params, searchParams }: PageProps<"/stu
   if (!studio) notFound();
 
   const name = studio.businessName ?? studio.name;
+  // Sent by a client's share link (/studio/<slug>/friend/<code>)?
+  const friendCode = (await cookies()).get(FRIEND_COOKIE)?.value ?? null;
+  const referrer = await referringClient(studio.id, friendCode);
+  const friend = referrer
+    ? { code: friendCode!, name: referrer.name.trim().split(/\s+/)[0], discountCents: referrer.discountCents }
+    : null;
   // The gift card field shows when the studio sells cards or has any active ones.
   const giftCardsOn =
     studio.giftCardsEnabled ||
@@ -274,6 +282,7 @@ export default async function BookPage({ params, searchParams }: PageProps<"/stu
                 questions={questions}
                 inspoMode={studio.inspoMode}
                 giftCardsOn={giftCardsOn}
+                friend={friend}
                 summary={
                   <>
                     <p className="font-semibold">

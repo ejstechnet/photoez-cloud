@@ -41,6 +41,7 @@ export function BookingForm({
   questions,
   inspoMode,
   giftCardsOn,
+  friend = null,
 }: {
   slug: string;
   sessionTypeId: string;
@@ -54,6 +55,8 @@ export function BookingForm({
   inspoMode: "off" | "optional" | "required";
   // Show the gift card field (the studio sells gift cards or has issued some).
   giftCardsOn: boolean;
+  // Came through a client's share link: the friend discount for a first session.
+  friend?: { code: string; name: string; discountCents: number } | null;
 }) {
   const [state, formAction, pending] = useActionState<BookingFormState, FormData>(
     createBooking.bind(null, slug, sessionTypeId, startsAt),
@@ -71,7 +74,9 @@ export function BookingForm({
   const [creditCents, setCreditCents] = useState(0);
   const [useCredit, setUseCredit] = useState(true);
   const discountCents = coupon ? couponDiscount(coupon, priceCents + extrasCents) : 0;
-  const totalCents = priceCents + extrasCents - discountCents;
+  // Checked again on the server: first bookings with the studio only.
+  const friendCents = friend ? Math.min(friend.discountCents, priceCents + extrasCents - discountCents) : 0;
+  const totalCents = priceCents + extrasCents - discountCents - friendCents;
   const [giftCard, setGiftCard] = useState<{ code: string; balanceCents: number } | null>(null);
   const [giftInput, setGiftInput] = useState("");
   const [giftMessage, setGiftMessage] = useState<string | null>(null);
@@ -219,6 +224,12 @@ export function BookingForm({
                 <dd>−{formatPrice(discountCents)}</dd>
               </div>
             )}
+            {friendCents > 0 && (
+              <div className="flex justify-between gap-4 text-lime-ink">
+                <dt>Friend discount (from {friend!.name})</dt>
+                <dd>−{formatPrice(friendCents)}</dd>
+              </div>
+            )}
             <div className="flex justify-between gap-4 text-base font-bold">
               <dt>Total</dt>
               <dd>{formatPrice(totalCents)}</dd>
@@ -321,6 +332,7 @@ export function BookingForm({
               <p className="mt-1.5 text-xs font-medium text-danger">{couponMessage ?? state.couponError}</p>
             )}
             {coupon && <input type="hidden" name="couponCode" value={coupon.code} />}
+            {friend && <input type="hidden" name="friendCode" value={friend.code} />}
           </div>
           {giftCardsOn && (
             <div>

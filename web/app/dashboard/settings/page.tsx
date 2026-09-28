@@ -10,6 +10,7 @@ import { syncStripeStatus } from "@/lib/payments/connect";
 import { stripeConfigured } from "@/lib/stripe";
 import { EmailCard } from "./email-card";
 import { ReviewsCard } from "./reviews-card";
+import { ClientReferralsCard } from "./client-referrals-card";
 import { GiftCardsCard } from "./gift-cards-card";
 import { FaqForm } from "./faq-form";
 import { PaymentsCard } from "./payments-card";
@@ -45,6 +46,9 @@ export default async function SettingsPage() {
       shootLocations: photographers.shootLocations,
       quoteOnlyTypes: photographers.quoteOnlyTypes,
       directoryListed: photographers.directoryListed,
+      clientReferralsEnabled: photographers.clientReferralsEnabled,
+      clientReferralRewardCents: photographers.clientReferralRewardCents,
+      clientReferralDiscountCents: photographers.clientReferralDiscountCents,
       directoryZip: photographers.directoryZip,
       directoryCity: photographers.directoryCity,
       directoryState: photographers.directoryState,
@@ -178,6 +182,11 @@ export default async function SettingsPage() {
             paymentsReady={stripeReady}
           />
           <ReviewsCard requestDays={settings.reviewRequestDays} googleUrl={settings.googleReviewUrl} />
+          <ClientReferralsCard
+            enabled={settings.clientReferralsEnabled}
+            rewardCents={settings.clientReferralRewardCents}
+            discountCents={settings.clientReferralDiscountCents}
+          />
           <GiftCardsCard
             enabled={settings.giftCardsEnabled}
             amounts={settings.giftCardAmounts}

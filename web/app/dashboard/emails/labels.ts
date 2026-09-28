@@ -23,6 +23,7 @@ export const KIND_LABELS: Record<EmailKind, string> = {
   gift_card_sold: "Gift card sold (to you)",
   review_request: "Review request",
   review_new: "New review (to you)",
+  referral_credit: "Referral credit",
   password_reset: "Password reset",
   test: "Test email",
 };

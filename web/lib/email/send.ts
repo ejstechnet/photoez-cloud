@@ -33,6 +33,7 @@ export type EmailKind =
   | "gift_card_sold"
   | "review_request"
   | "review_new"
+  | "referral_credit"
   | "password_reset"
   | "test";
 

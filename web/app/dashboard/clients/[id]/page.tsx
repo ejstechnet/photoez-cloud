@@ -1,8 +1,11 @@
 import { notFound } from "next/navigation";
-import { and, desc, eq } from "drizzle-orm";
+import { and, count, desc, eq, isNotNull } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db";
-import { clients, photographers, sessionCredits } from "@/db/schema";
+import { bookings, clients, photographers, sessionCredits } from "@/db/schema";
+import { CopyLink } from "@/components/copy-link";
+import { clientReferralLink } from "@/lib/client-referrals";
+import { formatPrice } from "@/lib/booking/format";
 import { localDateOf } from "@/lib/booking/time";
 import { Avatar } from "@/components/avatar";
 import { requirePhotographer } from "@/lib/session";
@@ -38,6 +41,14 @@ export default async function EditClientPage({ params }: PageProps<"/dashboard/c
           .orderBy(desc(sessionCredits.createdAt))
       ).map((c) => ({ ...c, expired: c.expiresOn !== null && c.expiresOn < today }))
     : [];
+  // Their share-with-a-friend link, and the friends who booked through it.
+  const share = await clientReferralLink(user.id, client.email);
+  const [referred] = share
+    ? await db
+        .select({ friends: count(), rewarded: count(bookings.referralRewardedAt) })
+        .from(bookings)
+        .where(and(eq(bookings.referredByClientId, client.id), isNotNull(bookings.referredByClientId)))
+    : [null];
   const balanceCents = credits
     .filter((c) => !c.expired)
     .reduce((sum, c) => sum + c.amountCents - c.usedCents, 0);
@@ -57,6 +68,25 @@ export default async function EditClientPage({ params }: PageProps<"/dashboard/c
         <ClientForm action={updateClient.bind(null, client.id)} defaultValues={client} submitLabel="Save changes" />
       </div>
       <CreditsCard clientId={client.id} hasEmail={Boolean(client.email)} credits={credits} balanceCents={balanceCents} />
+      {share && (
+        <section className="card mt-8 p-6 sm:p-8">
+          <h2 className="font-display text-2xl font-bold">Share link</h2>
+          <p className="mt-1 text-sm text-muted">
+            Friends who book their first session through this link get {formatPrice(share.discountCents)} off;{" "}
+            {client.name.split(" ")[0]} gets {formatPrice(share.rewardCents)} of credit after each friend&rsquo;s
+            session. It&rsquo;s also on their booking page and in their final photos email.
+          </p>
+          <div className="mt-4">
+            <CopyLink url={share.url} label={`${client.name}'s share link`} />
+          </div>
+          {referred && referred.friends > 0 && (
+            <p className="mt-3 text-sm font-semibold">
+              {referred.friends} {referred.friends === 1 ? "friend has" : "friends have"} booked · {referred.rewarded}{" "}
+              {referred.rewarded === 1 ? "credit" : "credits"} earned
+            </p>
+          )}
+        </section>
+      )}
       <div className="mt-8 flex flex-col gap-4 rounded-3xl border-2 border-dashed border-danger/30 p-6 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <p className="font-semibold">Delete this client</p>
