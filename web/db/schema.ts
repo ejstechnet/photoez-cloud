@@ -10,6 +10,7 @@ import {
   jsonb,
   unique,
   date,
+  type AnyPgColumn,
 } from "drizzle-orm/pg-core";
 import type { TriageResult } from "../lib/ai/triage";
 import { BOOKING_FIELD_TYPES, type BookingAnswer } from "../lib/booking/fields";
@@ -220,6 +221,11 @@ export const galleries = pgTable(
       .notNull()
       .references(() => photographers.id, { onDelete: "cascade" }),
     clientId: uuid("client_id").references(() => clients.id, { onDelete: "set null" }),
+    // The booking this gallery was made for (lib/booking-gallery.ts); one
+    // gallery per booking.
+    bookingId: uuid("booking_id")
+      .unique()
+      .references((): AnyPgColumn => bookings.id, { onDelete: "set null" }),
     title: text("title").notNull(),
     // Random, unguessable token used in the client's gallery link.
     shareToken: text("share_token").notNull().unique(),
@@ -361,6 +367,10 @@ export const sessionTypes = pgTable(
     saleEndsOn: date("sale_ends_on"),
     location: text("location"),
     photosIncluded: integer("photos_included"),
+    // Like PhotoEZ Booking's gallery_type: "proofing" makes a gallery for each
+    // booking once it's confirmed (lib/booking-gallery.ts); "none" for
+    // sessions with nothing to deliver, like consultations.
+    galleryType: text("gallery_type", { enum: ["proofing", "none"] }).notNull().default("proofing"),
     // Photo shown above the session on the booking page (a storage key).
     imageKey: text("image_key"),
     // Contract signed after booking: the studio's default (null), a chosen
@@ -457,6 +467,10 @@ export const bookings = pgTable(
     sessionTypeId: uuid("session_type_id").references(() => sessionTypes.id, { onDelete: "set null" }),
     clientId: uuid("client_id").references(() => clients.id, { onDelete: "set null" }),
     sessionName: text("session_name").notNull(),
+    // The client's own name for the shoot, asked on the booking form like
+    // PhotoEZ Booking's "Session Title" (e.g. "Tina's Senior Photos"); it
+    // becomes the gallery's title.
+    title: text("title"),
     priceCents: integer("price_cents").notNull(),
     depositPercent: integer("deposit_percent").notNull(),
     startsAt: timestamp("starts_at", { withTimezone: true }).notNull(),

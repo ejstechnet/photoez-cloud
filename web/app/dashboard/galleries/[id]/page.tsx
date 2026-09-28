@@ -45,6 +45,7 @@ export default async function GalleryPage({ params }: PageProps<"/dashboard/gall
       clientName: clients.name,
       clientEmail: clients.email,
       reviewStatus: reviews.status,
+      bookingId: galleries.bookingId,
     })
     .from(galleries)
     .leftJoin(clients, eq(clients.id, galleries.clientId))
@@ -122,6 +123,14 @@ export default async function GalleryPage({ params }: PageProps<"/dashboard/gall
                   <a href={`mailto:${gallery.clientEmail}`} className="link">
                     {gallery.clientEmail}
                   </a>
+                </>
+              )}
+              {gallery.bookingId && (
+                <>
+                  {" · "}
+                  <Link href={`/dashboard/bookings/${gallery.bookingId}`} className="link">
+                    View booking
+                  </Link>
                 </>
               )}
               {" · "}

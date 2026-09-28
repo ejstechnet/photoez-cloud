@@ -72,6 +72,7 @@ export default async function ClientBookingPage({ params, searchParams }: PagePr
   const totalCents = bookingTotal(booking);
   const details: [string, React.ReactNode][] = [
     ["Session", booking.sessionName],
+    ...(booking.title ? [["Session title", booking.title] as [string, string]] : []),
     ["Date", formatDate(booking.startsAt, tz)],
     [
       "Time",

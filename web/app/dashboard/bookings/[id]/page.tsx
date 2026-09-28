@@ -3,7 +3,9 @@ import { notFound } from "next/navigation";
 import { and, asc, eq } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db";
-import { bookingInspoPhotos, bookings, photographers } from "@/db/schema";
+import { bookingInspoPhotos, bookings, galleries, photographers } from "@/db/schema";
+import { STATUS_LABELS } from "@/lib/gallery-status";
+import { CreateGalleryButton } from "./create-gallery-button";
 import { formatDuration, formatPrice } from "@/lib/booking/format";
 import { formatDate, formatTime } from "@/lib/booking/time";
 import { bookingExtras } from "@/lib/booking/session-addons";
@@ -39,6 +41,11 @@ export default async function BookingPage({ params }: PageProps<"/dashboard/book
   const paidCents = amountPaid(paymentRows);
   const signedContract = await signedContractFor(booking.id);
   const contractNeeded = !signedContract && booking.status !== "cancelled" && (await contractTemplateFor(booking)) !== null;
+  // The gallery made for this booking (lib/booking-gallery.ts), if any.
+  const [gallery] = await db
+    .select({ id: galleries.id, title: galleries.title, status: galleries.status })
+    .from(galleries)
+    .where(and(eq(galleries.bookingId, booking.id), eq(galleries.photographerId, user.id)));
   const inspoRows = await db
     .select({ id: bookingInspoPhotos.id, fileKey: bookingInspoPhotos.fileKey })
     .from(bookingInspoPhotos)
@@ -117,7 +124,10 @@ export default async function BookingPage({ params }: PageProps<"/dashboard/book
         <h1 className="font-display text-4xl font-bold tracking-tight">{booking.clientName}</h1>
         <BookingStatusPill status={booking.status} />
       </div>
-      <p className="mt-1 text-lg font-semibold text-muted">{booking.sessionName}</p>
+      <p className="mt-1 text-lg font-semibold text-muted">
+        {booking.sessionName}
+        {booking.title && <> · &ldquo;{booking.title}&rdquo;</>}
+      </p>
 
       <dl className="card mt-8 divide-y divide-border px-6 sm:px-8">
         {details.map(([label, value]) => (
@@ -157,6 +167,26 @@ export default async function BookingPage({ params }: PageProps<"/dashboard/book
           <a href={`${siteUrl}/booking/${booking.manageToken}/contract`} target="_blank" className="btn-secondary">
             View signed contract
           </a>
+        )}
+      </div>
+
+      <div
+        className={`mt-3 flex flex-wrap items-center justify-between gap-3 rounded-2xl px-5 py-4 ${gallery ? "bg-lime/15" : "bg-background"}`}
+      >
+        <p className="text-sm">
+          <span className="font-semibold">Gallery: </span>
+          {gallery
+            ? `${gallery.title} (${STATUS_LABELS[gallery.status]})`
+            : booking.status === "cancelled"
+              ? "None."
+              : "None yet."}
+        </p>
+        {gallery ? (
+          <Link href={`/dashboard/galleries/${gallery.id}`} className="btn-secondary">
+            Open gallery
+          </Link>
+        ) : (
+          booking.status !== "cancelled" && <CreateGalleryButton bookingId={booking.id} />
         )}
       </div>
 

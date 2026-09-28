@@ -1,5 +1,6 @@
 "use server";
 
+import { createGalleryForBooking } from "@/lib/booking-gallery";
 import { emailBookingCancelled, emailBookingRescheduled } from "@/lib/email/notify";
 import { afterResponse } from "@/lib/email/send";
 import { randomBytes } from "node:crypto";
@@ -94,6 +95,7 @@ const sessionTypeSchema = z.object({
     .trim()
     .refine((value) => value === "" || /^\d{1,4}$/.test(value), "Enter a number of photos, or leave it blank.")
     .transform((value) => (value === "" ? null : Number(value))),
+  galleryType: z.enum(["proofing", "none"], "Pick what gallery to make."),
   hidden: z.boolean(),
   // "default", "none", or one of the studio's contract template ids.
   contract: z.string().refine((v) => v === "default" || v === "none" || isUuid(v), "Pick a contract."),
@@ -122,6 +124,7 @@ function parseSessionType(formData: FormData) {
     depositPercent: text(formData, "depositPercent"),
     location: text(formData, "location"),
     photosIncluded: text(formData, "photosIncluded"),
+    galleryType: text(formData, "galleryType") || "proofing",
     hidden: formData.get("hidden") === "on",
     contract: text(formData, "contract"),
   });
@@ -410,6 +413,8 @@ export async function setBookingStatus(
   }
   // You cancelled: any session credit the client used goes back to them.
   if (status === "cancelled") await returnBookingCredit(bookingId);
+  // Confirmed by hand: its gallery, if it doesn't have one yet.
+  if (status === "confirmed") await createGalleryForBooking(bookingId);
   if (cancelledUpcoming) afterResponse(() => emailBookingCancelled(bookingId, "studio", { cents: 0, expiresOn: null }));
   revalidatePath("/dashboard", "layout");
   revalidatePath("/studio/[slug]", "layout");
@@ -514,4 +519,20 @@ export async function rescheduleByStudio(
   revalidatePath("/dashboard", "layout");
   revalidatePath("/studio/[slug]", "layout");
   return {};
+}
+
+// The booking page's "Create gallery" button: for sessions set to "no
+// gallery", or when the plan's gallery limit stopped the automatic one.
+export async function createBookingGallery(bookingId: string): Promise<{ message?: string }> {
+  const photographer = await requirePhotographer();
+  if (!isUuid(bookingId)) return { message: "That booking could not be found." };
+  const [owned] = await db
+    .select({ id: bookings.id })
+    .from(bookings)
+    .where(and(eq(bookings.id, bookingId), eq(bookings.photographerId, photographer.id)));
+  if (!owned) return { message: "That booking could not be found." };
+  const result = await createGalleryForBooking(bookingId, { manual: true });
+  if (!result.created && result.reason === "plan_limit") return { message: result.message };
+  if (result.created || result.reason === "exists") redirect(`/dashboard/galleries/${result.galleryId}`);
+  return { message: "The gallery couldn't be made. Please try again." };
 }

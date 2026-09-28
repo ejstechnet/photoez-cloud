@@ -253,6 +253,13 @@
       "when": 1790615658828,
       "tag": "0035_rare_wendigo",
       "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1790617720512,
+      "tag": "0036_damp_vulcan",
+      "breakpoints": true
     }
   ]
 }

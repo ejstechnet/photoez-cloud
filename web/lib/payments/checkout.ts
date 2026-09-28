@@ -10,6 +10,7 @@ import { siteUrl } from "@/lib/site";
 import { stripe, stripeConfigured } from "@/lib/stripe";
 import { returnBookingCredit } from "@/lib/credits";
 import { nextPayment } from "./amounts";
+import { createGalleryForBooking } from "@/lib/booking-gallery";
 
 // Stripe Checkout for booking payments, always on the photographer's own
 // connected account. The database only changes when Stripe confirms a payment
@@ -134,7 +135,11 @@ export async function applyCheckoutSession(session: Stripe.Checkout.Session) {
     });
 
     const { bookingId, galleryId } = payment;
-    if (bookingId && confirmedNow) afterResponse(() => emailBookingConfirmed(bookingId));
+    if (bookingId && confirmedNow) {
+      // Deposit paid: the booking's gallery is made now (lib/booking-gallery.ts).
+      await createGalleryForBooking(bookingId).catch((error) => console.error("Booking gallery failed", error));
+      afterResponse(() => emailBookingConfirmed(bookingId));
+    }
     else if (bookingId && payment.kind === "balance") {
       afterResponse(() => emailPaymentReceived(bookingId, payment.amountCents));
     }
