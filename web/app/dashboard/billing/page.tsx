@@ -6,12 +6,16 @@ import { IntervalSwitch, PlanCards } from "@/components/plan-cards";
 import { assistantAllowance } from "@/lib/ai/assistant/run";
 import { photoAllowance } from "@/lib/gallery-tagging";
 import { planUsage } from "@/lib/plan-usage";
-import { PLAN_LABELS, formatStorage, hasFeature, trialDaysLeft, type Interval } from "@/lib/plans";
+import { PLAN_LABELS, TRIAL_DAYS, formatStorage, hasFeature, trialDaysLeft, type Interval } from "@/lib/plans";
 import { requirePhotographer } from "@/lib/session";
 import { refreshSubscription } from "@/lib/billing";
 import { stripeConfigured } from "@/lib/stripe";
 import { manageBilling, subscribe } from "./actions";
 import { BrandingToggle } from "./branding-toggle";
+import { ReferralLink } from "./referral-link";
+import { referralSummary } from "@/lib/referrals";
+import { siteUrl } from "@/lib/site";
+import { REFERRAL_DISCOUNT_PERCENT, REFERRAL_YEARLY_CAP, referralRewardCents } from "@/lib/plans";
 
 export const metadata: Metadata = { title: "Billing" };
 
@@ -35,10 +39,11 @@ export default async function BillingPage({ searchParams }: PageProps<"/dashboar
     })
     .from(photographers)
     .where(eq(photographers.id, user.id));
-  const [usage, photosAi, assistant] = await Promise.all([
+  const [usage, photosAi, assistant, referrals] = await Promise.all([
     planUsage(user.id),
     photoAllowance(user.id),
     assistantAllowance(user.id),
+    referralSummary(user.id),
   ]);
   const plan = usage.plan;
   const trialLeft = studio.subscribedPlan === "free" ? trialDaysLeft(studio.trialEndsAt) : 0;
@@ -180,6 +185,41 @@ export default async function BillingPage({ searchParams }: PageProps<"/dashboar
             }}
           />
         </div>
+      </section>
+
+      <section id="refer" className="card mt-12 scroll-mt-8 p-6 sm:p-8">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 className="font-display text-2xl font-bold">Refer a photographer</h2>
+          <span className="rounded-full bg-lime/25 px-3 py-1 text-xs font-bold tracking-wider text-lime-ink uppercase">
+            Earn free months
+          </span>
+        </div>
+        <p className="mt-1 max-w-3xl text-sm text-muted">
+          Share your link with other photographers. They get a free {TRIAL_DAYS}-day Pro trial and{" "}
+          {REFERRAL_DISCOUNT_PERCENT}% off their first plan payment. When that payment goes through, you get a month of
+          your plan free ({`$${referralRewardCents(plan) / 100}`} credit on your next bill), up to {REFERRAL_YEARLY_CAP}{" "}
+          months a year.
+        </p>
+        <div className="mt-5">
+          <ReferralLink url={`${siteUrl}/r/${referrals.code}`} />
+        </div>
+        <dl className="mt-6 grid grid-cols-3 gap-3 text-center">
+          {[
+            ["Signed up", String(referrals.signups)],
+            ["Became paying", String(referrals.paid)],
+            ["Credit earned", `$${(referrals.earnedCents / 100).toLocaleString("en-US")}`],
+          ].map(([label, value]) => (
+            <div key={label} className="rounded-2xl bg-background px-3 py-4">
+              <dt className="text-xs font-bold tracking-wider text-muted uppercase">{label}</dt>
+              <dd className="mt-1 font-display text-3xl font-bold">{value}</dd>
+            </div>
+          ))}
+        </dl>
+        {referrals.thisYear >= REFERRAL_YEARLY_CAP && (
+          <p className="mt-3 text-sm font-semibold text-lime-ink">
+            You&rsquo;ve earned the most free months for this year. Thank you for spreading the word!
+          </p>
+        )}
       </section>
 
       <section className="card mt-12 p-6 sm:p-8">

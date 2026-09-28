@@ -87,3 +87,18 @@ export function formatStorage(bytes: number) {
   if (bytes >= GB) return `${Math.round((bytes / GB) * 10) / 10} GB`;
   return `${Math.max(0, Math.round(bytes / 1024 ** 2))} MB`;
 }
+
+// ---- Photographer referrals (lib/referrals.ts) ----
+
+// The new studio's discount on its first plan payment (a Stripe coupon made
+// by scripts/stripe-billing-setup.mjs).
+export const REFERRAL_DISCOUNT_PERCENT = 20;
+export const REFERRAL_COUPON_ID = "photoez_referral_20";
+// Most paid-off referrals that earn credit in any 12 months.
+export const REFERRAL_YEARLY_CAP = 12;
+
+// The referrer's reward: one month of their own plan, or of Pro while
+// they're on Free (so the credit is there when they upgrade).
+export function referralRewardCents(referrerPlan: Plan) {
+  return PLAN_PRICES[referrerPlan === "studio" ? "studio" : "pro"].month;
+}

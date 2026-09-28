@@ -4,8 +4,7 @@ import { photos, reviews } from "@/db/schema";
 import { siteUrl } from "@/lib/site";
 import { averageRating } from "@/lib/reviews";
 import { photoKey, signedViewUrl } from "@/lib/storage";
-
-const SHOWN_FIRST = 4;
+import { ReviewRotator } from "./review-rotator";
 
 // Published reviews on the studio page (PhotoEZ Reviews' review wall), with
 // the average rating, each client's photo when they gave permission, and
@@ -54,7 +53,7 @@ function Stars({ rating, className = "" }: { rating: number; className?: string 
 
 function ReviewItem({ review }: { review: Loaded["list"][number] }) {
   return (
-    <li className="rounded-2xl border-2 border-border p-4">
+    <div className="h-full rounded-2xl border-2 border-border p-4">
       <div className="flex gap-4">
         {review.photoUrl && (
           // eslint-disable-next-line @next/next/no-img-element
@@ -66,14 +65,12 @@ function ReviewItem({ review }: { review: Loaded["list"][number] }) {
           <p className="mt-2 text-sm font-semibold">— {review.name}</p>
         </div>
       </div>
-    </li>
+    </div>
   );
 }
 
 export function StudioReviews({ reviews: { list, average } }: { reviews: Loaded }) {
   if (list.length === 0 || average === null) return null;
-  const first = list.slice(0, SHOWN_FIRST);
-  const rest = list.slice(SHOWN_FIRST);
   return (
     <div id="reviews" className="card scroll-mt-28 p-6">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
@@ -84,23 +81,11 @@ export function StudioReviews({ reviews: { list, average } }: { reviews: Loaded 
           {list.length === 1 ? "review" : "reviews"}
         </p>
       </div>
-      <ul className="mt-4 space-y-3">
-        {first.map((review) => (
+      <ReviewRotator>
+        {list.map((review) => (
           <ReviewItem key={review.id} review={review} />
         ))}
-      </ul>
-      {rest.length > 0 && (
-        <details className="group mt-3">
-          <summary className="cursor-pointer text-sm font-bold tracking-wider text-link uppercase group-open:hidden">
-            Show all {list.length} reviews
-          </summary>
-          <ul className="space-y-3">
-            {rest.map((review) => (
-              <ReviewItem key={review.id} review={review} />
-            ))}
-          </ul>
-        </details>
-      )}
+      </ReviewRotator>
     </div>
   );
 }

@@ -2,7 +2,8 @@ import { eq } from "drizzle-orm";
 import type Stripe from "stripe";
 import { db } from "@/db";
 import { photographers } from "@/db/schema";
-import { hasFeature, planFromLookupKey, priceLookupKey, type Interval, type PaidPlan } from "@/lib/plans";
+import { REFERRAL_COUPON_ID, hasFeature, planFromLookupKey, priceLookupKey, type Interval, type PaidPlan } from "@/lib/plans";
+import { rewardReferral } from "@/lib/referrals";
 import { siteUrl } from "@/lib/site";
 import { stripe } from "@/lib/stripe";
 
@@ -27,7 +28,7 @@ async function priceId(plan: PaidPlan, interval: Interval) {
 
 // The photographer's customer record on the PhotoEZ Cloud account, made on
 // first use.
-async function billingCustomer(photographerId: string) {
+export async function billingCustomer(photographerId: string) {
   const [studio] = await db
     .select({
       customerId: photographers.billingCustomerId,
@@ -49,18 +50,36 @@ async function billingCustomer(photographerId: string) {
 
 // A Stripe Checkout page for a new subscription.
 export async function subscriptionCheckoutUrl(photographerId: string, plan: PaidPlan, interval: Interval) {
+  const discount = await referralDiscount(photographerId);
   const session = await stripe().checkout.sessions.create({
     mode: "subscription",
     customer: await billingCustomer(photographerId),
     client_reference_id: photographerId,
     line_items: [{ price: await priceId(plan, interval), quantity: 1 }],
     subscription_data: { metadata: { photographerId } },
-    allow_promotion_codes: true,
+    // Stripe allows either a set discount or a promo code box, not both.
+    ...(discount ? { discounts: [{ coupon: discount }] } : { allow_promotion_codes: true }),
     success_url: `${siteUrl}/dashboard/billing/return?session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: `${siteUrl}/dashboard/billing`,
   });
   if (!session.url) throw new Error("Stripe didn't return a Checkout page.");
   return session.url;
+}
+
+// A referred studio's 20% off, on its first subscription only (never after
+// it has paid once), when the coupon exists in Stripe.
+async function referralDiscount(photographerId: string) {
+  const [studio] = await db
+    .select({ referredById: photographers.referredById, subscriptionId: photographers.subscriptionId })
+    .from(photographers)
+    .where(eq(photographers.id, photographerId));
+  if (!studio?.referredById || studio.subscriptionId) return null;
+  try {
+    const coupon = await stripe().coupons.retrieve(REFERRAL_COUPON_ID);
+    return coupon.valid ? coupon.id : null;
+  } catch {
+    return null;
+  }
 }
 
 // Stripe's billing portal: change plan, update the card, see invoices, cancel.
@@ -110,6 +129,8 @@ export async function syncSubscription(subscription: Stripe.Subscription) {
       ...(paid ? { trialEndsAt: null } : {}),
     })
     .where(eq(photographers.id, studio.id));
+  // A referred studio's first payment earns its referrer a month of credit.
+  if (paid) await rewardReferral(studio.id);
 }
 
 // The return from Checkout: syncs right away instead of waiting on the webhook.
