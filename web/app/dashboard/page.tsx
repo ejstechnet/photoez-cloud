@@ -63,7 +63,7 @@ export default async function DashboardPage({ searchParams }: PageProps<"/dashbo
             ))}
           </nav>
         </div>
-        <div className="relative mt-6 grid gap-6 sm:grid-cols-2 sm:items-end lg:grid-cols-[1.3fr_1fr_1fr_1fr_1fr]">
+        <div className="relative mt-6 grid gap-6 sm:grid-cols-2 sm:items-end lg:grid-cols-[1.3fr_1fr_1fr_1fr_1fr_1fr]">
           <div>
             <p className="font-display text-5xl font-bold sm:text-6xl">{formatPrice(stats.revenue.total)}</p>
             <p className="mt-1 text-sm font-semibold text-white/70">Total collected</p>
@@ -71,6 +71,7 @@ export default async function DashboardPage({ searchParams }: PageProps<"/dashbo
           <RevenueStat label="Bookings" value={stats.revenue.booking} note="Deposits and balances" />
           <RevenueStat label="Gallery extras" value={stats.revenue.gallery} note="Extra photos sold" />
           <RevenueStat label="Gift cards" value={stats.revenue.giftCards} note="Gift cards sold" />
+          <RevenueStat label="Store" value={stats.revenue.store} note="Prints and products" />
           <RevenueStat label="Still owed" value={stats.revenue.owedCents} note="Balances not paid yet" accent />
         </div>
         {!studio.stripeReady && (

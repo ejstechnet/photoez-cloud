@@ -30,6 +30,7 @@ export async function findGalleryByToken(token: string) {
       galleryNotes: galleries.notesEnabled,
       studioNotes: photographers.photoNotesEnabled,
       clientName: clients.name,
+      clientEmail: clients.email,
       studioName: photographers.businessName,
       photographerName: photographers.name,
       studioSlug: photographers.studioSlug,

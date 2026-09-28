@@ -103,6 +103,12 @@ export const photographers = pgTable("photographers", {
   clientReferralsEnabled: boolean("client_referrals_enabled").notNull().default(false),
   clientReferralRewardCents: integer("client_referral_reward_cents").notNull().default(2500),
   clientReferralDiscountCents: integer("client_referral_discount_cents").notNull().default(2500),
+  // Online Store (lib/store): clients order prints and products of their
+  // photos from delivered galleries. Shipping is a flat amount per order for
+  // items the studio sends itself; handling is an optional extra per order.
+  storeEnabled: boolean("store_enabled").notNull().default(false),
+  storeShippingCents: integer("store_shipping_cents").notNull().default(0),
+  storeHandlingCents: integer("store_handling_cents").notNull().default(0),
   // Price per photo a client selects beyond a gallery's included number
   // (PhotoEZ's "global extra price"; galleries can override it).
   extraPhotoPriceCents: integer("extra_photo_price_cents").notNull().default(1000),
@@ -624,7 +630,9 @@ export const payments = pgTable(
     // A payment is for a booking or for a gallery's extra photos.
     bookingId: uuid("booking_id").references(() => bookings.id, { onDelete: "cascade" }),
     galleryId: uuid("gallery_id").references(() => galleries.id, { onDelete: "cascade" }),
-    kind: text("kind", { enum: ["deposit", "balance", "gallery_extras", "gift_card"] }).notNull(),
+    kind: text("kind", { enum: ["deposit", "balance", "gallery_extras", "gift_card", "store_order"] }).notNull(),
+    // For a store order (lib/store/checkout.ts): the order being paid for.
+    storeOrderId: uuid("store_order_id"),
     // For a gift card purchase: the card being bought.
     giftCardId: uuid("gift_card_id"),
     // How many extra photos a gallery_extras payment covers.
@@ -914,4 +922,97 @@ export const referralRewards = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index("referral_rewards_referrer_idx").on(t.referrerId, t.createdAt)],
+);
+
+// ---- Online Store (lib/store) ----
+
+// One size or option of a store product, e.g. "8×10" at $25. For prints,
+// widthIn × heightIn is the shape the client crops their photo to.
+export type StoreVariant = { id: string; label: string; priceCents: number; widthIn: number | null; heightIn: number | null };
+
+// Something clients can order with one of their photos: a print, canvas,
+// mug, tee… "self" = the studio makes and ships it; lab partners like
+// SwaggPress come later.
+export const storeProducts = pgTable(
+  "store_products",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    photographerId: uuid("photographer_id")
+      .notNull()
+      .references(() => photographers.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    description: text("description"),
+    // The client crops their photo to the chosen size's shape (prints, canvas).
+    cropToSize: boolean("crop_to_size").notNull().default(true),
+    variants: jsonb("variants").$type<StoreVariant[]>().notNull().default([]),
+    // Pictures of the product itself (a sample canvas, the tee), in order;
+    // storage keys (lib/storage.ts storeProductPhotoKey), up to 6.
+    imageKeys: jsonb("image_keys").$type<string[]>().notNull().default([]),
+    fulfillment: text("fulfillment", { enum: ["self"] }).notNull().default("self"),
+    active: boolean("active").notNull().default(true),
+    sortOrder: integer("sort_order").notNull().default(0),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("store_products_photographer_idx").on(t.photographerId, t.sortOrder)],
+);
+
+export const STORE_ORDER_STATUSES = ["pending_payment", "paid", "shipped", "cancelled"] as const;
+
+// A client's order from a gallery, paid through the studio's Stripe.
+export const storeOrders = pgTable(
+  "store_orders",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    photographerId: uuid("photographer_id")
+      .notNull()
+      .references(() => photographers.id, { onDelete: "cascade" }),
+    galleryId: uuid("gallery_id").references(() => galleries.id, { onDelete: "set null" }),
+    // Short number shown to clients and in emails, e.g. "PEZ-4K7Q2M".
+    orderNumber: text("order_number").notNull().unique(),
+    status: text("status", { enum: STORE_ORDER_STATUSES }).notNull().default("pending_payment"),
+    clientName: text("client_name"),
+    clientEmail: text("client_email"),
+    // Filled from Stripe Checkout once paid.
+    shipName: text("ship_name"),
+    shipLine1: text("ship_line1"),
+    shipLine2: text("ship_line2"),
+    shipCity: text("ship_city"),
+    shipState: text("ship_state"),
+    shipPostalCode: text("ship_postal_code"),
+    shipCountry: text("ship_country"),
+    subtotalCents: integer("subtotal_cents").notNull(),
+    shippingCents: integer("shipping_cents").notNull().default(0),
+    handlingCents: integer("handling_cents").notNull().default(0),
+    totalCents: integer("total_cents").notNull(),
+    carrier: text("carrier"),
+    trackingNumber: text("tracking_number"),
+    paidAt: timestamp("paid_at", { withTimezone: true }),
+    shippedAt: timestamp("shipped_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("store_orders_photographer_idx").on(t.photographerId, t.createdAt)],
+);
+
+// Where on the photo the client cropped: fractions (0–1) of its width and height.
+export type StoreCrop = { x: number; y: number; width: number; height: number };
+
+export const storeOrderItems = pgTable(
+  "store_order_items",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    orderId: uuid("order_id")
+      .notNull()
+      .references(() => storeOrders.id, { onDelete: "cascade" }),
+    productId: uuid("product_id").references(() => storeProducts.id, { onDelete: "set null" }),
+    photoId: uuid("photo_id").references(() => photos.id, { onDelete: "set null" }),
+    // Copies, so later product edits never change an order.
+    productName: text("product_name").notNull(),
+    variantLabel: text("variant_label").notNull(),
+    unitCents: integer("unit_cents").notNull(),
+    quantity: integer("quantity").notNull(),
+    crop: jsonb("crop").$type<StoreCrop>(),
+    photoName: text("photo_name"),
+    fulfillment: text("fulfillment", { enum: ["self"] }).notNull().default("self"),
+  },
+  (t) => [index("store_order_items_order_idx").on(t.orderId)],
 );

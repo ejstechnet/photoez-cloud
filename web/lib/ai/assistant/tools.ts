@@ -1,7 +1,7 @@
 import type Anthropic from "@anthropic-ai/sdk";
 import { and, asc, desc, eq, gte, ilike, inArray, isNotNull, lt, lte, or, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { assistantProposals, bookings, clients, galleries, giftCards, inquiries, payments, reviews } from "@/db/schema";
+import { assistantProposals, bookings, clients, galleries, giftCards, inquiries, payments, reviews, storeOrders } from "@/db/schema";
 import { formatPrice } from "@/lib/booking/format";
 import { addDays, formatDate, formatTime, localDateOf, zonedToUtc } from "@/lib/booking/time";
 import { signedContractFor } from "@/lib/contracts/for-booking";
@@ -184,7 +184,7 @@ export async function runTool(name: string, input: Input, ctx: ToolContext): Pro
             and(
               eq(payments.status, "paid"),
               gte(payments.paidAt, monthStart),
-              sql`coalesce(${bookings.photographerId}, ${galleries.photographerId}, ${giftCards.photographerId}) = ${ctx.photographerId}`,
+              sql`coalesce(${bookings.photographerId}, ${galleries.photographerId}, ${giftCards.photographerId}, ${storeOrders.photographerId}) = ${ctx.photographerId}`,
             ),
           ),
       ]);
@@ -348,12 +348,13 @@ export async function runTool(name: string, input: Input, ctx: ToolContext): Pro
         .leftJoin(bookings, eq(bookings.id, payments.bookingId))
         .leftJoin(galleries, eq(galleries.id, payments.galleryId))
         .leftJoin(giftCards, eq(giftCards.id, payments.giftCardId))
+        .leftJoin(storeOrders, eq(storeOrders.id, payments.storeOrderId))
         .where(
           and(
             eq(payments.status, "paid"),
             gte(payments.paidAt, startOf(input.from)),
             lt(payments.paidAt, startOf(addDays(input.to, 1))),
-            sql`coalesce(${bookings.photographerId}, ${galleries.photographerId}, ${giftCards.photographerId}) = ${ctx.photographerId}`,
+            sql`coalesce(${bookings.photographerId}, ${galleries.photographerId}, ${giftCards.photographerId}, ${storeOrders.photographerId}) = ${ctx.photographerId}`,
           ),
         )
         .groupBy(payments.kind);
@@ -365,7 +366,8 @@ export async function runTool(name: string, input: Input, ctx: ToolContext): Pro
           bookings: formatPrice(sum(["deposit", "balance"])),
           gallery_extras: formatPrice(sum(["gallery_extras"])),
           gift_cards: formatPrice(sum(["gift_card"])),
-          total: formatPrice(sum(["deposit", "balance", "gallery_extras", "gift_card"])),
+          store: formatPrice(sum(["store_order"])),
+          total: formatPrice(sum(["deposit", "balance", "gallery_extras", "gift_card", "store_order"])),
           note: "Online payments only.",
         }),
       };

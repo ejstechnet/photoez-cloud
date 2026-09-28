@@ -1,3 +1,4 @@
+import { storefrontFor } from "@/lib/store/checkout";
 import { and, eq, isNotNull } from "drizzle-orm";
 import { db } from "@/db";
 import { photos as photoRows } from "@/db/schema";
@@ -30,7 +31,7 @@ export async function generateMetadata({ params }: PageProps<"/g/[token]">): Pro
 
 export default async function ClientGalleryPage({ params, searchParams }: PageProps<"/g/[token]">) {
   const { token } = await params;
-  const { preview, paid, payment } = await searchParams;
+  const { preview, paid, payment, ordered, order } = await searchParams;
   const gallery = await findGalleryByToken(token);
   if (!gallery) notFound();
 
@@ -58,6 +59,8 @@ export default async function ClientGalleryPage({ params, searchParams }: PagePr
     ).length > 0;
 
   const delivered = isDelivered(gallery);
+  // The studio's shop, on delivered galleries (lib/store/checkout.ts).
+  const store = delivered ? await storefrontFor(gallery.photographerId) : null;
   const finals = await clientFinals(gallery);
   const finalTiles = await Promise.all(
     finals.map(async (photo, i) => ({
@@ -159,6 +162,9 @@ export default async function ClientGalleryPage({ params, searchParams }: PagePr
               studio={studio}
               clientFirstName={gallery.clientName?.split(" ")[0] ?? null}
               totalSize={totalSize}
+              store={store}
+              ordered={typeof ordered === "string" && /^PEZ-[A-Z0-9]{6}$/.test(ordered) ? ordered : null}
+              orderCancelled={order === "cancelled"}
             />
           )
         ) : tiles.length === 0 ? (

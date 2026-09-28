@@ -2,7 +2,11 @@
 
 import { SearchBox } from "./search-box";
 import { galleryItemClass, galleryListClass, galleryTileAspect, type GalleryLayout } from "@/lib/gallery-layout";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import type { Storefront } from "@/lib/store/checkout";
+import { CartPanel } from "./shop/cart-panel";
+import { ShopDialog } from "./shop/shop-dialog";
+import { useCart } from "./shop/use-cart";
 import { DownloadIcon } from "@/components/icons";
 import { Lightbox } from "@/components/lightbox";
 
@@ -27,6 +31,9 @@ export function DeliveryGallery({
   studio,
   clientFirstName,
   totalSize,
+  store = null,
+  ordered = null,
+  orderCancelled = false,
 }: {
   // Gallery search is on (the studio's plan, and photos described).
   canSearch?: boolean;
@@ -39,11 +46,26 @@ export function DeliveryGallery({
   studio: string;
   clientFirstName: string | null;
   totalSize: string;
+  // The studio's shop (lib/store), when it's open.
+  store?: Storefront | null;
+  // Back from a paid store checkout: the order number.
+  ordered?: string | null;
+  orderCancelled?: boolean;
 }) {
   const [open, setOpen] = useState<number | null>(null);
   // Gallery search results (null = show everything).
   const [found, setFound] = useState<Set<string> | null>(null);
   const shown = found ? tiles.filter((tile) => found.has(tile.id)) : tiles;
+  const cart = useCart(token);
+  const [ordering, setOrdering] = useState<FinalTile | null>(null);
+  const [added, setAdded] = useState(false);
+  // A paid order: the cart's job is done.
+  const { clear } = cart;
+  useEffect(() => {
+    if (ordered) clear();
+    // Only when arriving back from checkout.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ordered]);
 
   return (
     <>
@@ -60,6 +82,25 @@ export function DeliveryGallery({
           <DownloadIcon size={18} /> Download all · {totalSize}
         </a>
       </div>
+
+      {ordered && (
+        <p className="mt-6 rounded-2xl bg-lime/20 px-5 py-4 font-semibold">
+          Thank you! Your order {ordered} is in. {studio} will email you when it ships.
+        </p>
+      )}
+      {orderCancelled && (
+        <p className="mt-6 rounded-2xl bg-sun/30 px-5 py-4 font-semibold">
+          Checkout was cancelled, so you weren&rsquo;t charged. Your cart is still here.
+        </p>
+      )}
+      {store && !ordered && (
+        <p className="mt-6 rounded-2xl bg-sky-light/50 px-5 py-4 text-sm">
+          <strong>Prints and more:</strong> tap 🛍️ on any photo to order {store.products.map((p) => p.name.toLowerCase()).join(", ")} from {studio}.
+        </p>
+      )}
+      {added && (
+        <p className="mt-6 rounded-2xl bg-lime/20 px-5 py-3 text-sm font-semibold">Added to your cart. Keep shopping or open the cart to check out.</p>
+      )}
 
       {canSearch && (
         <div className="mt-6">
@@ -90,6 +131,19 @@ export function DeliveryGallery({
               <span className="pointer-events-none absolute top-2 left-2 grid size-7 place-items-center rounded-full bg-brand-deep/80 text-xs font-bold text-white">
                 {tile.number}
               </span>
+              {store && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAdded(false);
+                    setOrdering(tile);
+                  }}
+                  aria-label={`Order prints of photo ${tile.number}`}
+                  className="absolute right-15 bottom-2 grid size-11 place-items-center rounded-full bg-white/90 text-lg shadow-lg transition hover:scale-110 hover:bg-lime"
+                >
+                  🛍️
+                </button>
+              )}
               <a
                 href={tile.downloadUrl}
                 aria-label={`Download photo ${tile.number}`}
@@ -101,6 +155,20 @@ export function DeliveryGallery({
           </li>
         ))}
       </ul>
+
+      {store && ordering && (
+        <ShopDialog
+          photo={ordering}
+          store={store}
+          onClose={() => setOrdering(null)}
+          onAdd={(item) => {
+            cart.add(item);
+            setOrdering(null);
+            setAdded(true);
+          }}
+        />
+      )}
+      {store && <CartPanel token={token} store={store} photos={tiles} cart={cart} preview={preview} />}
 
       {open !== null && (
         <Lightbox

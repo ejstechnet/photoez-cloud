@@ -34,6 +34,9 @@ export type EmailKind =
   | "review_request"
   | "review_new"
   | "referral_credit"
+  | "store_order"
+  | "store_order_new"
+  | "store_order_shipped"
   | "password_reset"
   | "test";
 

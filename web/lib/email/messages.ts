@@ -518,3 +518,72 @@ export function referralCreditClient(o: {
     outro: o.share ? [shareLine(o.share, o.studioName)] : [],
   };
 }
+
+// ---- Online Store ----
+
+export type StoreOrderFacts = {
+  studioName: string;
+  clientName: string | null;
+  orderNumber: string;
+  items: string[];
+  subtotalCents: number;
+  shippingCents: number;
+  handlingCents: number;
+  totalCents: number;
+  shipTo: string | null;
+};
+
+function storeOrderDetails(o: StoreOrderFacts): [string, string][] {
+  return [
+    ["Order", o.orderNumber],
+    ["Items", o.items.join("\n")],
+    ["Subtotal", formatPrice(o.subtotalCents)],
+    ...(o.shippingCents > 0 ? ([["Shipping", formatPrice(o.shippingCents)]] as [string, string][]) : []),
+    ...(o.handlingCents > 0 ? ([["Handling", formatPrice(o.handlingCents)]] as [string, string][]) : []),
+    ["Total paid", formatPrice(o.totalCents)],
+    ...(o.shipTo ? ([["Ship to", o.shipTo]] as [string, string][]) : []),
+  ];
+}
+
+export function storeOrderClient(o: StoreOrderFacts & { galleryUrl: string | null }): EmailContent {
+  return {
+    subject: `Your order from ${o.studioName} (${o.orderNumber})`,
+    heading: "Thank you for your order!",
+    intro: [
+      `Hi ${o.clientName ? firstName(o.clientName) : "there"}, ${o.studioName} has your order and will get it made. We'll email you again when it ships.`,
+    ],
+    details: storeOrderDetails(o),
+    ...(o.galleryUrl ? { button: { label: "Back to my gallery", url: o.galleryUrl } } : {}),
+  };
+}
+
+export function storeOrderStudio(o: StoreOrderFacts & { dashboardUrl: string }): EmailContent {
+  return {
+    subject: `New store order ${o.orderNumber}: ${formatPrice(o.totalCents)}`,
+    heading: "You have a new order 🛍️",
+    intro: [`${o.clientName ?? "A client"} just ordered from their gallery. Download the print files and mark it shipped when it's on its way.`],
+    details: storeOrderDetails(o),
+    button: { label: "Open the order", url: o.dashboardUrl },
+  };
+}
+
+export function storeOrderShippedClient(
+  o: Pick<StoreOrderFacts, "studioName" | "clientName" | "orderNumber" | "items"> & {
+    carrier: string | null;
+    trackingNumber: string | null;
+    trackingUrl: string | null;
+  },
+): EmailContent {
+  return {
+    subject: `Your order from ${o.studioName} has shipped (${o.orderNumber})`,
+    heading: "Your order is on its way! 📦",
+    intro: [`Hi ${o.clientName ? firstName(o.clientName) : "there"}, your order from ${o.studioName} has shipped.`],
+    details: [
+      ["Order", o.orderNumber],
+      ["Items", o.items.join("\n")],
+      ...(o.carrier ? ([["Carrier", o.carrier]] as [string, string][]) : []),
+      ...(o.trackingNumber ? ([["Tracking", o.trackingNumber]] as [string, string][]) : []),
+    ],
+    ...(o.trackingUrl ? { button: { label: "Track my package", url: o.trackingUrl } } : {}),
+  };
+}

@@ -8,7 +8,7 @@ import { photoAllowance } from "@/lib/gallery-tagging";
 import { planUsage } from "@/lib/plan-usage";
 import { PLAN_LABELS, TRIAL_DAYS, formatStorage, hasFeature, trialDaysLeft, type Interval } from "@/lib/plans";
 import { requirePhotographer } from "@/lib/session";
-import { refreshSubscription } from "@/lib/billing";
+import { refreshSubscription, scheduledChange } from "@/lib/billing";
 import { stripeConfigured } from "@/lib/stripe";
 import { manageBilling, subscribe } from "./actions";
 import { BrandingToggle } from "./branding-toggle";
@@ -39,11 +39,12 @@ export default async function BillingPage({ searchParams }: PageProps<"/dashboar
     })
     .from(photographers)
     .where(eq(photographers.id, user.id));
-  const [usage, photosAi, assistant, referrals] = await Promise.all([
+  const [usage, photosAi, assistant, referrals, change] = await Promise.all([
     planUsage(user.id),
     photoAllowance(user.id),
     assistantAllowance(user.id),
     referralSummary(user.id),
+    stripeConfigured() ? scheduledChange(user.id).catch(() => null) : null,
   ]);
   const plan = usage.plan;
   const trialLeft = studio.subscribedPlan === "free" ? trialDaysLeft(studio.trialEndsAt) : 0;
@@ -104,6 +105,12 @@ export default async function BillingPage({ searchParams }: PageProps<"/dashboar
                 ) : (
                   <>Renews on {date(studio.periodEnd)}.</>
                 )}
+              </p>
+            )}
+            {change && !studio.cancelling && (
+              <p className="rounded-xl bg-sky-light/50 px-3 py-2">
+                Changing to <strong>{PLAN_LABELS[change.plan]}</strong>, billed {change.interval === "year" ? "yearly" : "monthly"}, on{" "}
+                {date(change.on)}. You keep everything you have now until then.
               </p>
             )}
             {studio.status === "past_due" && (

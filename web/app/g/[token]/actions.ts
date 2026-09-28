@@ -13,6 +13,7 @@ import { paymentAccount } from "@/lib/payments/checkout";
 import { paidGalleryExtras, startGalleryCheckout } from "@/lib/payments/gallery-checkout";
 import { emailSelectionsSubmitted } from "@/lib/email/notify";
 import { afterResponse } from "@/lib/email/send";
+import { startStoreCheckout } from "@/lib/store/checkout";
 
 // Actions a client can take from their gallery link. The token is re-checked
 // on every call, and changes are only allowed while the gallery is in proofing.
@@ -143,4 +144,22 @@ export async function searchGallery(token: string, query: string): Promise<strin
   if (!gallery || !hasFeature(gallery.plan, "aiSearch")) return [];
   const delivered = gallery.status === "delivered" || gallery.status === "completed";
   return searchGalleryPhotos(gallery.id, query, [delivered ? "final" : "proof"]);
+}
+
+// The gallery shop's checkout: the cart is checked and priced on the server,
+// then the client goes to Stripe to pay the studio (lib/store/checkout.ts).
+export async function checkoutStoreCart(token: string, cart: unknown): Promise<{ url: string } | { error: string }> {
+  const gallery = await findGalleryByToken(token);
+  if (!gallery || (gallery.status !== "delivered" && gallery.status !== "completed")) {
+    return { error: "This gallery's shop isn't open." };
+  }
+  return startStoreCheckout({
+    galleryId: gallery.id,
+    token,
+    photographerId: gallery.photographerId,
+    studioName: gallery.studioName ?? gallery.photographerName,
+    clientName: gallery.clientName,
+    clientEmail: gallery.clientEmail ?? null,
+    cart,
+  });
 }

@@ -24,6 +24,9 @@ export const KIND_LABELS: Record<EmailKind, string> = {
   review_request: "Review request",
   review_new: "New review (to you)",
   referral_credit: "Referral credit",
+  store_order: "Store order receipt",
+  store_order_new: "New store order (to you)",
+  store_order_shipped: "Store order shipped",
   password_reset: "Password reset",
   test: "Test email",
 };
