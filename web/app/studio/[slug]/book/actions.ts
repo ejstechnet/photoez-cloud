@@ -29,6 +29,7 @@ import { normalizeCode } from "@/lib/coupons";
 import { checkCouponCode } from "@/lib/coupon-lookup";
 import { creditBalance, useCredits } from "@/lib/credits";
 import { friendDiscountFor } from "@/lib/client-referrals";
+import { createGalleryForBooking } from "@/lib/booking-gallery";
 import { nextPayment } from "@/lib/payments/amounts";
 import { paymentAccount, releaseExpiredHolds, releaseHold, startCheckout } from "@/lib/payments/checkout";
 import { contractTemplateFor } from "@/lib/contracts/for-booking";
@@ -44,6 +45,7 @@ import { inspoKey, signedUploadUrl, storedSize } from "@/lib/storage";
 const MAX_PER_EMAIL_PER_HOUR = 3;
 
 const formSchema = z.object({
+  title: z.string().trim().min(1, "Give your session a title.").max(120, "Keep the title under 120 characters."),
   name: z.string().trim().min(1, "Enter your name.").max(120, "Keep your name under 120 characters."),
   email: z.email("Enter a valid email address.").trim().max(254),
   phone: z
@@ -107,6 +109,7 @@ export async function createBooking(
   if (String(formData.get("website") ?? "") !== "") return { message: "Something went wrong. Please try again." };
 
   const parsed = formSchema.safeParse({
+    title: String(formData.get("title") ?? ""),
     name: String(formData.get("name") ?? ""),
     email: String(formData.get("email") ?? ""),
     phone: String(formData.get("phone") ?? ""),
@@ -289,6 +292,7 @@ export async function createBooking(
         sessionTypeId: session.id,
         clientId,
         sessionName: session.name,
+        title: data.title,
         // The special price, if one applies today in the studio's time zone.
         priceCents: currentPriceCents,
         ...(takesDeposit
@@ -356,8 +360,12 @@ export async function createBooking(
     redirect(checkoutUrl);
   }
 
-  // No deposit: the booking is confirmed now, so the emails go out.
-  if (saved) afterResponse(() => emailBookingConfirmed(saved.id));
+  // No deposit: the booking is confirmed now, so its gallery is made
+  // (lib/booking-gallery.ts) and the emails go out.
+  if (saved) {
+    await createGalleryForBooking(saved.id).catch((error) => console.error("Booking gallery failed", error));
+    afterResponse(() => emailBookingConfirmed(saved.id));
+  }
 
   // Straight to signing when this session has a contract, like PhotoEZ Contracts.
   const needsContract = saved ? (await contractTemplateFor(saved)) !== null : false;

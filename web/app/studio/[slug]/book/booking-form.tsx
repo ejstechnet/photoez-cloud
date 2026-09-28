@@ -269,6 +269,15 @@ export function BookingForm({
               <input type="text" name="website" tabIndex={-1} autoComplete="off" />
             </label>
           </div>
+          <Field
+            label="Session title"
+            name="title"
+            maxLength={120}
+            placeholder="Example: Tina's Senior Photos"
+            hint="What should we call your session? It becomes the name of your photo gallery."
+            error={errors.title}
+            required
+          />
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Your name" name="name" autoComplete="name" error={errors.name} required />
             <Field

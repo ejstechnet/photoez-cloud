@@ -18,6 +18,7 @@ export type SessionTypeValues = {
   depositPercent: number;
   location: string | null;
   photosIncluded: number | null;
+  galleryType: "proofing" | "none";
   hidden: boolean;
   contractTemplateId: string | null;
   noContract: boolean;
@@ -157,6 +158,16 @@ export function SessionTypeForm({
           </option>
         ))}
         <option value="none">No contract</option>
+      </SelectField>
+      <SelectField
+        label="Gallery"
+        name="galleryType"
+        defaultValue={defaultValues?.galleryType ?? "proofing"}
+        error={errors.galleryType}
+        hint="Made when a booking is confirmed, ready for you to upload to. The client isn't emailed until you share it."
+      >
+        <option value="proofing">Create a proofing gallery for each booking</option>
+        <option value="none">No gallery (like consultations)</option>
       </SelectField>
       <label className="flex items-start gap-3 rounded-xl border-2 border-border px-3.5 py-3">
         <input
