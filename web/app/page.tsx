@@ -10,6 +10,9 @@ import Image from "next/image";
 import { Logo, WorkflowPills } from "@/components/brand";
 import {
   ArrowRightIcon,
+  BagIcon,
+  GiftIcon,
+  MapPinIcon,
   CalendarIcon,
   CameraIcon,
   ChatIcon,
@@ -53,7 +56,7 @@ const features = [
 // What PhotoEZ Cloud does today (the home page's "in one place" list).
 const cloudFeatures = [
   { title: "Your studio page", body: "Your work, sessions, reviews, and FAQ, with an inquiry form that sorts itself." },
-  { title: "Online booking", body: "Real open times, add-ons, deposits, reschedules, and session credits." },
+  { title: "Step-by-step booking", body: "Real open times, deposits, and reschedules, and a gallery made the moment they book." },
   { title: "Proofing & delivery", body: "Watermarked proofs, client favorites and notes, paid extras, clean downloads." },
   { title: "Contracts", body: "Signed online, filled in from each booking automatically." },
   { title: "Payments", body: "Deposits, balances, and extras straight to your own Stripe account." },
@@ -61,6 +64,37 @@ const cloudFeatures = [
   { title: "Reviews", body: "Asked for after delivery, approved by you, shown on your page." },
   { title: "Emails & reminders", body: "Confirmations, reminders, and gallery emails sent for you." },
   { title: "Page Designer", body: "Your colors, fonts, banner, and gallery style." },
+  { title: "Online store", body: "Clients order prints and products of their photos right from their gallery." },
+  { title: "Photographer directory", body: "People searching nearby find your studio page. Free on every plan." },
+  { title: "Referrals", body: "Clients share a link; their friends save, and they earn session credit." },
+];
+
+// Elle's print and merch company, the store's first print partner.
+const SWAGGPRESS_URL = "https://swaggpress.com";
+
+// "Grow your business": the features that bring in money and new clients.
+const growth = [
+  {
+    title: "Sell prints and products",
+    body: "Your clients order prints, canvases, and more of their own photos from their gallery, framed exactly how they like. You set the prices, and the money goes straight to your Stripe.",
+    icon: <BagIcon size={24} />,
+    tile: "bg-coral",
+    link: { href: "/pricing", label: "Included on every plan" },
+  },
+  {
+    title: "Get found nearby",
+    body: "The PhotoEZ Cloud directory lists your studio for people searching their ZIP code or city, ranked by distance and reviews. Their messages land in your inquiries.",
+    icon: <MapPinIcon size={24} />,
+    tile: "bg-sky",
+    link: { href: "/photographers", label: "See the directory" },
+  },
+  {
+    title: "Turn clients into referrals",
+    body: "Every client gets a share link. Friends save on their first session, and your client earns credit toward their next one once that session happens.",
+    icon: <GiftIcon size={24} />,
+    tile: "bg-lime",
+    link: null,
+  },
 ];
 
 // An icon and color for each plugin in "Meet PhotoEZ for WordPress".
@@ -176,8 +210,8 @@ export default async function Home() {
               .
             </h1>
             <p className="mt-6 max-w-lg text-lg text-white/80">
-              Galleries, clients, and delivery, with AI that reads your inquiries, finds your shots, and handles the
-              busywork so you can get back behind the camera.
+              Booking, galleries, delivery, and a print store, with AI that reads your inquiries, finds your shots, and
+              handles the busywork so you can get back behind the camera.
             </p>
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
               {session ? (
@@ -245,6 +279,59 @@ export default async function Home() {
         </div>
       </section>
 
+      {/* Growing the business: store, directory, referrals. */}
+      <section className="bg-brand-deep text-white">
+        <div className="mx-auto w-full max-w-7xl px-4 py-20">
+          <p className="text-sm font-bold tracking-wider text-lime uppercase">Grow your business</p>
+          <h2 className="mt-2 max-w-2xl font-display text-4xl font-bold tracking-tight">
+            More clients. <span className="italic text-sun">More sales.</span>
+          </h2>
+          <div className="mt-10 grid gap-5 lg:grid-cols-3">
+            {growth.map((item) => (
+              <article key={item.title} className="rounded-3xl bg-white/10 p-6 ring-1 ring-white/10 transition hover:-translate-y-1 hover:bg-white/15 sm:p-8">
+                <span className={`grid size-12 place-items-center rounded-2xl text-brand-deep ${item.tile}`}>{item.icon}</span>
+                <h3 className="mt-5 font-display text-2xl font-bold">{item.title}</h3>
+                <p className="mt-2 leading-relaxed text-white/75">{item.body}</p>
+                {item.link && (
+                  <Link href={item.link.href} className="mt-5 inline-flex items-center gap-1.5 text-sm font-bold tracking-wider text-lime uppercase hover:underline">
+                    {item.link.label} <ArrowRightIcon size={16} />
+                  </Link>
+                )}
+              </article>
+            ))}
+          </div>
+
+          {/* The print and merch partner (Elle's own company). */}
+          <div className="mt-6 flex flex-col gap-6 rounded-3xl bg-surface p-6 text-foreground sm:flex-row sm:items-center sm:p-8">
+            <a href={SWAGGPRESS_URL} target="_blank" rel="noopener" className="shrink-0 transition hover:opacity-80">
+              <Image
+                src="/home/swaggpress-logo.webp"
+                alt="SwaggPress Creations"
+                width={720}
+                height={239}
+                style={{ width: 240, height: "auto" }}
+              />
+            </a>
+            <div>
+              <p className="text-sm font-bold tracking-wider text-coral uppercase">Print &amp; merch partner · Coming soon</p>
+              <p className="mt-2 text-lg leading-relaxed text-foreground/80">
+                <strong className="text-foreground">SwaggPress Creations</strong> prints your clients&rsquo; photos on
+                wide-format printers and presses them onto tees, hoodies, hats, tumblers, and graduate swag, then ships
+                straight to their door. You set the prices.
+              </p>
+              <a
+                href={SWAGGPRESS_URL}
+                target="_blank"
+                rel="noopener"
+                className="mt-3 inline-flex items-center gap-1.5 text-base font-bold tracking-wider text-link uppercase hover:underline"
+              >
+                Visit SwaggPress Creations <ArrowRightIcon size={16} />
+              </a>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* What PhotoEZ Cloud does today. */}
       <section className="border-y border-border bg-surface">
         <div className="mx-auto w-full max-w-7xl px-4 py-20">
@@ -292,6 +379,15 @@ export default async function Home() {
               </li>
             ))}
           </ul>
+          <div className="mt-16 flex flex-col items-start justify-between gap-5 rounded-3xl bg-lime/15 p-6 ring-1 ring-lime/30 sm:flex-row sm:items-center sm:p-8">
+            <div>
+              <p className="font-display text-2xl font-bold">Start free. Try Pro for 14 days.</p>
+              <p className="mt-1 text-muted">No card needed. Stay on Free as long as you like, or grow into Pro and Studio.</p>
+            </div>
+            <Link href="/pricing" className="btn-primary shrink-0">
+              See pricing <ArrowRightIcon size={18} />
+            </Link>
+          </div>
         </div>
       </section>
 
