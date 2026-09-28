@@ -50,6 +50,11 @@ export function studioPhotoKey(photographerId: string, version: string) {
   return `photographers/${photographerId}/portfolio/${version}.jpg`;
 }
 
+// A picture of an Online Store product (lib/store).
+export function storeProductPhotoKey(photographerId: string, productId: string, version: string) {
+  return `photographers/${photographerId}/store/${productId}/${version}.jpg`;
+}
+
 // The photo shown above a session on the booking page. A new key per upload,
 // so browsers never show a cached old photo.
 export function sessionImageKey(photographerId: string, sessionTypeId: string, version: string) {

@@ -47,6 +47,13 @@ export default async function DashboardLayout({ children }: LayoutProps<"/dashbo
               ]}
             />
             <NavLink href="/dashboard/galleries">Galleries</NavLink>
+            <NavMenu
+              label="Store"
+              items={[
+                { href: "/dashboard/store/orders", label: "Orders" },
+                { href: "/dashboard/store", label: "Products & settings", exact: true },
+              ]}
+            />
             <NavLink href="/dashboard/assistant">Assistant</NavLink>
             <NavMenu
               label={

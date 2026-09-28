@@ -154,3 +154,22 @@ export async function refreshSubscription(photographerId: string) {
   if (!studio?.subscriptionId) return;
   await syncSubscription(await stripe().subscriptions.retrieve(studio.subscriptionId));
 }
+
+// A downgrade waiting for the next billing date (the portal schedules them):
+// the plan and interval it changes to, and when. Null when nothing is scheduled.
+export async function scheduledChange(photographerId: string) {
+  const [studio] = await db
+    .select({ subscriptionId: photographers.subscriptionId })
+    .from(photographers)
+    .where(eq(photographers.id, photographerId));
+  if (!studio?.subscriptionId) return null;
+  const subscription = await stripe().subscriptions.retrieve(studio.subscriptionId);
+  if (!subscription.schedule) return null;
+  const scheduleId = typeof subscription.schedule === "string" ? subscription.schedule : subscription.schedule.id;
+  const schedule = await stripe().subscriptionSchedules.retrieve(scheduleId, { expand: ["phases.items.price"] });
+  const now = Date.now() / 1000;
+  const next = schedule.phases.find((phase) => phase.start_date > now);
+  const price = next?.items[0]?.price;
+  const bought = price && typeof price !== "string" && !("deleted" in price && price.deleted) ? planFromLookupKey(price.lookup_key) : null;
+  return next && bought ? { ...bought, on: new Date(next.start_date * 1000) } : null;
+}

@@ -1,4 +1,4 @@
-import { emailBookingConfirmed, emailPaymentReceived, emailSelectionsSubmitted } from "@/lib/email/notify";
+import { emailBookingConfirmed, emailPaymentReceived, emailSelectionsSubmitted, emailStoreOrderPaid } from "@/lib/email/notify";
 import { activatePurchasedCard } from "@/lib/gift-cards";
 import { afterResponse } from "@/lib/email/send";
 import { and, asc, eq, lt, sql } from "drizzle-orm";
@@ -11,6 +11,7 @@ import { stripe, stripeConfigured } from "@/lib/stripe";
 import { returnBookingCredit } from "@/lib/credits";
 import { nextPayment } from "./amounts";
 import { createGalleryForBooking } from "@/lib/booking-gallery";
+import { cancelUnpaidStoreOrder, markStoreOrderPaid } from "@/lib/store/checkout";
 
 // Stripe Checkout for booking payments, always on the photographer's own
 // connected account. The database only changes when Stripe confirms a payment
@@ -144,12 +145,18 @@ export async function applyCheckoutSession(session: Stripe.Checkout.Session) {
       afterResponse(() => emailPaymentReceived(bookingId, payment.amountCents));
     }
     if (galleryId && submittedNow) afterResponse(() => emailSelectionsSubmitted(galleryId));
+    // A store order: paid, with the shipping address from Checkout.
+    const { storeOrderId } = payment;
+    if (storeOrderId && (await markStoreOrderPaid(storeOrderId, session))) {
+      afterResponse(() => emailStoreOrderPaid(storeOrderId));
+    }
     // A gift card purchase: the card turns on and goes out.
     const { giftCardId } = payment;
     if (giftCardId) afterResponse(() => activatePurchasedCard(giftCardId));
   } else if (session.status === "expired" && payment.status === "pending") {
     await db.update(payments).set({ status: "expired" }).where(eq(payments.id, payment.id));
     if (payment.bookingId) await releaseHold(payment.bookingId);
+    if (payment.storeOrderId) await cancelUnpaidStoreOrder(payment.storeOrderId);
     // An abandoned gift card purchase never becomes a usable card.
     if (payment.giftCardId) {
       await db

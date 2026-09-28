@@ -260,6 +260,20 @@
       "when": 1790617720512,
       "tag": "0036_damp_vulcan",
       "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "7",
+      "when": 1790620352896,
+      "tag": "0037_fantastic_nova",
+      "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1790622896738,
+      "tag": "0038_hot_chimera",
+      "breakpoints": true
     }
   ]
 }

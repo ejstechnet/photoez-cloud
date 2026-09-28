@@ -64,6 +64,9 @@ const features = {
     // Upgrades charge the difference right away, so the next bill is the
     // plain plan price instead of a surprise catch-up amount.
     proration_behavior: "always_invoice",
+    // Downgrades (Studio → Pro, yearly → monthly) wait for the next billing
+    // date: the studio keeps what it paid for until then, with no credit.
+    schedule_at_period_end: { conditions: [{ type: "decreasing_item_amount" }, { type: "shortening_interval" }] },
   },
 };
 const { data: configs } = await stripe.billingPortal.configurations.list({ active: true, limit: 20 });

@@ -1,6 +1,7 @@
 import { and, count, eq } from "drizzle-orm";
 import { db } from "@/db";
-import { bookingAddons, bookings, clients, favorites, galleries, inquiries, photographers, photos } from "@/db/schema";
+import { bookingAddons, bookings, clients, favorites, galleries, inquiries, photographers, photos, storeOrderItems, storeOrders } from "@/db/schema";
+import { trackingUrl } from "@/lib/store/rules";
 import { formatDuration } from "@/lib/booking/format";
 import { formatDate, formatTime, zoneLabel } from "@/lib/booking/time";
 import { contractTemplateFor, signedContractFor } from "@/lib/contracts/for-booking";
@@ -418,4 +419,70 @@ export async function emailReferralCredit(o: {
 function formatLocalDate(date: string) {
   const [y, m, d] = date.split("-").map(Number);
   return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric", timeZone: "UTC" });
+}
+
+// ---- Online Store ----
+
+async function loadStoreOrder(orderId: string) {
+  const [row] = await db
+    .select({ order: storeOrders, studioName: photographers.businessName, name: photographers.name, token: galleries.shareToken })
+    .from(storeOrders)
+    .innerJoin(photographers, eq(photographers.id, storeOrders.photographerId))
+    .leftJoin(galleries, eq(galleries.id, storeOrders.galleryId))
+    .where(eq(storeOrders.id, orderId));
+  if (!row) return null;
+  const items = await db.select().from(storeOrderItems).where(eq(storeOrderItems.orderId, orderId));
+  const { order } = row;
+  const facts: messages.StoreOrderFacts = {
+    studioName: row.studioName || row.name,
+    clientName: order.clientName,
+    orderNumber: order.orderNumber,
+    items: items.map((i) => `${i.quantity} × ${i.productName} ${i.variantLabel}${i.photoName ? ` (${i.photoName})` : ""}`),
+    subtotalCents: order.subtotalCents,
+    shippingCents: order.shippingCents,
+    handlingCents: order.handlingCents,
+    totalCents: order.totalCents,
+    shipTo: order.shipLine1
+      ? [order.shipName, order.shipLine1, order.shipLine2, `${order.shipCity ?? ""}, ${order.shipState ?? ""} ${order.shipPostalCode ?? ""}`.trim()]
+          .filter(Boolean)
+          .join("\n")
+      : null,
+  };
+  return { order, facts, galleryUrl: row.token ? `${siteUrl}/g/${row.token}` : null };
+}
+
+// A store order was paid: the client's receipt, and a heads-up to the studio.
+export async function emailStoreOrderPaid(orderId: string) {
+  const loaded = await loadStoreOrder(orderId);
+  if (!loaded) return;
+  const { order, facts, galleryUrl } = loaded;
+  if (order.clientEmail) {
+    await sendToClient(order.photographerId, "store_order", order.clientEmail, messages.storeOrderClient({ ...facts, galleryUrl }), {
+      galleryId: order.galleryId ?? undefined,
+    });
+  }
+  await sendToStudio(
+    order.photographerId,
+    "store_order_new",
+    messages.storeOrderStudio({ ...facts, dashboardUrl: `${siteUrl}/dashboard/store/orders/${order.id}` }),
+  );
+}
+
+export async function emailStoreOrderShipped(orderId: string) {
+  const loaded = await loadStoreOrder(orderId);
+  const to = loaded?.order.clientEmail;
+  if (!loaded || !to) return false;
+  const { order, facts } = loaded;
+  return sendToClient(
+    order.photographerId,
+    "store_order_shipped",
+    to,
+    messages.storeOrderShippedClient({
+      ...facts,
+      carrier: order.carrier,
+      trackingNumber: order.trackingNumber,
+      trackingUrl: trackingUrl(order.carrier, order.trackingNumber),
+    }),
+    { galleryId: order.galleryId ?? undefined },
+  );
 }
