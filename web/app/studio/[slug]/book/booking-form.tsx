@@ -8,6 +8,7 @@ import { depositCents, formatPrice } from "@/lib/booking/format";
 import { couponDiscount } from "@/lib/coupons";
 import { createBooking, creditAvailable, previewCoupon, previewGiftCard, type BookingFormState } from "./actions";
 import { InspoUploader } from "./inspo-uploader";
+import { BookingSteps } from "./booking-steps";
 
 export type BookingQuestion = {
   id: string;
@@ -34,6 +35,8 @@ export function BookingForm({
   sessionTypeId,
   startsAt,
   backHref,
+  changeSessionHref,
+  changeDateHref,
   summary,
   priceCents,
   depositPercent,
@@ -46,7 +49,10 @@ export function BookingForm({
   slug: string;
   sessionTypeId: string;
   startsAt: string;
+  // Back to picking a time, a day, or the session.
   backHref: string;
+  changeSessionHref: string;
+  changeDateHref: string;
   summary: React.ReactNode;
   priceCents: number;
   depositPercent: number;
@@ -104,7 +110,13 @@ export function BookingForm({
     if (result.ok) setCoupon(result);
     else setCouponMessage(result.message);
   }
-  const step = (n: number) => (addons.length > 0 ? n : n - 1);
+  // The last steps of the step form: Extras (when there are any), then details.
+  const hasExtras = addons.length > 0;
+  const [formStep, setFormStep] = useState<"extras" | "details">(hasExtras ? "extras" : "details");
+  const goTo = (next: "extras" | "details") => {
+    setFormStep(next);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
 
   const setQuantity = (addon: BookingAddon, quantity: number) =>
     setQuantities((current) => ({ ...current, [addon.id]: Math.max(0, Math.min(addon.maxQuantity, quantity)) }));
@@ -134,9 +146,26 @@ export function BookingForm({
       className="space-y-6"
       noValidate
     >
+      <BookingSteps current={formStep} hasExtras={hasExtras} />
+      {/* What's chosen so far, with a way back to each part. */}
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-lime/15 px-5 py-4">
+        <div>{summary}</div>
+        <p className="flex flex-wrap gap-x-4 gap-y-1 text-xs font-bold tracking-wider uppercase">
+          <Link href={changeSessionHref} className="text-link hover:underline">
+            Change session
+          </Link>
+          <Link href={changeDateHref} className="text-link hover:underline">
+            Change day
+          </Link>
+          <Link href={backHref} className="text-link hover:underline">
+            Change time
+          </Link>
+        </p>
+      </div>
       {addons.length > 0 && (
-        <section className="card p-6 sm:p-8">
-          <StepHeading n={3}>Add extras</StepHeading>
+        // Hidden rather than removed on the next step, so the picks still submit.
+        <section className={`card p-6 sm:p-8 ${formStep === "extras" ? "" : "hidden"}`}>
+          <StepHeading>Add extras</StepHeading>
           <p className="mt-1 text-sm text-muted">Optional. Add as many as you like, up to each limit.</p>
           <ul className="mt-5 grid gap-3">
             {addons.map((addon) => {
@@ -200,11 +229,19 @@ export function BookingForm({
               );
             })}
           </ul>
+          <div className="mt-8 flex flex-wrap items-center justify-between gap-3">
+            <Link href={backHref} className="text-sm font-bold tracking-wider text-link uppercase hover:underline">
+              ← Pick another time
+            </Link>
+            <button type="button" className="btn-primary" onClick={() => goTo("details")}>
+              {extrasCents > 0 ? `Continue with extras · ${formatPrice(extrasCents)}` : "Continue without extras"}
+            </button>
+          </div>
         </section>
       )}
 
-      <section className="card relative p-6 sm:p-8">
-        <StepHeading n={step(4)}>Your details</StepHeading>
+      <section className={`card relative p-6 sm:p-8 ${formStep === "details" ? "" : "hidden"}`}>
+        <StepHeading>Your details</StepHeading>
         <div className="mt-4 rounded-2xl bg-sky-light/40 px-5 py-4">
           {summary}
           <dl className="mt-3 space-y-1 border-t border-brand/10 pt-3 text-sm">
@@ -402,21 +439,23 @@ export function BookingForm({
           {inspoMode !== "off" && <InspoUploader slug={slug} required={inspoMode === "required"} error={state.inspoError} />}
           <FormError message={state.message} />
           <SubmitButton pending={pending}>Confirm booking</SubmitButton>
+          {hasExtras ? (
+            <button type="button" onClick={() => goTo("extras")} className="text-sm font-bold tracking-wider text-link uppercase hover:underline">
+              ← Back to extras
+            </button>
+          ) : (
+            <Link href={backHref} className="inline-block text-sm font-bold tracking-wider text-link uppercase hover:underline">
+              ← Pick another time
+            </Link>
+          )}
         </div>
       </section>
     </form>
   );
 }
 
-function StepHeading({ n, children }: { n: number; children: React.ReactNode }) {
-  return (
-    <h2 className="flex items-center gap-3 font-display text-2xl font-bold">
-      <span className="grid size-8 shrink-0 place-items-center rounded-full bg-brand font-sans text-sm font-bold text-white">
-        {n}
-      </span>
-      {children}
-    </h2>
-  );
+function StepHeading({ children }: { children: React.ReactNode }) {
+  return <h2 className="font-display text-2xl font-bold sm:text-3xl">{children}</h2>;
 }
 
 // One of the studio's own questions, drawn to match its answer type.

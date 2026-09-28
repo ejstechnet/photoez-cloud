@@ -17,6 +17,7 @@ import { richTextHtml, richTextToPlain } from "@/lib/rich-text";
 import { signedViewUrl } from "@/lib/storage";
 import { StudioBar, StudioFooter } from "../studio-bar";
 import { BookingForm } from "./booking-form";
+import { BookingSteps } from "./booking-steps";
 import { Calendar } from "./calendar";
 import { SessionPicker } from "./session-picker";
 
@@ -122,9 +123,12 @@ export default async function BookPage({ params, searchParams }: PageProps<"/stu
   }
 
   const slots = session && date && openDates.includes(date) ? await slotsForDate(rules, session.durationMinutes, date, now) : [];
+  // The chosen day, when it really has times left.
+  const validDate = date && slots.length > 0 ? date : null;
   const timeParam = one(query.time);
   const time = slots.find((slot) => slot.toISOString() === timeParam) ?? null;
-  const sessionAddons = session && time ? await addonsForSession(session.id) : [];
+  const sessionAddons = session ? await addonsForSession(session.id) : [];
+  const hasExtras = session ? sessionAddons.length > 0 : true;
   const questions =
     session && time
       ? fieldsForSession(
@@ -173,23 +177,23 @@ export default async function BookPage({ params, searchParams }: PageProps<"/stu
             </Link>
           </div>
         ) : (
-          <div className="mt-8 space-y-6">
-            {/* Step 1: session */}
-            <section className="card p-6 sm:p-8">
-              <StepTitle n={1} done={Boolean(session)}>
-                Choose a session
-              </StepTitle>
-              {session ? (
-                <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-lime/15 px-5 py-4">
-                  <div>
-                    <p className="font-semibold">{session.name}</p>
-                    <p className="text-sm text-muted">{sessionFacts({ ...session, priceCents: priceOf(session).priceCents })}</p>
-                  </div>
-                  <Link href={href({})} scroll={false} className="link text-sm font-semibold">
-                    Change
-                  </Link>
-                </div>
-              ) : (
+          <div className="mt-8">
+            {/* One step at a time, like PhotoEZ Booking's step form. */}
+            {!(session && time) && (
+              <BookingSteps current={!session ? "session" : !validDate ? "date" : "time"} hasExtras={hasExtras} />
+            )}
+
+            {/* The choices so far, each with its own Change link. */}
+            {session && !time && (
+              <ul className="mt-6 flex flex-wrap gap-2 text-sm">
+                <Choice label={session.name} changeHref={href({})} />
+                {validDate && <Choice label={formatDate(zonedNoon(validDate), tz)} changeHref={href({ session: session.id, month })} />}
+              </ul>
+            )}
+
+            {!session ? (
+              <section className="card mt-6 p-6 sm:p-8">
+                <StepTitle>Choose a session</StepTitle>
                 <div className="mt-6">
                   <SessionPicker
                     sessions={sessions.map((s) => ({
@@ -212,70 +216,54 @@ export default async function BookPage({ params, searchParams }: PageProps<"/stu
                     }))}
                   />
                 </div>
-              )}
-            </section>
-
-            {/* Step 2: day and time */}
-            {session && (
-              <section className="card p-6 sm:p-8">
-                <StepTitle n={2} done={Boolean(time)}>
-                  Pick a day and time
-                </StepTitle>
-                <div className="mt-4 grid gap-6 sm:grid-cols-[1fr_12rem]">
+              </section>
+            ) : !validDate ? (
+              <section className="card mt-6 p-6 sm:p-8">
+                <StepTitle>Pick a day</StepTitle>
+                <p className="mt-1 text-sm text-muted">
+                  {sessionFacts({ ...session, priceCents: priceOf(session).priceCents })}. Highlighted days have openings.
+                </p>
+                <div className="mx-auto mt-6 max-w-md">
                   <Calendar
                     month={month}
                     openDates={openDates}
-                    selected={date}
+                    selected={null}
                     prevHref={month > thisMonth ? href({ session: session.id, month: addMonths(month, -1) }) : null}
                     nextHref={month < lastMonth ? href({ session: session.id, month: addMonths(month, 1) }) : null}
                     dayHref={(d) => href({ session: session.id, date: d })}
                   />
-                  <div>
-                    {date && openDates.includes(date) ? (
-                      <>
-                        <p className="text-sm font-semibold">
-                          {formatDate(slots[0] ?? now, tz, "short").replace(/, \d{4}$/, "")}
-                        </p>
-                        <ul className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-1">
-                          {slots.map((slot) => {
-                            const chosen = time?.getTime() === slot.getTime();
-                            return (
-                              <li key={slot.toISOString()}>
-                                <Link
-                                  href={href({ session: session.id, date, time: slot.toISOString() })}
-                                  scroll={false}
-                                  aria-current={chosen ? "true" : undefined}
-                                  className={`block rounded-xl border-2 px-3 py-2 text-center font-semibold transition ${
-                                    chosen
-                                      ? "border-lime-ink bg-lime text-on-accent"
-                                      : "border-border hover:border-lime-ink hover:bg-lime/15"
-                                  }`}
-                                >
-                                  {formatTime(slot, tz)}
-                                </Link>
-                              </li>
-                            );
-                          })}
-                        </ul>
-                      </>
-                    ) : (
-                      <p className="text-sm text-muted">
-                        {openDates.length > 0 ? "Pick a highlighted day to see times." : "No openings this month."}
-                      </p>
-                    )}
-                    <p className="mt-4 text-xs text-muted">Times are {zoneLabel(now, tz)} ({tz.replaceAll("_", " ")}).</p>
-                  </div>
+                  {openDates.length === 0 && <p className="mt-4 text-center text-sm text-muted">No openings this month. Try the next one.</p>}
                 </div>
+                <StepBack href={href({})}>Choose a different session</StepBack>
               </section>
-            )}
-
-            {/* Steps 3–4: extras (when the session has any) and the client's details */}
-            {session && time && (
+            ) : !time ? (
+              <section className="card mt-6 p-6 sm:p-8">
+                <StepTitle>Pick a time</StepTitle>
+                <p className="mt-1 text-sm text-muted">
+                  {formatDate(zonedNoon(validDate), tz)} · times are {zoneLabel(now, tz)} ({tz.replaceAll("_", " ")})
+                </p>
+                <ul className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                  {slots.map((slot) => (
+                    <li key={slot.toISOString()}>
+                      <Link
+                        href={href({ session: session.id, date: validDate, time: slot.toISOString() })}
+                        className="block rounded-2xl border-2 border-border px-3 py-3 text-center font-semibold transition hover:border-lime-ink hover:bg-lime/15"
+                      >
+                        {formatTime(slot, tz)}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+                <StepBack href={href({ session: session.id, month })}>Pick another day</StepBack>
+              </section>
+            ) : (
               <BookingForm
                 slug={slug}
                 sessionTypeId={session.id}
                 startsAt={time.toISOString()}
-                backHref={href({ session: session.id, month })}
+                backHref={href({ session: session.id, date: validDate })}
+                changeSessionHref={href({})}
+                changeDateHref={href({ session: session.id, month })}
                 priceCents={priceOf(session).priceCents}
                 depositPercent={session.depositPercent}
                 addons={sessionAddons}
@@ -316,17 +304,30 @@ function sessionFacts(s: { durationMinutes: number; priceCents: number; location
     .join(" · ");
 }
 
-function StepTitle({ n, done, children }: { n: number; done: boolean; children: React.ReactNode }) {
+function StepTitle({ children }: { children: React.ReactNode }) {
+  return <h2 className="font-display text-2xl font-bold sm:text-3xl">{children}</h2>;
+}
+
+function StepBack({ href, children }: { href: string; children: React.ReactNode }) {
   return (
-    <h2 className="flex items-center gap-3 font-display text-2xl font-bold">
-      <span
-        className={`grid size-8 shrink-0 place-items-center rounded-full font-sans text-sm font-bold ${
-          done ? "bg-lime text-on-accent" : "bg-brand text-white"
-        }`}
-      >
-        {done ? "✓" : n}
-      </span>
-      {children}
-    </h2>
+    <Link href={href} className="mt-8 inline-flex items-center gap-2 text-sm font-bold tracking-wider text-link uppercase hover:underline">
+      ← {children}
+    </Link>
   );
+}
+
+function Choice({ label, changeHref }: { label: string; changeHref: string }) {
+  return (
+    <li className="flex items-center gap-2 rounded-full bg-lime/15 py-1.5 pr-2 pl-3.5">
+      <span className="font-semibold">✓ {label}</span>
+      <Link href={changeHref} className="rounded-full px-2 py-0.5 text-xs font-bold tracking-wider text-link uppercase hover:bg-surface">
+        Change
+      </Link>
+    </li>
+  );
+}
+
+// Noon on a studio calendar day, for showing that day's date in its time zone.
+function zonedNoon(day: string) {
+  return new Date(`${day}T12:00:00Z`);
 }
