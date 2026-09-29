@@ -76,16 +76,20 @@ export function cropPixels(crop: StoreCrop, photo: { width: number; height: numb
 
 export type PricedLine = { unitCents: number; quantity: number; fulfillment?: "self" | "swaggpress" };
 
-// One item's price: the size's price, plus the full-wrap upcharge when the
-// client chose a full wrap on a product that offers the choice, plus the
-// chosen options' price changes (optionsCents).
+// One item's price: the size's price, plus the full-wrap or all-over
+// upcharge when the client chose that print style on a product that offers
+// it, plus the chosen options' price changes (optionsCents). `style` true/false
+// is the older "full wrap or not".
 export function itemUnitCents(
   variant: { priceCents: number },
-  design: { wrapChoice?: boolean; wrapUpchargeCents?: number } | null | undefined,
-  wrap: boolean,
+  design: { wrapChoice?: boolean; wrapUpchargeCents?: number; allOver?: { upchargeCents: number } | null } | null | undefined,
+  style: boolean | "panel" | "wrap" | "allover" | null | undefined,
   optionCents = 0,
 ) {
-  return variant.priceCents + (wrap && design?.wrapChoice ? (design.wrapUpchargeCents ?? 0) : 0) + optionCents;
+  const wrap = style === true || style === "wrap";
+  const upcharge =
+    wrap && design?.wrapChoice ? (design.wrapUpchargeCents ?? 0) : style === "allover" && design?.allOver ? design.allOver.upchargeCents : 0;
+  return variant.priceCents + upcharge + optionCents;
 }
 
 type OptionDefs = {

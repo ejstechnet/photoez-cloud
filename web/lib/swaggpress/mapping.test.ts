@@ -90,7 +90,12 @@ test("a product's design setup comes along for the gallery designer", () => {
     wrapChoice: false,
     wrapUpchargeCents: 0,
     wrapInches: null,
+    allOver: null,
+    view3d: null,
   });
+  // All-over printing comes along with its upcharge in cents.
+  const allOverTee = { ...mug, design: { ...mug.design, full_wrap: false, allover: { upcharge: 10, inches: { w: 20, h: 28 } } } };
+  assert.deepEqual(swaggDesign(allOverTee)!.allOver, { upchargeCents: 1000, inches: { w: 20, h: 28 } });
   // "Customer chooses", with a $5 upcharge and a wrap size.
   const choosy = { ...mug, design: { ...mug.design, full_wrap: false, wrap_optional: true, wrap_upcharge: 5, wrap_in: { w: 8.5, h: 3.5 } } };
   const setup = swaggDesign(choosy)!;

@@ -83,6 +83,13 @@ export function swaggDesign(product: SwaggProduct): StoreLabDesign | null {
     wrapChoice: Boolean(d.wrap_optional) && !d.full_wrap,
     wrapUpchargeCents: d.wrap_optional ? cents(d.wrap_upcharge ?? 0) : 0,
     wrapInches: d.wrap_in && d.wrap_in.w > 0 && d.wrap_in.h > 0 ? { w: d.wrap_in.w, h: d.wrap_in.h } : null,
+    view3d: d.view3d === "tee" ? "tee" : null,
+    allOver: d.allover
+      ? {
+          upchargeCents: cents(Number(d.allover.upcharge) || 0),
+          inches: d.allover.inches && d.allover.inches.w > 0 && d.allover.inches.h > 0 ? { w: d.allover.inches.w, h: d.allover.inches.h } : null,
+        }
+      : null,
   };
 }
 

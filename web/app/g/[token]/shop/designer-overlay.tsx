@@ -12,16 +12,16 @@ import type { ShopPhoto } from "./shop-dialog";
 // and the design is saved for the cart (lib/store/designs.ts).
 
 // Bump when a new designer build is copied in, so browsers load it fresh.
-const DESIGNER_URL = "/vendor/swagg-designer.js?v=2026-09-29a";
+const DESIGNER_URL = "/vendor/swagg-designer.js?v=2026-09-29g";
 
-export type SavedDesign = { id: string; previewUrl: string; design: unknown; printStyle: "panel" | "wrap" };
+export type SavedDesign = { id: string; previewUrl: string; design: unknown; printStyle: "panel" | "wrap" | "allover" };
 
 type DesignResult = {
   design: unknown;
   preview: Blob;
   printFiles: { front: Blob; back?: Blob };
   photoIds: string[];
-  printStyle: "panel" | "wrap";
+  printStyle: "panel" | "wrap" | "allover";
 };
 
 type SwaggDesignerGlobal = {
@@ -104,6 +104,11 @@ export function DesignerOverlay({
             // "Customer chooses": front & back, or a full wrap for the upcharge.
             wrapChoice: setup.wrapChoice
               ? { upcharge: setup.wrapUpchargeCents ? `+${formatPrice(setup.wrapUpchargeCents)}` : null, wrapInches: setup.wrapInches ?? null }
+              : null,
+            // All-over (tees): the whole shirt, edge to edge, for its upcharge.
+            view3d: setup.view3d ?? null,
+            allOverChoice: setup.allOver
+              ? { upcharge: setup.allOver.upchargeCents ? `+${formatPrice(setup.allOver.upchargeCents)}` : null, printInches: setup.allOver.inches }
               : null,
             printPx: setup.printPx ? { w: setup.printPx.w, h: setup.printPx.h } : null,
             dpi: setup.printPx?.dpi ?? 300,
