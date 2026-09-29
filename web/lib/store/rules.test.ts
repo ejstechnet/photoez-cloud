@@ -152,3 +152,11 @@ test("personalize fields: conditions, required answers and photo limits", () => 
   assert.ok("error" in checkFields(fields, {}, { name: "Mylee" }, { photos: ["a", "b", "c"] }));
 });
 
+test("an all-over print adds its upcharge only when the product offers it", () => {
+  const size = { priceCents: 3000 };
+  assert.equal(itemUnitCents(size, { allOver: { upchargeCents: 1000 } }, "allover"), 4000);
+  assert.equal(itemUnitCents(size, { allOver: { upchargeCents: 1000 } }, "panel"), 3000);
+  assert.equal(itemUnitCents(size, { allOver: null }, "allover"), 3000);
+  assert.equal(itemUnitCents(size, { wrapChoice: true, wrapUpchargeCents: 500 }, "wrap"), 3500);
+});
+

@@ -35,6 +35,7 @@ export function ShopDialog({
     crop: StoreCrop | null;
     designId: string | null;
     wrap: boolean;
+    printStyle: "panel" | "wrap" | "allover";
     options: Record<string, string>;
     fields: Record<string, string>;
     fieldPhotos: Record<string, string[]>;
@@ -50,6 +51,7 @@ export function ShopDialog({
   const [design, setDesign] = useState<SavedDesign | null>(null);
   const [designing, setDesigning] = useState(false);
   const wrap = design?.printStyle === "wrap";
+  const printStyle = design?.printStyle ?? "panel";
   // Options besides size (e.g. Trim), each choice may change the price.
   const [picks, setPicks] = useState<Record<string, string>>({});
   const productOptions = product?.options ?? [];
@@ -61,7 +63,7 @@ export function ShopDialog({
   const visibleOptions = shownOptions(productOptions, effectivePicks);
   const pickedOptions = optionsCents(productOptions, effectivePicks);
   const optionsReady = !("error" in pickedOptions);
-  const unitCents = variant ? itemUnitCents(variant, product?.design, wrap, optionsReady ? pickedOptions.cents : 0) : 0;
+  const unitCents = variant ? itemUnitCents(variant, product?.design, printStyle, optionsReady ? pickedOptions.cents : 0) : 0;
   // Custom Text & Photos products: fill in the fields SwaggPress asks for.
   const productFields = product?.fields ?? [];
   const [answers, setAnswers] = useState<Record<string, string>>({});
@@ -102,6 +104,7 @@ export function ShopDialog({
       crop,
       designId: design?.id ?? null,
       wrap,
+      printStyle,
       options: optionsReady ? pickedOptions.picks : {},
       fields: answers,
       fieldPhotos: effectiveFieldPhotos,
@@ -287,13 +290,17 @@ export function ShopDialog({
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={design.previewUrl} alt="Your design" className="h-48 w-auto rounded-2xl border-2 border-border bg-white object-contain" />
                 <div>
-                  {product.design.wrapChoice && (
+                  {(product.design.wrapChoice || product.design.allOver) && (
                     <p className="mb-2 text-sm font-semibold">
                       {wrap
                         ? `Full wrap${product.design.wrapUpchargeCents ? ` (+${formatPrice(product.design.wrapUpchargeCents)})` : ""}`
-                        : product.design.back
-                          ? "Front & back"
-                          : "Front"}
+                        : printStyle === "allover"
+                          ? `All-over${product.design.allOver?.upchargeCents ? ` (+${formatPrice(product.design.allOver.upchargeCents)})` : ""}`
+                          : product.design.allOver
+                            ? "Standard print"
+                            : product.design.back
+                              ? "Front & back"
+                              : "Front"}
                     </p>
                   )}
                   <button type="button" className="btn-secondary" onClick={() => setDesigning(true)}>

@@ -998,6 +998,11 @@ export type StoreLabDesign = {
   wrapUpchargeCents?: number;
   // The whole wrap laid flat, in inches (null = not set in SwaggPress).
   wrapInches?: { w: number; h: number } | null;
+  // All-over printing (tees): the whole shirt, edge to edge, for an upcharge;
+  // inches = the print size per side (null = not set in SwaggPress).
+  allOver?: { upchargeCents: number; inches: { w: number; h: number } | null } | null;
+  // "View in 3D" model in the designer ("tee"); round products always get one.
+  view3d?: "tee" | null;
 };
 
 // Something clients can order with one of their photos: a print, canvas,

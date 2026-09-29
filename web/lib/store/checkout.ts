@@ -202,8 +202,10 @@ async function checkCart(galleryId: string, photographerId: string, cart: unknow
       if (!design || design.productId !== product.id) {
         return { error: `Please design your ${product.name} again, then add it to your cart.` };
       }
-      // The client's full-wrap choice comes from the saved design, never the browser.
-      const wrap = (design.design as { printStyle?: string }).printStyle === "wrap" && Boolean(product.design.wrapChoice);
+      // The client's print style comes from the saved design, never the browser.
+      const savedStyle = (design.design as { printStyle?: string }).printStyle;
+      const wrap = savedStyle === "wrap" && Boolean(product.design.wrapChoice);
+      const allOver = savedStyle === "allover" && Boolean(product.design.allOver);
       lines.push({
         product,
         variant,
@@ -212,9 +214,10 @@ async function checkCart(galleryId: string, photographerId: string, cart: unknow
         crop: null,
         designId: design.id,
         wrap,
+        allOver,
         options: picked.picks,
         ...personalized,
-        unitCents: itemUnitCents(variant, product.design, wrap, picked.cents),
+        unitCents: itemUnitCents(variant, product.design, wrap ? "wrap" : allOver ? "allover" : "panel", picked.cents),
       });
       continue;
     }
@@ -232,6 +235,7 @@ async function checkCart(galleryId: string, photographerId: string, cart: unknow
       crop: ratio !== null ? line.crop : null,
       designId: null as string | null,
       wrap: false,
+      allOver: false,
       options: picked.picks,
       ...personalized,
       unitCents: variant.priceCents + picked.cents,
@@ -384,7 +388,7 @@ export async function startStoreCheckout(options: {
       productId: l.product.id,
       photoId: l.photo.id,
       productName: l.product.name,
-      variantLabel: l.wrap ? `${l.variant.label} · Full wrap` : l.variant.label,
+      variantLabel: l.wrap ? `${l.variant.label} · Full wrap` : l.allOver ? `${l.variant.label} · All-over` : l.variant.label,
       unitCents: l.unitCents,
       quantity: l.quantity,
       crop: l.crop,
@@ -414,7 +418,7 @@ export async function startStoreCheckout(options: {
             currency: "usd",
             unit_amount: l.unitCents,
             product_data: {
-              name: `${l.product.name} · ${l.variant.label}${l.wrap ? " · Full wrap" : ""}${Object.entries(l.options).map(([k, v]) => ` · ${k}: ${v}`).join("")}`, description: l.designId ? "Your design" : `Photo: ${l.photo.name}` },
+              name: `${l.product.name} · ${l.variant.label}${l.wrap ? " · Full wrap" : l.allOver ? " · All-over" : ""}${Object.entries(l.options).map(([k, v]) => ` · ${k}: ${v}`).join("")}`, description: l.designId ? "Your design" : `Photo: ${l.photo.name}` },
           },
         })),
         ...(totals.handlingCents > 0

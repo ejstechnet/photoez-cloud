@@ -45,7 +45,7 @@ export function CartPanel({
     const photo = photos.find((p) => p.id === item.photoId);
     if (!product || !variant || !photo) return [];
     const picked = optionsCents(product.options, item.options);
-    const unitCents = itemUnitCents(variant, product.design, Boolean(item.wrap), "cents" in picked ? picked.cents : 0);
+    const unitCents = itemUnitCents(variant, product.design, item.printStyle ?? Boolean(item.wrap), "cents" in picked ? picked.cents : 0);
     const filled = checkFields(product.fields, "picks" in picked ? picked.picks : {}, item.fields, item.fieldPhotos);
     const personalized = "text" in filled ? Object.entries(filled.text) : [];
     return [{ item, product, variant, photo, unitCents, personalized }];
@@ -148,7 +148,9 @@ export function CartPanel({
                           </p>
                         )}
                         <p className="truncate text-xs text-muted">
-                          {item.designId ? `Your design${item.wrap && product.design?.wrapChoice ? " · Full wrap" : ""}` : `Photo ${photo.number} · ${photo.name}`}
+                          {item.designId
+                            ? `Your design${item.wrap && product.design?.wrapChoice ? " · Full wrap" : item.printStyle === "allover" && product.design?.allOver ? " · All-over" : ""}`
+                            : `Photo ${photo.number} · ${photo.name}`}
                         </p>
                         <div className="mt-2 flex items-center gap-2">
                           <button type="button" className="size-7 rounded-full border-2 border-border font-bold" onClick={() => cart.setQuantity(item.key, item.quantity - 1)} aria-label="One fewer">

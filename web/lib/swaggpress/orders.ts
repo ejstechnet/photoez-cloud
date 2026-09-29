@@ -61,8 +61,10 @@ export async function submitLabOrder(orderId: string): Promise<{ ok: true } | { 
         image_url: await signedViewUrl(design.frontKey),
         ...(design.backKey ? { back_image_url: await signedViewUrl(design.backKey) } : {}),
         preview_url: await signedViewUrl(design.previewKey),
-        // Full wrap on a "customer chooses" product (SwaggPress adds its upcharge).
-        print_style: (design.design as { printStyle?: string }).printStyle === "wrap" ? ("wrap" as const) : ("panel" as const),
+        // Full wrap or all-over, when chosen (SwaggPress adds its upcharge).
+        print_style: ((style): "panel" | "wrap" | "allover" => (style === "wrap" || style === "allover" ? style : "panel"))(
+          (design.design as { printStyle?: string }).printStyle,
+        ),
         options: item.options ?? {},
         note: `${item.productName} · ${item.variantLabel} · designed by the client`,
       });

@@ -63,6 +63,10 @@ export type SwaggDesign = {
   wrap_upcharge?: number;
   // The whole wrap laid flat, in inches.
   wrap_in?: { w: number; h: number } | null;
+  // All-over printing (tees): its upcharge (dollars) and print size per side.
+  allover?: { upcharge: number; inches: { w: number; h: number } | null } | null;
+  // "View in 3D" model in the designer ("tee" or null).
+  view3d?: string | null;
 };
 
 export type SwaggCatalog = {
@@ -134,7 +138,7 @@ export async function swaggPlaceOrder(
   apiKey: string,
   order: {
     partner_ref: string;
-    items: { variant_id?: number; product_id?: number; qty: number; image_url: string; back_image_url?: string; preview_url?: string; print_style?: "panel" | "wrap";
+    items: { variant_id?: number; product_id?: number; qty: number; image_url: string; back_image_url?: string; preview_url?: string; print_style?: "panel" | "wrap" | "allover";
       options?: Record<string, string>;
       custom_text?: Record<string, string>;
       asset_urls?: string[];
