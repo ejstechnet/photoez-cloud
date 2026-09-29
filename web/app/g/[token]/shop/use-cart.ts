@@ -14,6 +14,10 @@ export type CartItem = {
   photoId: string;
   quantity: number;
   crop: StoreCrop | null;
+  // Designed in the gallery designer (lib/store/designs.ts).
+  designId?: string | null;
+  // The client chose a full wrap (for showing the price; checkout re-checks).
+  wrap?: boolean;
 };
 
 const storageKey = (token: string) => `pez-cart-${token}`;

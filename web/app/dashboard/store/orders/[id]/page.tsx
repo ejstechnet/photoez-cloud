@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db";
-import { galleries, photographers, photos, storeOrderItems, storeOrders } from "@/db/schema";
+import { galleries, photographers, photos, storeDesigns, storeOrderItems, storeOrders } from "@/db/schema";
 import { formatPrice } from "@/lib/booking/format";
 import { formatDate } from "@/lib/booking/time";
 import { requirePhotographer } from "@/lib/session";
@@ -35,11 +35,22 @@ export default async function StoreOrderPage({ params }: PageProps<"/dashboard/s
   const items = await Promise.all(
     (
       await db
-        .select({ item: storeOrderItems, fileKey: photos.fileKey })
+        .select({ item: storeOrderItems, fileKey: photos.fileKey, design: { previewKey: storeDesigns.previewKey, backKey: storeDesigns.backKey } })
         .from(storeOrderItems)
         .leftJoin(photos, eq(photos.id, storeOrderItems.photoId))
+        .leftJoin(storeDesigns, eq(storeDesigns.id, storeOrderItems.designId))
         .where(eq(storeOrderItems.orderId, order.id))
-    ).map(async ({ item, fileKey }) => ({ ...item, thumbUrl: fileKey ? await signedViewUrl(photoKey(fileKey, "thumb")) : null })),
+    ).map(async ({ item, fileKey, design }) => ({
+      ...item,
+      // Designed items show the design on the product.
+      designed: Boolean(design?.previewKey),
+      hasBack: Boolean(design?.backKey),
+      thumbUrl: design?.previewKey
+        ? await signedViewUrl(design.previewKey)
+        : fileKey
+          ? await signedViewUrl(photoKey(fileKey, "thumb"))
+          : null,
+    })),
   );
   const track = trackingUrl(order.carrier, order.trackingNumber);
   const labTrack = trackingUrl(order.labCarrier, order.labTracking);
@@ -83,7 +94,7 @@ export default async function StoreOrderPage({ params }: PageProps<"/dashboard/s
             <li key={item.id} className="flex flex-wrap items-center gap-4 py-4">
               {item.thumbUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={item.thumbUrl} alt="" className="size-16 rounded-xl object-cover" />
+                <img src={item.thumbUrl} alt="" className={`rounded-xl ${item.designed ? "size-24 bg-white object-contain" : "size-16 object-cover"}`} />
               ) : (
                 <span className="grid size-16 place-items-center rounded-xl bg-border text-xs text-muted">Deleted</span>
               )}
@@ -95,14 +106,19 @@ export default async function StoreOrderPage({ params }: PageProps<"/dashboard/s
                   )}
                 </p>
                 <p className="truncate text-sm text-muted">
-                  {item.photoName}
+                  {item.designed ? "Designed by the client" : item.photoName}
                   {item.crop ? " · cropped by the client" : ""}
                 </p>
               </div>
               <span className="text-sm font-semibold">{formatPrice(item.unitCents * item.quantity)}</span>
               {item.thumbUrl && (
                 <a href={`/dashboard/store/orders/${order.id}/file/${item.id}`} className="btn-secondary px-4 py-2 text-xs">
-                  Download print file
+                  Download print file{item.hasBack ? " (front)" : ""}
+                </a>
+              )}
+              {item.hasBack && (
+                <a href={`/dashboard/store/orders/${order.id}/file/${item.id}?side=back`} className="btn-secondary px-4 py-2 text-xs">
+                  Print file (back)
                 </a>
               )}
             </li>

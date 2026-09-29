@@ -14,6 +14,7 @@ import { paidGalleryExtras, startGalleryCheckout } from "@/lib/payments/gallery-
 import { emailSelectionsSubmitted } from "@/lib/email/notify";
 import { afterResponse } from "@/lib/email/send";
 import { quoteStoreShipping, startStoreCheckout } from "@/lib/store/checkout";
+import { finishDesign, startDesign } from "@/lib/store/designs";
 
 // Actions a client can take from their gallery link. The token is re-checked
 // on every call, and changes are only allowed while the gallery is in proofing.
@@ -177,4 +178,35 @@ export async function quoteCartShipping(token: string, cart: unknown, shipTo: un
     return { error: "This gallery's shop isn't open." };
   }
   return quoteStoreShipping({ galleryId: gallery.id, photographerId: gallery.photographerId, cart, shipTo });
+}
+
+async function shopGallery(token: string) {
+  const gallery = await findGalleryByToken(token);
+  return gallery && (gallery.status === "delivered" || gallery.status === "completed") ? gallery : null;
+}
+
+// The gallery designer, step 1: where to upload the design's pictures.
+export async function startGalleryDesign(token: string, productId: string, hasBack: boolean) {
+  const gallery = await shopGallery(token);
+  if (!gallery) return { error: "This gallery's shop isn't open." };
+  if (!z.uuid().safeParse(productId).success) return { error: "That product isn't available." };
+  return startDesign({ galleryId: gallery.id, photographerId: gallery.photographerId, productId, hasBack: hasBack === true });
+}
+
+// Step 2: the pictures are uploaded; save the design for the cart.
+export async function finishGalleryDesign(token: string, input: { designId: string; productId: string; design: unknown; photoIds: unknown }) {
+  const gallery = await shopGallery(token);
+  if (!gallery) return { error: "This gallery's shop isn't open." };
+  if (!z.uuid().safeParse(input?.designId).success || !z.uuid().safeParse(input?.productId).success) {
+    return { error: "The design couldn't be saved. Please try again." };
+  }
+  const photoIds = Array.isArray(input.photoIds) ? input.photoIds.filter((id): id is string => typeof id === "string") : [];
+  return finishDesign({
+    galleryId: gallery.id,
+    photographerId: gallery.photographerId,
+    designId: input.designId,
+    productId: input.productId,
+    design: input.design,
+    photoIds,
+  });
 }

@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { formatPrice } from "@/lib/booking/format";
 import type { Storefront } from "@/lib/store/checkout";
-import { cartTotals } from "@/lib/store/rules";
+import { cartTotals, itemUnitCents } from "@/lib/store/rules";
 import { checkoutStoreCart, quoteCartShipping } from "../actions";
 import type { ShopPhoto } from "./shop-dialog";
 import type { useCart } from "./use-cart";
@@ -53,7 +53,7 @@ export function CartPanel({
   const rate = liveQuote?.rates.find((r) => r.id === rateId) ?? null;
   const needsShipping = labLines.length > 0;
   const totals = cartTotals(
-    lines.map((l) => ({ unitCents: l.variant.priceCents, quantity: l.item.quantity, fulfillment: l.product.fulfillment })),
+    lines.map((l) => ({ unitCents: itemUnitCents(l.variant, l.product.design, Boolean(l.item.wrap)), quantity: l.item.quantity, fulfillment: l.product.fulfillment })),
     store,
     rate?.amountCents ?? 0,
   );
@@ -64,6 +64,7 @@ export function CartPanel({
       photoId: item.photoId,
       quantity: item.quantity,
       crop: item.crop,
+      designId: item.designId ?? null,
     }));
 
   function getRates() {
@@ -119,13 +120,20 @@ export function CartPanel({
                 <ul className="space-y-4">
                   {lines.map(({ item, product, variant, photo }) => (
                     <li key={item.key} className="flex gap-3">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={photo.thumbUrl} alt="" className="size-16 shrink-0 rounded-xl object-cover" />
+                      {item.designId ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={`/g/${token}/shop/design/${item.designId}`} alt="Your design" className="size-16 shrink-0 rounded-xl bg-white object-contain" />
+                      ) : (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={photo.thumbUrl} alt="" className="size-16 shrink-0 rounded-xl object-cover" />
+                      )}
                       <div className="min-w-0 flex-1">
                         <p className="font-semibold">
                           {product.name} · {variant.label}
                         </p>
-                        <p className="truncate text-xs text-muted">Photo {photo.number} · {photo.name}</p>
+                        <p className="truncate text-xs text-muted">
+                          {item.designId ? `Your design${item.wrap && product.design?.wrapChoice ? " · Full wrap" : ""}` : `Photo ${photo.number} · ${photo.name}`}
+                        </p>
                         <div className="mt-2 flex items-center gap-2">
                           <button type="button" className="size-7 rounded-full border-2 border-border font-bold" onClick={() => cart.setQuantity(item.key, item.quantity - 1)} aria-label="One fewer">
                             −
@@ -139,7 +147,7 @@ export function CartPanel({
                           </button>
                         </div>
                       </div>
-                      <p className="text-sm font-semibold">{formatPrice(variant.priceCents * item.quantity)}</p>
+                      <p className="text-sm font-semibold">{formatPrice(itemUnitCents(variant, product.design, Boolean(item.wrap)) * item.quantity)}</p>
                     </li>
                   ))}
                 </ul>

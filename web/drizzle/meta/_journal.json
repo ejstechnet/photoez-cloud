@@ -281,6 +281,13 @@
       "when": 1790633287721,
       "tag": "0039_good_boomer",
       "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1790640760737,
+      "tag": "0040_lyrical_magneto",
+      "breakpoints": true
     }
   ]
 }

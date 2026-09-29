@@ -158,6 +158,8 @@ export function DeliveryGallery({
 
       {store && ordering && (
         <ShopDialog
+          token={token}
+          photos={tiles}
           photo={ordering}
           store={store}
           onClose={() => setOrdering(null)}

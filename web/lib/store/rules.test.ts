@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   cartTotals,
+  itemUnitCents,
   centeredCrop,
   cropFits,
   cropPixels,
@@ -82,4 +83,14 @@ test("order numbers and tracking links", () => {
   assert.equal(trackingUrl("USPS", "9400 1"), "https://tools.usps.com/go/TrackConfirmAction?tLabels=9400%201");
   assert.equal(trackingUrl("Other", "123"), null);
   assert.equal(trackingUrl("ups", null), null);
+});
+
+test("a full wrap adds its upcharge only on products that offer the choice", () => {
+  const size = { priceCents: 2800 };
+  const choosy = { wrapChoice: true, wrapUpchargeCents: 500 };
+  assert.equal(itemUnitCents(size, choosy, true), 3300);
+  assert.equal(itemUnitCents(size, choosy, false), 2800);
+  // Always-wrap products are priced by size alone.
+  assert.equal(itemUnitCents(size, { wrapChoice: false, wrapUpchargeCents: 500 }, true), 2800);
+  assert.equal(itemUnitCents(size, null, true), 2800);
 });

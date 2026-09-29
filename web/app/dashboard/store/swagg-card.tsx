@@ -52,7 +52,7 @@ export function SwaggCard({
               Browse the catalog
             </Link>
             <button type="button" className="btn-secondary px-4 py-2 text-xs" disabled={working} onClick={() => start(async () => setRefreshed(await refreshSwagg()))}>
-              {working ? "Refreshing…" : "Refresh prices"}
+              {working ? "Refreshing…" : "Refresh"}
             </button>
             <button
               type="button"
@@ -66,7 +66,7 @@ export function SwaggCard({
           {refreshed && (
             <p className={`text-sm font-semibold ${refreshed.ok ? "text-lime-ink" : "text-danger"}`}>{refreshed.message}</p>
           )}
-          {syncedAt && <p className="text-xs text-muted">Prices and sizes last updated {syncedAt}.</p>}
+          {syncedAt && <p className="text-xs text-muted">Products, prices and sizes last updated {syncedAt}.</p>}
         </div>
       ) : (
         <form action={formAction} className="mt-5 space-y-3">

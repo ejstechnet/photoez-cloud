@@ -5,6 +5,7 @@ import { sendDueGiftCards } from "@/lib/gift-cards";
 import { sendDueReviewRequests } from "@/lib/review-requests";
 import { payDueClientReferrals } from "@/lib/client-referrals";
 import { runLabOrders } from "@/lib/swaggpress/orders";
+import { removeOldDesigns } from "@/lib/store/designs";
 import { syncSwaggProducts } from "@/lib/swaggpress/catalog";
 import { emailBalanceReminder, emailGalleryExpiring, emailSessionReminder } from "./notify";
 
@@ -102,6 +103,9 @@ export async function runReminders(now = new Date()) {
   });
   const connected = await db.select({ id: photographers.id }).from(photographers).where(isNotNull(photographers.swaggpressKey));
   for (const { id } of connected) await syncSwaggProducts(id).catch((error) => console.error("SwaggPress sync failed", error));
+
+  // Gallery designer designs nobody ordered, after 30 days.
+  await removeOldDesigns(now).catch((error) => console.error("Removing old designs failed", error));
 
   return sent;
 }

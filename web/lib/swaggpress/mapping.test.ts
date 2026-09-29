@@ -1,7 +1,7 @@
 // Tests for SwaggPress catalog mapping.   npm test
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { sellable, suggestedRetailCents, swaggImages, swaggVariantLabel, swaggVariants, syncSwaggVariants } from "./mapping.ts";
+import { sellable, suggestedRetailCents, swaggImages, swaggVariantLabel, swaggVariants, swaggDesign, syncSwaggVariants } from "./mapping.ts";
 
 let n = 0;
 const makeId = () => `v${++n}`;
@@ -65,4 +65,36 @@ test("only sizes still offered and priced above wholesale are sellable", () => {
   assert.ok(sellable({ ...base, wholesaleCents: 1200, available: true }));
   assert.ok(!sellable({ ...base, wholesaleCents: 2400 }));
   assert.ok(!sellable({ ...base, available: false }));
+});
+
+test("a product's design setup comes along for the gallery designer", () => {
+  assert.equal(swaggDesign(tee), null);
+  const mug = {
+    ...tee,
+    design: {
+      canvas: { w: 600, h: 600 },
+      front: { mockup: "https://swaggpress.com/m.webp", area: { x: 97, y: 128, w: 427, h: 378 } },
+      back: null,
+      print_mask: null,
+      full_wrap: true,
+      print_px: { w: 0, h: 0, dpi: 300 },
+    },
+  };
+  assert.deepEqual(swaggDesign(mug), {
+    canvas: { w: 600, h: 600 },
+    front: { mockup: "https://swaggpress.com/m.webp", area: { x: 97, y: 128, w: 427, h: 378 } },
+    back: null,
+    fullWrap: true,
+    // 0 × 0 means SwaggPress has no print size set.
+    printPx: null,
+    wrapChoice: false,
+    wrapUpchargeCents: 0,
+    wrapInches: null,
+  });
+  // "Customer chooses", with a $5 upcharge and a wrap size.
+  const choosy = { ...mug, design: { ...mug.design, full_wrap: false, wrap_optional: true, wrap_upcharge: 5, wrap_in: { w: 8.5, h: 3.5 } } };
+  const setup = swaggDesign(choosy)!;
+  assert.equal(setup.wrapChoice, true);
+  assert.equal(setup.wrapUpchargeCents, 500);
+  assert.deepEqual(setup.wrapInches, { w: 8.5, h: 3.5 });
 });
