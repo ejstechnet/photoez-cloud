@@ -1,6 +1,6 @@
 import { and, eq, inArray, isNotNull, lt, or } from "drizzle-orm";
 import { db } from "@/db";
-import { photographers, photos, storeOrderItems, storeOrders } from "@/db/schema";
+import { photographers, photos, storeDesigns, storeOrderItems, storeOrders } from "@/db/schema";
 import { emailStoreOrderShipped } from "@/lib/email/notify";
 import { openSecret } from "@/lib/secret-box";
 import { makePrintFile } from "@/lib/store/print-file";
@@ -38,9 +38,10 @@ export async function submitLabOrder(orderId: string): Promise<{ ok: true } | { 
   if (!order.shipLine1 || !order.shipCity || !order.shipState || !order.shipPostalCode) return fail("The order has no shipping address.");
 
   const items = await db
-    .select({ item: storeOrderItems, fileKey: photos.fileKey })
+    .select({ item: storeOrderItems, fileKey: photos.fileKey, design: storeDesigns })
     .from(storeOrderItems)
     .leftJoin(photos, eq(photos.id, storeOrderItems.photoId))
+    .leftJoin(storeDesigns, eq(storeDesigns.id, storeOrderItems.designId))
     .where(and(eq(storeOrderItems.orderId, orderId), eq(storeOrderItems.fulfillment, "swaggpress")));
   if (items.length === 0) {
     await db.update(storeOrders).set({ labStatus: "none" }).where(eq(storeOrders.id, orderId));
@@ -49,7 +50,22 @@ export async function submitLabOrder(orderId: string): Promise<{ ok: true } | { 
 
   // Print-ready files, uploaded privately; SwaggPress downloads them right away.
   const lines = [];
-  for (const { item, fileKey } of items) {
+  for (const { item, fileKey, design } of items) {
+    // Designed in the gallery: the design's own print files (already print-ready).
+    if (item.designId || design) {
+      if (!design) return fail(`The design for "${item.productName}" is missing.`);
+      lines.push({
+        ...(item.labVariantId ? { variant_id: item.labVariantId } : { product_id: item.labProductId! }),
+        qty: item.quantity,
+        image_url: await signedViewUrl(design.frontKey),
+        ...(design.backKey ? { back_image_url: await signedViewUrl(design.backKey) } : {}),
+        preview_url: await signedViewUrl(design.previewKey),
+        // Full wrap on a "customer chooses" product (SwaggPress adds its upcharge).
+        print_style: (design.design as { printStyle?: string }).printStyle === "wrap" ? ("wrap" as const) : ("panel" as const),
+        note: `${item.productName} · ${item.variantLabel} · designed by the client`,
+      });
+      continue;
+    }
     if (!fileKey) return fail(`The photo for "${item.productName}" was deleted from the gallery.`);
     const jpeg = await makePrintFile(fileKey, item.crop);
     if (!jpeg) return fail(`The photo file for "${item.productName}" is missing.`);

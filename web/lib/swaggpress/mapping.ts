@@ -1,7 +1,7 @@
 // Turning SwaggPress catalog products into the studio's store products, and
 // keeping them in step. Plain functions; tested in mapping.test.ts.
 
-import type { StoreVariant } from "../../db/schema.ts";
+import type { StoreLabDesign, StoreVariant } from "../../db/schema.ts";
 import type { SwaggProduct, SwaggVariant } from "./client.ts";
 
 const cents = (dollars: number) => Math.round(dollars * 100);
@@ -37,6 +37,9 @@ export function swaggVariants(p: SwaggProduct, makeId: () => string): StoreVaria
       labVariantId: v?.id ?? null,
       wholesaleCents,
       available: true,
+      // For the gallery designer: this color's product picture and swatch.
+      labImage: v?.image ?? null,
+      colorHex: v?.color_hex ?? null,
     };
   });
 }
@@ -51,7 +54,7 @@ export function syncSwaggVariants(current: StoreVariant[], p: SwaggProduct | nul
   const merged = fresh.map((f) => {
     const had = byLab.get(f.labVariantId ?? null);
     return had
-      ? { ...had, label: f.label, widthIn: f.widthIn, heightIn: f.heightIn, wholesaleCents: f.wholesaleCents, available: true }
+      ? { ...had, label: f.label, widthIn: f.widthIn, heightIn: f.heightIn, wholesaleCents: f.wholesaleCents, labImage: f.labImage, colorHex: f.colorHex, available: true }
       : f;
   });
   const keptIds = new Set(fresh.map((f) => f.labVariantId ?? null));
@@ -63,4 +66,22 @@ export function syncSwaggVariants(current: StoreVariant[], p: SwaggProduct | nul
 // (so a price change at SwaggPress never makes a studio sell at a loss).
 export function sellable(v: StoreVariant) {
   return v.available !== false && (v.wholesaleCents == null || v.priceCents > v.wholesaleCents);
+}
+
+// The product's design setup for the gallery designer; null when SwaggPress
+// didn't send one or it has no product picture to design on.
+export function swaggDesign(product: SwaggProduct): StoreLabDesign | null {
+  const d = product.design;
+  if (!d || !d.front?.area) return null;
+  const px = d.print_px?.w > 0 && d.print_px?.h > 0 ? d.print_px : null;
+  return {
+    canvas: { w: d.canvas?.w || 600, h: d.canvas?.h || 600 },
+    front: { mockup: d.front.mockup ?? product.mockup_front ?? null, area: d.front.area },
+    back: d.back ? { mockup: d.back.mockup ?? null, area: d.back.area } : null,
+    fullWrap: Boolean(d.full_wrap),
+    printPx: px ? { w: px.w, h: px.h, dpi: px.dpi || 300 } : null,
+    wrapChoice: Boolean(d.wrap_optional) && !d.full_wrap,
+    wrapUpchargeCents: d.wrap_optional ? cents(d.wrap_upcharge ?? 0) : 0,
+    wrapInches: d.wrap_in && d.wrap_in.w > 0 && d.wrap_in.h > 0 ? { w: d.wrap_in.w, h: d.wrap_in.h } : null,
+  };
 }

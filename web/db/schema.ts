@@ -946,6 +946,24 @@ export type StoreVariant = {
   labVariantId?: number | null;
   wholesaleCents?: number | null;
   available?: boolean;
+  // SwaggPress products: this color's product picture and swatch color.
+  labImage?: string | null;
+  colorHex?: string | null;
+};
+
+// A SwaggPress product's design setup, as its partner catalog sends it.
+export type StoreLabArea = { x: number; y: number; w: number; h: number };
+export type StoreLabDesign = {
+  canvas: { w: number; h: number };
+  front: { mockup: string | null; area: StoreLabArea };
+  back: { mockup: string | null; area: StoreLabArea } | null;
+  fullWrap: boolean;
+  printPx: { w: number; h: number; dpi: number } | null;
+  // The client picks panels or a full wrap; wrap costs wrapUpchargeCents more.
+  wrapChoice?: boolean;
+  wrapUpchargeCents?: number;
+  // The whole wrap laid flat, in inches (null = not set in SwaggPress).
+  wrapInches?: { w: number; h: number } | null;
 };
 
 // Something clients can order with one of their photos: a print, canvas,
@@ -972,6 +990,9 @@ export const storeProducts = pgTable(
     labProductId: integer("lab_product_id"),
     labImageUrls: jsonb("lab_image_urls").$type<string[]>().notNull().default([]),
     labUnavailable: boolean("lab_unavailable").notNull().default(false),
+    // SwaggPress products: how it's designed (mockups, print areas, wrap),
+    // for the gallery designer. Null = no designer, just the photo.
+    labDesign: jsonb("lab_design").$type<StoreLabDesign>(),
     active: boolean("active").notNull().default(true),
     sortOrder: integer("sort_order").notNull().default(0),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
@@ -1052,8 +1073,35 @@ export const storeOrderItems = pgTable(
     // SwaggPress items: which partner variant to send.
     labVariantId: integer("lab_variant_id"),
     labProductId: integer("lab_product_id"),
+    // Designed in the gallery designer: its print files replace the photo.
+    designId: uuid("design_id").references(() => storeDesigns.id, { onDelete: "set null" }),
   },
   (t) => [index("store_order_items_order_idx").on(t.orderId)],
+);
+
+// A design a client made in the gallery designer (swagg-designer): the
+// editable design, a picture of it on the product, and print-ready files.
+// Made when they add it to the cart; ones never ordered are removed after
+// 30 days (lib/store/designs.ts).
+export const storeDesigns = pgTable(
+  "store_designs",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    photographerId: uuid("photographer_id")
+      .notNull()
+      .references(() => photographers.id, { onDelete: "cascade" }),
+    galleryId: uuid("gallery_id")
+      .notNull()
+      .references(() => galleries.id, { onDelete: "cascade" }),
+    productId: uuid("product_id").references(() => storeProducts.id, { onDelete: "set null" }),
+    design: jsonb("design").$type<Record<string, unknown>>().notNull(),
+    previewKey: text("preview_key").notNull(),
+    frontKey: text("front_key").notNull(),
+    backKey: text("back_key"),
+    photoIds: jsonb("photo_ids").$type<string[]>().notNull().default([]),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("store_designs_gallery_idx").on(t.galleryId, t.createdAt)],
 );
 
 // Shipping options quoted in a gallery cart for SwaggPress items (live

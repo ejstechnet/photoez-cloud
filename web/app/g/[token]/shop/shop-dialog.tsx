@@ -5,29 +5,50 @@ import Cropper, { type Area } from "react-easy-crop";
 import type { StoreCrop } from "@/db/schema";
 import { formatPrice } from "@/lib/booking/format";
 import type { Storefront } from "@/lib/store/checkout";
-import { MAX_QUANTITY, centeredCrop, variantRatio } from "@/lib/store/rules";
+import { MAX_QUANTITY, centeredCrop, itemUnitCents, variantRatio } from "@/lib/store/rules";
+import { DesignerOverlay, type SavedDesign } from "./designer-overlay";
 
 export type ShopPhoto = { id: string; number: number; name: string; aspect: number; previewUrl: string; thumbUrl: string };
 
 // Ordering one photo: pick a product, a size, crop the photo to that size's
-// shape (prints), and how many. Adds a line to the cart.
+// shape (prints) or design it (SwaggPress merch, in the gallery designer),
+// and how many. Adds a line to the cart.
 export function ShopDialog({
+  token,
   photo,
+  photos,
   store,
   onAdd,
   onClose,
 }: {
+  token: string;
   photo: ShopPhoto;
+  // Every photo in the gallery, for designs with more than one.
+  photos: ShopPhoto[];
   store: Storefront;
-  onAdd: (item: { productId: string; variantId: string; photoId: string; quantity: number; crop: StoreCrop | null }) => void;
+  onAdd: (item: {
+    productId: string;
+    variantId: string;
+    photoId: string;
+    quantity: number;
+    crop: StoreCrop | null;
+    designId: string | null;
+    wrap: boolean;
+  }) => void;
   onClose: () => void;
 }) {
   const [productId, setProductId] = useState(store.products.length === 1 ? store.products[0].id : null);
   const product = store.products.find((p) => p.id === productId) ?? null;
   const [variantId, setVariantId] = useState<string | null>(null);
   const variant = product?.variants.find((v) => v.id === variantId) ?? null;
+  // Merch with a design setup is designed instead of cropped.
+  const designable = Boolean(product?.design);
+  const [design, setDesign] = useState<SavedDesign | null>(null);
+  const [designing, setDesigning] = useState(false);
+  const wrap = design?.printStyle === "wrap";
+  const unitCents = variant ? itemUnitCents(variant, product?.design, wrap) : 0;
   // Sizes with a width and height are cropped to that shape; others aren't.
-  const ratio = variant ? variantRatio(variant) : null;
+  const ratio = variant && !designable ? variantRatio(variant) : null;
   // The crop frame follows the photo's orientation until the client turns it.
   const [landscape, setLandscape] = useState(photo.aspect >= 1);
   const [cropPos, setCropPos] = useState({ x: 0, y: 0 });
@@ -41,8 +62,9 @@ export function ShopDialog({
 
   function add() {
     if (!product || !variant) return;
+    if (designable && !design) return;
     const crop = ratio ? (area ?? centeredCrop({ width: photo.aspect, height: 1 }, ratio)) : null;
-    onAdd({ productId: product.id, variantId: variant.id, photoId: photo.id, quantity, crop });
+    onAdd({ productId: product.id, variantId: variant.id, photoId: photo.id, quantity, crop, designId: design?.id ?? null, wrap });
   }
 
   const pill = (active: boolean) =>
@@ -76,6 +98,7 @@ export function ShopDialog({
                 setProductId(p.id);
                 setVariantId(null);
                 setArea(null);
+                setDesign(null);
               }}
             >
               <span className="flex items-center gap-3">
@@ -121,6 +144,7 @@ export function ShopDialog({
                   onClick={() => {
                     setVariantId(v.id);
                     setArea(null);
+                    setDesign(null);
                     setCropPos({ x: 0, y: 0 });
                     setZoom(1);
                   }}
@@ -161,7 +185,60 @@ export function ShopDialog({
           </>
         )}
 
-        {variant && (
+        {variant && product?.design && (
+          <>
+            <p className="mt-6 text-sm font-bold tracking-wider text-muted uppercase">3 · Design it</p>
+            {design ? (
+              <div className="mt-3 flex flex-wrap items-center gap-4">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={design.previewUrl} alt="Your design" className="h-48 w-auto rounded-2xl border-2 border-border bg-white object-contain" />
+                <div>
+                  {product.design.wrapChoice && (
+                    <p className="mb-2 text-sm font-semibold">
+                      {wrap
+                        ? `Full wrap${product.design.wrapUpchargeCents ? ` (+${formatPrice(product.design.wrapUpchargeCents)})` : ""}`
+                        : product.design.back
+                          ? "Front & back"
+                          : "Front"}
+                    </p>
+                  )}
+                  <button type="button" className="btn-secondary" onClick={() => setDesigning(true)}>
+                    Change my design
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <>
+                <p className="mt-1 text-sm text-muted">
+                  Place your photo, add text, try effects and edges, and use more than one photo if you like.
+                </p>
+                <button type="button" className="btn-primary mt-3" onClick={() => setDesigning(true)}>
+                  🎨 Start designing
+                </button>
+              </>
+            )}
+          </>
+        )}
+
+        {designing && product?.design && variant && (
+          <DesignerOverlay
+            token={token}
+            productId={product.id}
+            productName={product.name}
+            setup={product.design}
+            variant={variant}
+            photos={photos}
+            startPhotoId={photo.id}
+            initialDesign={design?.design ?? null}
+            onSaved={(saved) => {
+              setDesign(saved);
+              setDesigning(false);
+            }}
+            onClose={() => setDesigning(false)}
+          />
+        )}
+
+        {variant && (!designable || design) && (
           <div className="mt-6 flex flex-wrap items-center justify-between gap-4 border-t border-border pt-5">
             <label className="flex items-center gap-3 text-sm font-semibold">
               Quantity
@@ -175,7 +252,7 @@ export function ShopDialog({
               />
             </label>
             <button type="button" className="btn-primary" onClick={add}>
-              Add to cart · {formatPrice(variant.priceCents * quantity)}
+              Add to cart · {formatPrice(unitCents * quantity)}
             </button>
           </div>
         )}

@@ -21,7 +21,8 @@ import { stripe } from "@/lib/stripe";
 import { swaggKeyFor } from "@/lib/swaggpress/catalog";
 import { swaggRates } from "@/lib/swaggpress/client";
 import { sellable } from "@/lib/swaggpress/mapping";
-import { MAX_CART_LINES, MAX_QUANTITY, cartTotals, cropFits, orderNumber, variantRatio } from "./rules";
+import { galleryDesign } from "./designs";
+import { MAX_CART_LINES, MAX_QUANTITY, cartTotals, cropFits, itemUnitCents, orderNumber, variantRatio } from "./rules";
 
 // The Online Store's checkout (decided with Elle 2026-09-28): clients order
 // prints and products of their photos from their delivered gallery, and pay
@@ -62,6 +63,7 @@ export async function storefrontFor(photographerId: string) {
       labProductId: storeProducts.labProductId,
       labImageUrls: storeProducts.labImageUrls,
       labUnavailable: storeProducts.labUnavailable,
+      labDesign: storeProducts.labDesign,
     })
     .from(storeProducts)
     .where(and(eq(storeProducts.photographerId, photographerId), eq(storeProducts.active, true)))
@@ -78,6 +80,8 @@ export async function storefrontFor(photographerId: string) {
         variants: p.variants,
         fulfillment: p.fulfillment,
         labProductId: p.labProductId,
+        // Designed in the gallery designer (SwaggPress products with a design setup).
+        design: p.fulfillment === "swaggpress" ? p.labDesign : null,
         imageUrls: p.fulfillment === "swaggpress" ? p.labImageUrls : await Promise.all(p.imageKeys.map((key) => signedViewUrl(key))),
       })),
   );
@@ -102,6 +106,8 @@ export const cartSchema = z
       photoId: z.uuid(),
       quantity: z.number().int().min(1).max(MAX_QUANTITY),
       crop: cropSchema.nullable(),
+      // A gallery designer design (lib/store/designs.ts).
+      designId: z.uuid().nullable().optional(),
     }),
   )
   .min(1, "Your cart is empty.")
@@ -144,13 +150,42 @@ async function checkCart(galleryId: string, photographerId: string, cart: unknow
     const variant = product?.variants.find((v) => v.id === line.variantId);
     const photo = finals.find((p) => p.id === line.photoId);
     if (!product || !variant || !photo) return { error: "Something in your cart isn't available anymore. Please remove it and try again." };
+    // Designed products: the design replaces cropping.
+    if (product.design) {
+      const design = line.designId ? await galleryDesign(galleryId, line.designId) : null;
+      if (!design || design.productId !== product.id) {
+        return { error: `Please design your ${product.name} again, then add it to your cart.` };
+      }
+      // The client's full-wrap choice comes from the saved design, never the browser.
+      const wrap = (design.design as { printStyle?: string }).printStyle === "wrap" && Boolean(product.design.wrapChoice);
+      lines.push({
+        product,
+        variant,
+        photo,
+        quantity: line.quantity,
+        crop: null,
+        designId: design.id,
+        wrap,
+        unitCents: itemUnitCents(variant, product.design, wrap),
+      });
+      continue;
+    }
     const ratio = variantRatio(variant);
     if (ratio !== null) {
       if (!line.crop || !photo.width || !photo.height || !cropFits(line.crop, { width: photo.width, height: photo.height }, ratio)) {
         return { error: `Please crop photo "${photo.name}" again for the ${variant.label} size.` };
       }
     }
-    lines.push({ product, variant, photo, quantity: line.quantity, crop: ratio !== null ? line.crop : null });
+    lines.push({
+      product,
+      variant,
+      photo,
+      quantity: line.quantity,
+      crop: ratio !== null ? line.crop : null,
+      designId: null as string | null,
+      wrap: false,
+      unitCents: variant.priceCents,
+    });
   }
   return { store, lines };
 }
@@ -259,7 +294,7 @@ export async function startStoreCheckout(options: {
   }
 
   const totals = cartTotals(
-    lines.map((l) => ({ unitCents: l.variant.priceCents, quantity: l.quantity, fulfillment: l.product.fulfillment })),
+    lines.map((l) => ({ unitCents: l.unitCents, quantity: l.quantity, fulfillment: l.product.fulfillment })),
     store,
     lab?.rate.amountCents ?? 0,
   );
@@ -299,14 +334,15 @@ export async function startStoreCheckout(options: {
       productId: l.product.id,
       photoId: l.photo.id,
       productName: l.product.name,
-      variantLabel: l.variant.label,
-      unitCents: l.variant.priceCents,
+      variantLabel: l.wrap ? `${l.variant.label} · Full wrap` : l.variant.label,
+      unitCents: l.unitCents,
       quantity: l.quantity,
       crop: l.crop,
       photoName: l.photo.name,
       fulfillment: l.product.fulfillment,
       labVariantId: l.variant.labVariantId ?? null,
       labProductId: l.product.labProductId ?? null,
+      designId: l.designId,
     })),
   );
 
@@ -323,8 +359,8 @@ export async function startStoreCheckout(options: {
           quantity: l.quantity,
           price_data: {
             currency: "usd",
-            unit_amount: l.variant.priceCents,
-            product_data: { name: `${l.product.name} · ${l.variant.label}`, description: `Photo: ${l.photo.name}` },
+            unit_amount: l.unitCents,
+            product_data: { name: `${l.product.name} · ${l.variant.label}${l.wrap ? " · Full wrap" : ""}`, description: l.designId ? "Your design" : `Photo: ${l.photo.name}` },
           },
         })),
         ...(totals.handlingCents > 0

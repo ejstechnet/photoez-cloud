@@ -76,6 +76,16 @@ export function cropPixels(crop: StoreCrop, photo: { width: number; height: numb
 
 export type PricedLine = { unitCents: number; quantity: number; fulfillment?: "self" | "swaggpress" };
 
+// One item's price: the size's price, plus the full-wrap upcharge when the
+// client chose a full wrap on a product that offers the choice.
+export function itemUnitCents(
+  variant: { priceCents: number },
+  design: { wrapChoice?: boolean; wrapUpchargeCents?: number } | null | undefined,
+  wrap: boolean,
+) {
+  return variant.priceCents + (wrap && design?.wrapChoice ? (design.wrapUpchargeCents ?? 0) : 0);
+}
+
 // Totals for a cart. Handling is once per order. The studio's own shipping
 // applies when the cart has items the studio ships itself; SwaggPress items
 // add the shipping option the client chose (labShippingCents).

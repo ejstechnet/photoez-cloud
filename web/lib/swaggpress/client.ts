@@ -26,6 +26,23 @@ export type SwaggProduct = {
   photos: string[];
   full_wrap: boolean;
   variants: SwaggVariant[];
+  // How it's designed: SwaggPress's product canvas, print areas and mockups.
+  design?: SwaggDesign;
+};
+
+type SwaggArea = { x: number; y: number; w: number; h: number };
+export type SwaggDesign = {
+  canvas: { w: number; h: number };
+  front: { mockup: string | null; area: SwaggArea };
+  back: { mockup: string | null; area: SwaggArea } | null;
+  print_mask: string | null;
+  full_wrap: boolean;
+  print_px: { w: number; h: number; dpi: number };
+  // "Customer chooses": panels or a full wrap costing wrap_upcharge more.
+  wrap_optional?: boolean;
+  wrap_upcharge?: number;
+  // The whole wrap laid flat, in inches.
+  wrap_in?: { w: number; h: number } | null;
 };
 
 export type SwaggCatalog = {
@@ -97,7 +114,7 @@ export async function swaggPlaceOrder(
   apiKey: string,
   order: {
     partner_ref: string;
-    items: { variant_id?: number; product_id?: number; qty: number; image_url: string; note?: string }[];
+    items: { variant_id?: number; product_id?: number; qty: number; image_url: string; back_image_url?: string; preview_url?: string; print_style?: "panel" | "wrap"; note?: string }[];
     ship_to: SwaggShipTo;
     shipping_rate_id: string;
   },

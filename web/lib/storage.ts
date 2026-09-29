@@ -106,6 +106,18 @@ export function photoKey(prefix: string, variant: PhotoVariant) {
   return variant === "original" ? `${prefix}/original` : `${prefix}/${variant}.jpg`;
 }
 
+// A final photo sized for the gallery designer (3600px on the long side),
+// made the first time a client designs with it.
+export function designPhotoKey(prefix: string) {
+  return `${prefix}/design.jpg`;
+}
+
+// A gallery designer design's files (lib/store/designs.ts), in the gallery's
+// folder so deleting the gallery deletes them too.
+export function storeDesignKey(photographerId: string, galleryId: string, designId: string, part: "preview" | "front" | "back") {
+  return `${galleryPrefix(photographerId, galleryId)}store-designs/${designId}/${part}.png`;
+}
+
 // A short-lived link the browser can upload one file to, directly.
 export function signedUploadUrl(key: string, contentType: string) {
   return getSignedUrl(s3, new PutObjectCommand({ Bucket: bucket, Key: key, ContentType: contentType }), {
