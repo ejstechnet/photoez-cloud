@@ -302,6 +302,13 @@
       "when": 1790706802454,
       "tag": "0042_melted_stranger",
       "breakpoints": true
+    },
+    {
+      "idx": 43,
+      "version": "7",
+      "when": 1790708464349,
+      "tag": "0043_regular_doctor_faustus",
+      "breakpoints": true
     }
   ]
 }

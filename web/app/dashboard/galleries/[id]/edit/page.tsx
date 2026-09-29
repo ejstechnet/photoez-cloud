@@ -1,8 +1,8 @@
 import { notFound } from "next/navigation";
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db";
-import { clients, galleries } from "@/db/schema";
+import { bookings, clients, galleries, sessionTypes } from "@/db/schema";
 import { requirePhotographer } from "@/lib/session";
 import { studioPlan } from "@/lib/studio-plan";
 import { galleryHeaderSourceKey, headerSourceVersion, signedViewUrl } from "@/lib/storage";
@@ -25,8 +25,11 @@ export default async function EditGalleryPage({ params }: PageProps<"/dashboard/
       headerImageKey: galleries.headerImageKey,
       extraPhotoPriceCents: galleries.extraPhotoPriceCents,
       notesEnabled: galleries.notesEnabled,
+      // Its own session type, else its booking's.
+      sessionTypeId: sql<string | null>`coalesce(${galleries.sessionTypeId}, ${bookings.sessionTypeId})`,
     })
     .from(galleries)
+    .leftJoin(bookings, eq(bookings.id, galleries.bookingId))
     .where(and(eq(galleries.id, id), eq(galleries.photographerId, user.id)));
   if (!gallery) notFound();
   const plan = await studioPlan(user.id);
@@ -38,6 +41,11 @@ export default async function EditGalleryPage({ params }: PageProps<"/dashboard/
     .from(clients)
     .where(eq(clients.photographerId, user.id))
     .orderBy(asc(clients.name));
+  const sessions = await db
+    .select({ id: sessionTypes.id, name: sessionTypes.name })
+    .from(sessionTypes)
+    .where(eq(sessionTypes.photographerId, user.id))
+    .orderBy(asc(sessionTypes.name));
 
   return (
     <div className="max-w-2xl">
@@ -56,6 +64,7 @@ export default async function EditGalleryPage({ params }: PageProps<"/dashboard/
         <GalleryForm
           action={updateGallery.bind(null, gallery.id)}
           clients={clientOptions}
+          sessions={sessions}
           defaultValues={gallery}
           submitLabel="Save changes"
           cancelHref={`/dashboard/galleries/${gallery.id}`}

@@ -15,6 +15,7 @@ import { emailSelectionsSubmitted } from "@/lib/email/notify";
 import { afterResponse } from "@/lib/email/send";
 import { quoteStoreShipping, startStoreCheckout } from "@/lib/store/checkout";
 import { finishDesign, startDesign } from "@/lib/store/designs";
+import { startFieldUpload } from "@/lib/store/field-uploads";
 
 // Actions a client can take from their gallery link. The token is re-checked
 // on every call, and changes are only allowed while the gallery is in proofing.
@@ -210,3 +211,16 @@ export async function finishGalleryDesign(token: string, input: { designId: stri
     photoIds,
   });
 }
+
+// A photo field's upload (e.g. a school logo): where to send the file.
+export async function startShopUpload(token: string, contentType: string, size: number) {
+  const gallery = await shopGallery(token);
+  if (!gallery) return { error: "This gallery's shop isn't open." };
+  return startFieldUpload({
+    photographerId: gallery.photographerId,
+    galleryId: gallery.id,
+    contentType: String(contentType),
+    size: Number(size),
+  });
+}
+

@@ -119,6 +119,7 @@ export function swaggFields(product: SwaggProduct): StoreLabField[] {
         max: Math.max(1, Math.min(type === "image" ? 10 : 500, Math.round(Number(f.max) || (type === "image" ? 1 : 50)))),
         required: Boolean(f.required),
         type,
+        source: type === "image" && f.source === "gallery" ? ("gallery" as const) : ("upload" as const),
         choices: type === "select" ? (f.options ?? []).map((c) => String(c).trim().slice(0, 80)).filter(Boolean) : [],
         showIf: f.show_if?.option && f.show_if.choice ? { option: String(f.show_if.option), choice: String(f.show_if.choice) } : null,
       };

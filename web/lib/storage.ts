@@ -112,6 +112,12 @@ export function designPhotoKey(prefix: string) {
   return `${prefix}/design.jpg`;
 }
 
+// A file a client uploads for a store product's photo field (lib/store/field-uploads.ts),
+// in the gallery's folder so deleting the gallery deletes it too.
+export function storeUploadKey(photographerId: string, galleryId: string, file: string) {
+  return `${galleryPrefix(photographerId, galleryId)}store-uploads/${file}`;
+}
+
 // A gallery designer design's files (lib/store/designs.ts), in the gallery's
 // folder so deleting the gallery deletes them too.
 export function storeDesignKey(photographerId: string, galleryId: string, designId: string, part: "preview" | "front" | "back") {

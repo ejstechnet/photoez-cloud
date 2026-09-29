@@ -1,6 +1,6 @@
 import { asc, eq } from "drizzle-orm";
 import { db } from "@/db";
-import { clients } from "@/db/schema";
+import { clients, sessionTypes } from "@/db/schema";
 import { requirePhotographer } from "@/lib/session";
 import { studioPlan } from "@/lib/studio-plan";
 import { createGallery } from "../actions";
@@ -14,6 +14,11 @@ export default async function NewGalleryPage() {
     .from(clients)
     .where(eq(clients.photographerId, user.id))
     .orderBy(asc(clients.name));
+  const sessions = await db
+    .select({ id: sessionTypes.id, name: sessionTypes.name })
+    .from(sessionTypes)
+    .where(eq(sessionTypes.photographerId, user.id))
+    .orderBy(asc(sessionTypes.name));
 
   return (
     <div className="max-w-2xl">
@@ -23,6 +28,7 @@ export default async function NewGalleryPage() {
         <GalleryForm
           action={createGallery}
           clients={clientOptions}
+          sessions={sessions}
           submitLabel="Create gallery"
           cancelHref="/dashboard/galleries"
           extras={plan.upsells ? { studioPriceCents: plan.extraPhotoPriceCents } : null}

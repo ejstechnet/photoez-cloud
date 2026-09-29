@@ -1,4 +1,4 @@
-import { storefrontFor } from "@/lib/store/checkout";
+import { gallerySessionType, storefrontFor } from "@/lib/store/checkout";
 import { and, eq, isNotNull } from "drizzle-orm";
 import { db } from "@/db";
 import { photos as photoRows } from "@/db/schema";
@@ -60,7 +60,8 @@ export default async function ClientGalleryPage({ params, searchParams }: PagePr
 
   const delivered = isDelivered(gallery);
   // The studio's shop, on delivered galleries (lib/store/checkout.ts).
-  const store = delivered ? await storefrontFor(gallery.photographerId) : null;
+  // Only products for this kind of shoot (products can be limited to some session types).
+  const store = delivered ? await storefrontFor(gallery.photographerId, await gallerySessionType(gallery.id)) : null;
   const finals = await clientFinals(gallery);
   const finalTiles = await Promise.all(
     finals.map(async (photo, i) => ({

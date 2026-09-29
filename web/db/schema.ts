@@ -240,6 +240,10 @@ export const galleries = pgTable(
       .unique()
       .references((): AnyPgColumn => bookings.id, { onDelete: "set null" }),
     title: text("title").notNull(),
+    // What kind of shoot it is, for store products limited to some session
+    // types. Set from the booking, or picked in the gallery's settings; null
+    // falls back to the booking's session type.
+    sessionTypeId: uuid("session_type_id").references((): AnyPgColumn => sessionTypes.id, { onDelete: "set null" }),
     // Random, unguessable token used in the client's gallery link.
     shareToken: text("share_token").notNull().unique(),
     // Same stages as PhotoEZ for WordPress (see lib/gallery-status.ts).
@@ -973,6 +977,9 @@ export type StoreLabField = {
   max: number;
   required: boolean;
   type: "text" | "select" | "image";
+  // Photo fields: "upload" (the client's own file, e.g. a school logo) or
+  // "gallery" (a photo from their gallery, or an upload).
+  source?: "upload" | "gallery";
   choices: string[];
   // Shown only when an option (or an earlier dropdown field) has this choice.
   showIf?: { option: string; choice: string } | null;
@@ -1026,6 +1033,8 @@ export const storeProducts = pgTable(
     // not synced yet (treated as before: the designer when there's a design).
     labMode: text("lab_mode", { enum: ["custom_design", "custom_text", "standard"] }),
     labFields: jsonb("lab_fields").$type<StoreLabField[]>().notNull().default([]),
+    // Shown only in galleries for these session types; empty = every gallery.
+    sessionTypeIds: jsonb("session_type_ids").$type<string[]>().notNull().default([]),
     active: boolean("active").notNull().default(true),
     sortOrder: integer("sort_order").notNull().default(0),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
@@ -1109,7 +1118,8 @@ export const storeOrderItems = pgTable(
     // The options the client picked, e.g. { Trim: "With trim" }.
     options: jsonb("options").$type<Record<string, string>>(),
     // Custom Text & Photos products: the answers by field label, and the
-    // gallery photos chosen for photo fields.
+    // photos for photo fields: gallery photo ids, and "upload:<file>" entries
+    // for files the client uploaded (lib/store/field-uploads.ts).
     fields: jsonb("fields").$type<Record<string, string>>(),
     fieldPhotoIds: jsonb("field_photo_ids").$type<string[]>(),
     // Designed in the gallery designer: its print files replace the photo.

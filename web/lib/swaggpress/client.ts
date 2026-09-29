@@ -44,6 +44,7 @@ export type SwaggProduct = {
     max?: number;
     required?: boolean;
     type?: "text" | "select" | "image";
+    source?: "upload" | "gallery";
     options?: string[];
     show_if?: { option: string; choice: string } | null;
   }[];

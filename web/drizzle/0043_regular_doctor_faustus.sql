@@ -1,0 +1,3 @@
+ALTER TABLE "galleries" ADD COLUMN "session_type_id" uuid;--> statement-breakpoint
+ALTER TABLE "store_products" ADD COLUMN "session_type_ids" jsonb DEFAULT '[]'::jsonb NOT NULL;--> statement-breakpoint
+ALTER TABLE "galleries" ADD CONSTRAINT "galleries_session_type_id_session_types_id_fk" FOREIGN KEY ("session_type_id") REFERENCES "public"."session_types"("id") ON DELETE set null ON UPDATE no action;

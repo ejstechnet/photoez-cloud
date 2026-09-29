@@ -1,11 +1,11 @@
 "use server";
 
 import { randomBytes } from "node:crypto";
-import { and, count, eq, isNull } from "drizzle-orm";
+import { and, count, eq, inArray, isNull } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { db } from "@/db";
-import { photographers, storeOrders, storeProducts, type StoreVariant } from "@/db/schema";
+import { photographers, sessionTypes, storeOrders, storeProducts, type StoreVariant } from "@/db/schema";
 import { emailStoreOrderShipped } from "@/lib/email/notify";
 import { refreshOrderShipped, submitLabOrder } from "@/lib/swaggpress/orders";
 import { addSwaggProduct, connectSwaggPress, disconnectSwaggPress, syncSwaggProducts } from "@/lib/swaggpress/catalog";
@@ -102,8 +102,22 @@ function readSwaggPrices(formData: FormData, variants: StoreVariant[]) {
   return { variants: next };
 }
 
+// "Show in galleries for": the chosen session types (this studio's), or
+// none for every gallery.
+async function readSessionTypeIds(formData: FormData, photographerId: string) {
+  if (String(formData.get("appliesTo") ?? "all") !== "some") return [];
+  const chosen = formData.getAll("sessionTypeIds").map(String).filter(isUuid);
+  if (!chosen.length) return [];
+  const owned = await db
+    .select({ id: sessionTypes.id })
+    .from(sessionTypes)
+    .where(and(eq(sessionTypes.photographerId, photographerId), inArray(sessionTypes.id, chosen)));
+  return owned.map((s) => s.id);
+}
+
 async function saveProduct(photographerId: string, productId: string | null, formData: FormData): Promise<ProductFormState> {
   const name = String(formData.get("name") ?? "").trim().slice(0, 80);
+  const sessionTypeIds = await readSessionTypeIds(formData, photographerId);
   if (!name) return { message: "Give the product a name, like Photo Prints." };
   const description = String(formData.get("description") ?? "").trim().slice(0, 200) || null;
   const [current] = productId
@@ -119,7 +133,7 @@ async function saveProduct(photographerId: string, productId: string | null, for
     if ("error" in priced) return { message: priced.error };
     await db
       .update(storeProducts)
-      .set({ name, description, variants: priced.variants, active: formData.get("active") === "on" })
+      .set({ name, description, variants: priced.variants, active: formData.get("active") === "on", sessionTypeIds })
       .where(eq(storeProducts.id, productId!));
     revalidatePath("/dashboard/store");
     redirect("/dashboard/store");
@@ -128,7 +142,7 @@ async function saveProduct(photographerId: string, productId: string | null, for
   if ("error" in read) return { message: read.error };
   // Cropping now follows each size's width and height (lib/store/rules.ts).
   const cropToSize = read.variants.some((v) => v.widthIn !== null);
-  const values = { name, description, cropToSize, variants: read.variants, active: formData.get("active") === "on" };
+  const values = { name, description, cropToSize, variants: read.variants, active: formData.get("active") === "on", sessionTypeIds };
   if (productId) {
     await db.update(storeProducts).set(values).where(eq(storeProducts.id, productId));
     revalidatePath("/dashboard/store");
