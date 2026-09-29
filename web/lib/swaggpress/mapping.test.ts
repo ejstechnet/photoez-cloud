@@ -129,14 +129,14 @@ test("a Custom Text & Photos product's fields come along", () => {
     purchase_mode: "custom_text" as const,
     custom_fields: [
       { key: "trim_type", label: "Trim Type", type: "select" as const, options: ["Satin"], required: true, show_if: { option: "Trim", choice: "With Trim" } },
-      { key: "photos", label: "Photos", type: "image" as const, max: 40 },
+      { key: "photos", label: "Photos", type: "image" as const, max: 40, source: "gallery" as const },
       { key: "empty", label: "Empty dropdown", type: "select" as const, options: [] },
     ],
   };
   assert.equal(swaggMode(stole), "custom_text");
   assert.deepEqual(swaggFields(stole), [
-    { key: "trim_type", label: "Trim Type", placeholder: "", max: 50, required: true, type: "select", choices: ["Satin"], showIf: { option: "Trim", choice: "With Trim" } },
-    { key: "photos", label: "Photos", placeholder: "", max: 10, required: false, type: "image", choices: [], showIf: null },
+    { key: "trim_type", label: "Trim Type", placeholder: "", max: 50, required: true, type: "select", source: "upload", choices: ["Satin"], showIf: { option: "Trim", choice: "With Trim" } },
+    { key: "photos", label: "Photos", placeholder: "", max: 10, required: false, type: "image", source: "gallery", choices: [], showIf: null },
   ]);
   // Designer products ask for no fields.
   assert.deepEqual(swaggFields({ ...stole, purchase_mode: "custom_design" as const }), []);

@@ -4,6 +4,7 @@ import type Stripe from "stripe";
 import { z } from "zod";
 import { db } from "@/db";
 import {
+  bookings,
   galleries,
   payments,
   photographers,
@@ -22,6 +23,7 @@ import { swaggKeyFor } from "@/lib/swaggpress/catalog";
 import { swaggRates } from "@/lib/swaggpress/client";
 import { sellable } from "@/lib/swaggpress/mapping";
 import { galleryDesign } from "./designs";
+import { fieldUploadsExist, isFieldUpload } from "./field-uploads";
 import { MAX_CART_LINES, MAX_QUANTITY, cartTotals, checkFields, cropFits, itemUnitCents, optionsCents, orderNumber, variantRatio } from "./rules";
 
 // The Online Store's checkout (decided with Elle 2026-09-28): clients order
@@ -39,7 +41,19 @@ import { MAX_CART_LINES, MAX_QUANTITY, cartTotals, checkFields, cropFits, itemUn
 // What a delivered gallery's shop offers, or null when the studio's store
 // is off or it can't take payments. SwaggPress products show only while the
 // studio is connected with a card on file, and only sizes still sellable.
-export async function storefrontFor(photographerId: string) {
+// A gallery's session type: its own, else its booking's (null = not set).
+export async function gallerySessionType(galleryId: string) {
+  const [row] = await db
+    .select({ own: galleries.sessionTypeId, booking: bookings.sessionTypeId })
+    .from(galleries)
+    .leftJoin(bookings, eq(bookings.id, galleries.bookingId))
+    .where(eq(galleries.id, galleryId));
+  return row?.own ?? row?.booking ?? null;
+}
+
+// sessionTypeId: the gallery's session type; products limited to some
+// session types only show in those galleries.
+export async function storefrontFor(photographerId: string, sessionTypeId: string | null = null) {
   const [studio] = await db
     .select({
       enabled: photographers.storeEnabled,
@@ -67,6 +81,7 @@ export async function storefrontFor(photographerId: string) {
       labOptions: storeProducts.labOptions,
       labMode: storeProducts.labMode,
       labFields: storeProducts.labFields,
+      sessionTypeIds: storeProducts.sessionTypeIds,
     })
     .from(storeProducts)
     .where(and(eq(storeProducts.photographerId, photographerId), eq(storeProducts.active, true)))
@@ -74,6 +89,7 @@ export async function storefrontFor(photographerId: string) {
   const shown = await Promise.all(
     products
       .filter((p) => p.fulfillment === "self" || (swaggReady && !p.labUnavailable))
+      .filter((p) => p.sessionTypeIds.length === 0 || (sessionTypeId !== null && p.sessionTypeIds.includes(sessionTypeId)))
       .map((p) => ({ ...p, variants: p.variants.filter(sellable) }))
       .filter((p) => p.variants.length > 0)
       .map(async (p) => ({
@@ -120,7 +136,10 @@ export const cartSchema = z
       options: z.record(z.string().max(60), z.string().max(80)).optional(),
       // Custom Text & Photos products: answers by field key, and gallery photos for photo fields.
       fields: z.record(z.string().max(40), z.string().max(500)).optional(),
-      fieldPhotos: z.record(z.string().max(40), z.array(z.uuid()).max(10)).optional(),
+      // Gallery photo ids, or "upload:<file>" for the client's own uploads.
+      fieldPhotos: z
+        .record(z.string().max(40), z.array(z.string().refine((v) => z.uuid().safeParse(v).success || isFieldUpload(v))).max(10))
+        .optional(),
     }),
   )
   .min(1, "Your cart is empty.")
@@ -150,9 +169,11 @@ export const shipToSchema = z.object({
 async function checkCart(galleryId: string, photographerId: string, cart: unknown) {
   const parsed = cartSchema.safeParse(cart);
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Your cart couldn't be read. Please try again." };
-  const store = await storefrontFor(photographerId);
+  const store = await storefrontFor(photographerId, await gallerySessionType(galleryId));
   if (!store) return { error: "This studio's shop is closed right now." };
-  const photoIds = [...new Set(parsed.data.flatMap((l) => [l.photoId, ...Object.values(l.fieldPhotos ?? {}).flat()]))];
+  const photoIds = [
+    ...new Set(parsed.data.flatMap((l) => [l.photoId, ...Object.values(l.fieldPhotos ?? {}).flat().filter((id) => !isFieldUpload(id))])),
+  ];
   const finals = await db
     .select({ id: photos.id, width: photos.width, height: photos.height, name: photos.originalName })
     .from(photos)
@@ -167,8 +188,12 @@ async function checkCart(galleryId: string, photographerId: string, cart: unknow
     if ("error" in picked) return { error: `${product.name}: ${picked.error}` };
     const filled = checkFields(product.fields, picked.picks, line.fields, line.fieldPhotos);
     if ("error" in filled) return { error: `${product.name}: ${filled.error}` };
-    if (filled.photoIds.some((id) => !finals.some((f) => f.id === id))) {
+    const uploads = filled.photoIds.filter(isFieldUpload);
+    if (filled.photoIds.some((id) => !isFieldUpload(id) && !finals.some((f) => f.id === id))) {
       return { error: `${product.name}: a photo you chose isn't in this gallery anymore. Please choose again.` };
+    }
+    if (uploads.length && !(await fieldUploadsExist(photographerId, galleryId, uploads))) {
+      return { error: `${product.name}: a photo you uploaded didn't finish. Please upload it again.` };
     }
     const personalized = { fields: filled.text, fieldPhotoIds: filled.photoIds };
     // Designed products: the design replaces cropping.

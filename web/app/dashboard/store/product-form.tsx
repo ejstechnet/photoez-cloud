@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useActionState, useState } from "react";
 import { Field, FormError, SubmitButton, inputClass } from "@/components/form";
+import { SessionPicker } from "./session-picker";
 import type { StoreVariant } from "@/db/schema";
 import { MAX_VARIANTS } from "@/lib/store/rules";
 import type { ProductFormState } from "./actions";
@@ -25,10 +26,13 @@ const toRow = (v: StoreVariant): Row => ({
 export function ProductForm({
   action,
   defaultValues,
+  sessions,
   submitLabel,
 }: {
   action: (state: ProductFormState, formData: FormData) => Promise<ProductFormState>;
-  defaultValues?: { name: string; description: string | null; active: boolean; variants: StoreVariant[] };
+  defaultValues?: { name: string; description: string | null; active: boolean; variants: StoreVariant[]; sessionTypeIds?: string[] };
+  // The studio's session types, for "Show in galleries for".
+  sessions: { id: string; name: string }[];
   submitLabel: string;
 }) {
   const [state, formAction, pending] = useActionState(action, {});
@@ -106,6 +110,7 @@ export function ProductForm({
         )}
       </fieldset>
 
+      <SessionPicker sessions={sessions} selected={defaultValues?.sessionTypeIds ?? []} />
       <label className="flex items-center gap-3 text-sm font-semibold">
         <input type="checkbox" name="active" defaultChecked={defaultValues?.active ?? true} className="size-4 accent-lime-ink" />
         Show in my store

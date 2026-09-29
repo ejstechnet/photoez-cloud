@@ -6,6 +6,7 @@ import { z } from "zod";
 import { db } from "@/db";
 import { galleries, photographers, photos, storeDesigns, storeOrderItems, storeOrders } from "@/db/schema";
 import { formatPrice } from "@/lib/booking/format";
+import { fieldUploadUrls, isFieldUpload } from "@/lib/store/field-uploads";
 import { formatDate } from "@/lib/booking/time";
 import { requirePhotographer } from "@/lib/session";
 import { photoKey, signedViewUrl } from "@/lib/storage";
@@ -42,6 +43,11 @@ export default async function StoreOrderPage({ params }: PageProps<"/dashboard/s
         .where(eq(storeOrderItems.orderId, order.id))
     ).map(async ({ item, fileKey, design }) => ({
       ...item,
+      // Files the client uploaded for photo fields (e.g. a school logo).
+      uploadUrls:
+        order.galleryId && item.fieldPhotoIds?.some(isFieldUpload)
+          ? await fieldUploadUrls(order.photographerId, order.galleryId, item.fieldPhotoIds.filter(isFieldUpload))
+          : [],
       // Designed items show the design on the product.
       designed: Boolean(design?.previewKey),
       hasBack: Boolean(design?.backKey),
@@ -114,6 +120,18 @@ export default async function StoreOrderPage({ params }: PageProps<"/dashboard/s
                   {item.designed ? "Designed by the client" : item.photoName}
                   {item.crop ? " · cropped by the client" : ""}
                 </p>
+                {item.fields && Object.keys(item.fields).length > 0 && (
+                  <p className="mt-1 text-sm">{Object.entries(item.fields).map(([k, v]) => `${k}: ${v}`).join(" · ")}</p>
+                )}
+                {item.uploadUrls.length > 0 && (
+                  <p className="mt-1 flex flex-wrap gap-3 text-sm">
+                    {item.uploadUrls.map((url, i) => (
+                      <a key={url} href={url} target="_blank" rel="noopener" className="link">
+                        Client upload {i + 1}
+                      </a>
+                    ))}
+                  </p>
+                )}
               </div>
               <span className="text-sm font-semibold">{formatPrice(item.unitCents * item.quantity)}</span>
               {item.thumbUrl && (

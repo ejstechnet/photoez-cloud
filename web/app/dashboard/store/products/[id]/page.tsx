@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { and, eq } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db";
-import { storeProducts } from "@/db/schema";
+import { sessionTypes, storeProducts } from "@/db/schema";
 import { requirePhotographer } from "@/lib/session";
 import { deleteProduct, updateProduct } from "../../actions";
 import { ProductForm } from "../../product-form";
@@ -25,6 +25,11 @@ export default async function EditProductPage({ params, searchParams }: PageProp
     .where(and(eq(storeProducts.id, id), eq(storeProducts.photographerId, user.id)));
   if (!product) notFound();
   const swagg = product.fulfillment === "swaggpress";
+  const sessions = await db
+    .select({ id: sessionTypes.id, name: sessionTypes.name })
+    .from(sessionTypes)
+    .where(eq(sessionTypes.photographerId, user.id))
+    .orderBy(asc(sessionTypes.name));
   return (
     <div className="max-w-3xl">
       <p className="text-sm font-bold tracking-wider text-coral uppercase">Store</p>
@@ -58,7 +63,7 @@ export default async function EditProductPage({ params, searchParams }: PageProp
             </div>
           )}
           <div className="card mt-6 p-6 sm:p-8">
-            <SwaggPricesForm action={updateProduct.bind(null, product.id)} defaultValues={product} />
+            <SwaggPricesForm action={updateProduct.bind(null, product.id)} defaultValues={product} sessions={sessions} />
           </div>
         </>
       ) : (
@@ -70,7 +75,7 @@ export default async function EditProductPage({ params, searchParams }: PageProp
             />
           </div>
           <div className="card mt-6 p-6 sm:p-8">
-            <ProductForm action={updateProduct.bind(null, product.id)} defaultValues={product} submitLabel="Save changes" />
+            <ProductForm action={updateProduct.bind(null, product.id)} defaultValues={product} sessions={sessions} submitLabel="Save changes" />
           </div>
         </>
       )}

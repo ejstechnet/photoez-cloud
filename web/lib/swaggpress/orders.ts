@@ -5,6 +5,7 @@ import { emailStoreOrderShipped } from "@/lib/email/notify";
 import { openSecret } from "@/lib/secret-box";
 import { makePrintFile } from "@/lib/store/print-file";
 import { photoKey, putObject, signedViewUrl, storeOrderFileKey } from "@/lib/storage";
+import { fieldUploadUrls, isFieldUpload } from "@/lib/store/field-uploads";
 import { swaggOrderStatus, swaggPlaceOrder } from "./client";
 
 // Store orders with SwaggPress items: sent to SwaggPress once paid, then
@@ -79,7 +80,9 @@ export async function submitLabOrder(orderId: string): Promise<{ ok: true } | { 
       options: item.options ?? {},
       // Custom Text & Photos: the answers, and the chosen photos (full resolution).
       ...(item.fields ? { custom_text: item.fields } : {}),
-      ...(item.fieldPhotoIds?.length ? { asset_urls: await fieldPhotoUrls(item.fieldPhotoIds) } : {}),
+      ...(item.fieldPhotoIds?.length
+        ? { asset_urls: await fieldPhotoUrls(item.fieldPhotoIds, order.photographerId, order.galleryId) }
+        : {}),
       note: `${item.productName} · ${item.variantLabel}${item.photoName ? ` · photo ${item.photoName}` : ""}`,
     });
   }
@@ -108,10 +111,15 @@ export async function submitLabOrder(orderId: string): Promise<{ ok: true } | { 
   }
 }
 
-// Links to the originals of photos chosen for photo fields, for SwaggPress to download.
-async function fieldPhotoUrls(ids: string[]) {
-  const rows = await db.select({ id: photos.id, fileKey: photos.fileKey }).from(photos).where(inArray(photos.id, ids));
-  return Promise.all(rows.map((r) => signedViewUrl(photoKey(r.fileKey, "original"))));
+// Links for SwaggPress to download photo fields' photos: gallery originals,
+// and files the client uploaded.
+async function fieldPhotoUrls(entries: string[], photographerId: string, galleryId: string | null) {
+  const ids = entries.filter((e) => !isFieldUpload(e));
+  const uploads = entries.filter(isFieldUpload);
+  const rows = ids.length ? await db.select({ id: photos.id, fileKey: photos.fileKey }).from(photos).where(inArray(photos.id, ids)) : [];
+  const galleryUrls = await Promise.all(rows.map((r) => signedViewUrl(photoKey(r.fileKey, "original"))));
+  const uploadUrls = galleryId && uploads.length ? await fieldUploadUrls(photographerId, galleryId, uploads) : [];
+  return [...galleryUrls, ...uploadUrls];
 }
 
 // The overall status: shipped once every part is on its way.

@@ -53,6 +53,8 @@ export async function createGalleryForBooking(
       photographerId: booking.photographerId,
       clientId: booking.clientId,
       bookingId,
+      // The kind of shoot, for store products limited to some sessions.
+      sessionTypeId: booking.sessionTypeId,
       // The client's session title from the booking form, like PhotoEZ Booking;
       // bookings from before that field get "Session · Client · date".
       title: booking.title || bookingGalleryTitle(booking.sessionName, booking.clientName, booking.startsAt, row.timeZone),

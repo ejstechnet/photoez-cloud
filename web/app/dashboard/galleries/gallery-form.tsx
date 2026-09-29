@@ -10,6 +10,7 @@ import type { GalleryFormState } from "./actions";
 export function GalleryForm({
   action,
   clients,
+  sessions,
   defaultValues,
   submitLabel,
   cancelHref,
@@ -17,8 +18,11 @@ export function GalleryForm({
 }: {
   action: (state: GalleryFormState, formData: FormData) => Promise<GalleryFormState>;
   clients: { id: string; name: string }[];
+  // The studio's session types, for "What kind of shoot is this?".
+  sessions: { id: string; name: string }[];
   defaultValues?: {
     title: string;
+    sessionTypeId?: string | null;
     clientId: string | null;
     freeLimit: number;
     extraPhotoPriceCents?: number | null;
@@ -56,6 +60,22 @@ export function GalleryForm({
           </option>
         ))}
       </SelectField>
+      {sessions.length > 0 && (
+        <SelectField
+          label="Session type"
+          name="sessionTypeId"
+          defaultValue={defaultValues?.sessionTypeId ?? ""}
+          error={errors.sessionTypeId}
+          hint="Decides which store products show in this gallery (e.g. senior items for senior sessions)."
+        >
+          <option value="">Not set (every product that isn&rsquo;t limited)</option>
+          {sessions.map((s) => (
+            <option key={s.id} value={s.id}>
+              {s.name}
+            </option>
+          ))}
+        </SelectField>
+      )}
       <Field
         label="Free picks"
         name="freeLimit"

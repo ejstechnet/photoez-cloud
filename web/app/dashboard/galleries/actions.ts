@@ -6,7 +6,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { db } from "@/db";
-import { clients, galleries, photographers, photos } from "@/db/schema";
+import { clients, galleries, photographers, photos, sessionTypes } from "@/db/schema";
 import { MAX_PHOTO_BYTES, MAX_PHOTOS_PER_BATCH, PHOTO_KINDS, PHOTO_TYPES } from "@/lib/photo-limits";
 import { staleProof } from "@/lib/proofs";
 import { GALLERY_STATUSES, type GalleryStatus } from "@/lib/gallery-status";
@@ -50,6 +50,12 @@ async function findOwnedGallery(galleryId: string, photographerId: string) {
 
 const gallerySchema = z.object({
   title: z.string().trim().min(1, "Give the gallery a title.").max(200, "Keep the title under 200 characters."),
+  // The kind of shoot ("" = not set), for store products limited to some sessions.
+  sessionTypeId: z
+    .string()
+    .trim()
+    .transform((v) => v || null)
+    .refine((v) => v === null || z.uuid().safeParse(v).success, "Choose a session type from the list."),
   freeLimit: z.coerce
     .number({ message: "Enter a number." })
     .int("Enter a whole number.")
@@ -92,6 +98,7 @@ type ParsedGallery =
 async function parseGallery(formData: FormData, photographerId: string): Promise<ParsedGallery> {
   const parsed = gallerySchema.safeParse({
     title: String(formData.get("title") ?? ""),
+    sessionTypeId: String(formData.get("sessionTypeId") ?? ""),
     freeLimit: formData.get("freeLimit") ?? "",
     clientId: String(formData.get("clientId") ?? ""),
     extraPhotoPrice: String(formData.get("extraPhotoPrice") ?? ""),
@@ -112,6 +119,14 @@ async function parseGallery(formData: FormData, photographerId: string): Promise
       .from(clients)
       .where(and(eq(clients.id, parsed.data.clientId), eq(clients.photographerId, photographerId)));
     if (!client) return { ok: false, state: { errors: { clientId: "Choose a client from the list." } } };
+  }
+  // The session type must be this photographer's too.
+  if (parsed.data.sessionTypeId) {
+    const [session] = await db
+      .select({ id: sessionTypes.id })
+      .from(sessionTypes)
+      .where(and(eq(sessionTypes.id, parsed.data.sessionTypeId), eq(sessionTypes.photographerId, photographerId)));
+    if (!session) return { ok: false, state: { errors: { sessionTypeId: "Choose a session type from the list." } } };
   }
   // Only plans with gallery upsells can set a gallery's extra photo price.
   const { extraPhotoPrice, notes, ...rest } = parsed.data;

@@ -66,8 +66,8 @@ export function ShopDialog({
   const productFields = product?.fields ?? [];
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [fieldPhotos, setFieldPhotos] = useState<Record<string, string[]>>({});
-  // The first photo field starts with the photo the client tapped.
-  const firstPhotoField = productFields.find((f) => f.type === "image");
+  // The first "Photo from gallery" field starts with the photo the client tapped.
+  const firstPhotoField = productFields.find((f) => f.type === "image" && f.source === "gallery");
   const effectiveFieldPhotos =
     firstPhotoField && fieldPhotos[firstPhotoField.key] === undefined ? { ...fieldPhotos, [firstPhotoField.key]: [photo.id] } : fieldPhotos;
   const filled = checkFields(productFields, optionsReady ? pickedOptions.picks : {}, answers, effectiveFieldPhotos);
@@ -232,6 +232,7 @@ export function ShopDialog({
             <p className="mt-6 text-sm font-bold tracking-wider text-muted uppercase">3 · Personalize</p>
             <p className="mt-1 text-sm text-muted">Tell us what to put on it. We&rsquo;ll create it for you.</p>
             <PersonalizeFields
+              token={token}
               fields={productFields}
               optionPicks={optionsReady ? pickedOptions.picks : {}}
               answers={answers}
