@@ -22,7 +22,7 @@ import { swaggKeyFor } from "@/lib/swaggpress/catalog";
 import { swaggRates } from "@/lib/swaggpress/client";
 import { sellable } from "@/lib/swaggpress/mapping";
 import { galleryDesign } from "./designs";
-import { MAX_CART_LINES, MAX_QUANTITY, cartTotals, cropFits, itemUnitCents, orderNumber, variantRatio } from "./rules";
+import { MAX_CART_LINES, MAX_QUANTITY, cartTotals, checkFields, cropFits, itemUnitCents, optionsCents, orderNumber, variantRatio } from "./rules";
 
 // The Online Store's checkout (decided with Elle 2026-09-28): clients order
 // prints and products of their photos from their delivered gallery, and pay
@@ -64,6 +64,9 @@ export async function storefrontFor(photographerId: string) {
       labImageUrls: storeProducts.labImageUrls,
       labUnavailable: storeProducts.labUnavailable,
       labDesign: storeProducts.labDesign,
+      labOptions: storeProducts.labOptions,
+      labMode: storeProducts.labMode,
+      labFields: storeProducts.labFields,
     })
     .from(storeProducts)
     .where(and(eq(storeProducts.photographerId, photographerId), eq(storeProducts.active, true)))
@@ -81,7 +84,12 @@ export async function storefrontFor(photographerId: string) {
         fulfillment: p.fulfillment,
         labProductId: p.labProductId,
         // Designed in the gallery designer (SwaggPress products with a design setup).
-        design: p.fulfillment === "swaggpress" ? p.labDesign : null,
+        // Only products SwaggPress sells through its designer are designed.
+        design: p.fulfillment === "swaggpress" && (p.labMode ?? "custom_design") === "custom_design" ? p.labDesign : null,
+        // Custom Text & Photos products: the fields to fill in instead.
+        fields: p.fulfillment === "swaggpress" && p.labMode === "custom_text" ? (p.labFields ?? []) : [],
+        // Options besides size (SwaggPress products), e.g. Trim.
+        options: p.fulfillment === "swaggpress" ? (p.labOptions ?? []) : [],
         imageUrls: p.fulfillment === "swaggpress" ? p.labImageUrls : await Promise.all(p.imageKeys.map((key) => signedViewUrl(key))),
       })),
   );
@@ -108,6 +116,11 @@ export const cartSchema = z
       crop: cropSchema.nullable(),
       // A gallery designer design (lib/store/designs.ts).
       designId: z.uuid().nullable().optional(),
+      // The client's option picks, e.g. { Trim: "With trim" }.
+      options: z.record(z.string().max(60), z.string().max(80)).optional(),
+      // Custom Text & Photos products: answers by field key, and gallery photos for photo fields.
+      fields: z.record(z.string().max(40), z.string().max(500)).optional(),
+      fieldPhotos: z.record(z.string().max(40), z.array(z.uuid()).max(10)).optional(),
     }),
   )
   .min(1, "Your cart is empty.")
@@ -139,7 +152,7 @@ async function checkCart(galleryId: string, photographerId: string, cart: unknow
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Your cart couldn't be read. Please try again." };
   const store = await storefrontFor(photographerId);
   if (!store) return { error: "This studio's shop is closed right now." };
-  const photoIds = [...new Set(parsed.data.map((l) => l.photoId))];
+  const photoIds = [...new Set(parsed.data.flatMap((l) => [l.photoId, ...Object.values(l.fieldPhotos ?? {}).flat()]))];
   const finals = await db
     .select({ id: photos.id, width: photos.width, height: photos.height, name: photos.originalName })
     .from(photos)
@@ -150,6 +163,14 @@ async function checkCart(galleryId: string, photographerId: string, cart: unknow
     const variant = product?.variants.find((v) => v.id === line.variantId);
     const photo = finals.find((p) => p.id === line.photoId);
     if (!product || !variant || !photo) return { error: "Something in your cart isn't available anymore. Please remove it and try again." };
+    const picked = optionsCents(product.options, line.options);
+    if ("error" in picked) return { error: `${product.name}: ${picked.error}` };
+    const filled = checkFields(product.fields, picked.picks, line.fields, line.fieldPhotos);
+    if ("error" in filled) return { error: `${product.name}: ${filled.error}` };
+    if (filled.photoIds.some((id) => !finals.some((f) => f.id === id))) {
+      return { error: `${product.name}: a photo you chose isn't in this gallery anymore. Please choose again.` };
+    }
+    const personalized = { fields: filled.text, fieldPhotoIds: filled.photoIds };
     // Designed products: the design replaces cropping.
     if (product.design) {
       const design = line.designId ? await galleryDesign(galleryId, line.designId) : null;
@@ -166,7 +187,9 @@ async function checkCart(galleryId: string, photographerId: string, cart: unknow
         crop: null,
         designId: design.id,
         wrap,
-        unitCents: itemUnitCents(variant, product.design, wrap),
+        options: picked.picks,
+        ...personalized,
+        unitCents: itemUnitCents(variant, product.design, wrap, picked.cents),
       });
       continue;
     }
@@ -184,7 +207,9 @@ async function checkCart(galleryId: string, photographerId: string, cart: unknow
       crop: ratio !== null ? line.crop : null,
       designId: null as string | null,
       wrap: false,
-      unitCents: variant.priceCents,
+      options: picked.picks,
+      ...personalized,
+      unitCents: variant.priceCents + picked.cents,
     });
   }
   return { store, lines };
@@ -343,6 +368,9 @@ export async function startStoreCheckout(options: {
       labVariantId: l.variant.labVariantId ?? null,
       labProductId: l.product.labProductId ?? null,
       designId: l.designId,
+      options: Object.keys(l.options).length ? l.options : null,
+      fields: Object.keys(l.fields).length ? l.fields : null,
+      fieldPhotoIds: l.fieldPhotoIds.length ? l.fieldPhotoIds : null,
     })),
   );
 
@@ -360,7 +388,8 @@ export async function startStoreCheckout(options: {
           price_data: {
             currency: "usd",
             unit_amount: l.unitCents,
-            product_data: { name: `${l.product.name} · ${l.variant.label}${l.wrap ? " · Full wrap" : ""}`, description: l.designId ? "Your design" : `Photo: ${l.photo.name}` },
+            product_data: {
+              name: `${l.product.name} · ${l.variant.label}${l.wrap ? " · Full wrap" : ""}${Object.entries(l.options).map(([k, v]) => ` · ${k}: ${v}`).join("")}`, description: l.designId ? "Your design" : `Photo: ${l.photo.name}` },
           },
         })),
         ...(totals.handlingCents > 0

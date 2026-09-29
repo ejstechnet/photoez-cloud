@@ -288,6 +288,20 @@
       "when": 1790640760737,
       "tag": "0040_lyrical_magneto",
       "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1790697618724,
+      "tag": "0041_jittery_spiral",
+      "breakpoints": true
+    },
+    {
+      "idx": 42,
+      "version": "7",
+      "when": 1790706802454,
+      "tag": "0042_melted_stranger",
+      "breakpoints": true
     }
   ]
 }

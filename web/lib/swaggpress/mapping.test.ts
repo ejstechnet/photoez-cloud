@@ -1,7 +1,7 @@
 // Tests for SwaggPress catalog mapping.   npm test
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { sellable, suggestedRetailCents, swaggImages, swaggVariantLabel, swaggVariants, swaggDesign, syncSwaggVariants } from "./mapping.ts";
+import { sellable, suggestedRetailCents, swaggImages, swaggVariantLabel, swaggVariants, swaggDesign, swaggFields, swaggMode, swaggOptions, syncSwaggVariants } from "./mapping.ts";
 
 let n = 0;
 const makeId = () => `v${++n}`;
@@ -98,3 +98,47 @@ test("a product's design setup comes along for the gallery designer", () => {
   assert.equal(setup.wrapUpchargeCents, 500);
   assert.deepEqual(setup.wrapInches, { w: 8.5, h: 3.5 });
 });
+
+test("a product's options come along with their price changes in cents", () => {
+  assert.deepEqual(swaggOptions(tee), []);
+  const stole = {
+    ...tee,
+    options: [
+      { name: "Trim", required: true, choices: [{ label: "Without trim", mod: 0 }, { label: "With trim", mod: 5 }] },
+      { name: "  ", required: false, choices: [{ label: "x", mod: 1 }] },
+    ],
+  };
+  assert.deepEqual(swaggOptions(stole), [
+    { name: "Trim", required: true, choices: [{ label: "Without trim", modCents: 0 }, { label: "With trim", modCents: 500 }], showIf: null },
+  ]);
+  const withType = {
+    ...tee,
+    options: [
+      { name: "Trim", required: true, choices: [{ label: "With trim", mod: 5 }] },
+      { name: "Trim Type", required: true, choices: [{ label: "Gold", mod: 0 }], show_if: { option: "Trim", choice: "With trim" } },
+    ],
+  };
+  assert.deepEqual(swaggOptions(withType)[1].showIf, { option: "Trim", choice: "With trim" });
+});
+
+test("a Custom Text & Photos product's fields come along", () => {
+  assert.equal(swaggMode(tee), null);
+  assert.deepEqual(swaggFields(tee), []);
+  const stole = {
+    ...tee,
+    purchase_mode: "custom_text" as const,
+    custom_fields: [
+      { key: "trim_type", label: "Trim Type", type: "select" as const, options: ["Satin"], required: true, show_if: { option: "Trim", choice: "With Trim" } },
+      { key: "photos", label: "Photos", type: "image" as const, max: 40 },
+      { key: "empty", label: "Empty dropdown", type: "select" as const, options: [] },
+    ],
+  };
+  assert.equal(swaggMode(stole), "custom_text");
+  assert.deepEqual(swaggFields(stole), [
+    { key: "trim_type", label: "Trim Type", placeholder: "", max: 50, required: true, type: "select", choices: ["Satin"], showIf: { option: "Trim", choice: "With Trim" } },
+    { key: "photos", label: "Photos", placeholder: "", max: 10, required: false, type: "image", choices: [], showIf: null },
+  ]);
+  // Designer products ask for no fields.
+  assert.deepEqual(swaggFields({ ...stole, purchase_mode: "custom_design" as const }), []);
+});
+

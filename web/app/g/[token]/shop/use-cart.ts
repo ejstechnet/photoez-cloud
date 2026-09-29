@@ -18,6 +18,11 @@ export type CartItem = {
   designId?: string | null;
   // The client chose a full wrap (for showing the price; checkout re-checks).
   wrap?: boolean;
+  // Option picks, e.g. { Trim: "With trim" } (checkout re-checks and re-prices).
+  options?: Record<string, string>;
+  // Custom Text & Photos products: answers by field key, and photos for photo fields.
+  fields?: Record<string, string>;
+  fieldPhotos?: Record<string, string[]>;
 };
 
 const storageKey = (token: string) => `pez-cart-${token}`;

@@ -951,6 +951,33 @@ export type StoreVariant = {
   colorHex?: string | null;
 };
 
+// A SwaggPress product's options besides size and color (e.g. Trim: Without
+// trim / With trim +$5), as its partner catalog sends them. The price change
+// passes through to the client at the same amount.
+export type StoreLabOption = {
+  name: string;
+  required: boolean;
+  choices: { label: string; modCents: number }[];
+  // Shown only when an earlier option has this choice (e.g. Trim Type only
+  // when Trim is "With trim").
+  showIf?: { option: string; choice: string } | null;
+};
+
+// A field a SwaggPress "Custom Text & Photos" product asks for: a line of
+// text, a dropdown, or photos (chosen from the client's gallery).
+export type StoreLabField = {
+  key: string;
+  label: string;
+  placeholder: string;
+  // Characters for text; how many photos for image fields.
+  max: number;
+  required: boolean;
+  type: "text" | "select" | "image";
+  choices: string[];
+  // Shown only when an option (or an earlier dropdown field) has this choice.
+  showIf?: { option: string; choice: string } | null;
+};
+
 // A SwaggPress product's design setup, as its partner catalog sends it.
 export type StoreLabArea = { x: number; y: number; w: number; h: number };
 export type StoreLabDesign = {
@@ -993,6 +1020,12 @@ export const storeProducts = pgTable(
     // SwaggPress products: how it's designed (mockups, print areas, wrap),
     // for the gallery designer. Null = no designer, just the photo.
     labDesign: jsonb("lab_design").$type<StoreLabDesign>(),
+    labOptions: jsonb("lab_options").$type<StoreLabOption[]>().notNull().default([]),
+    // How clients order it, as set on SwaggPress: "custom_design" (the
+    // designer), "custom_text" (fill in labFields) or "standard". Null =
+    // not synced yet (treated as before: the designer when there's a design).
+    labMode: text("lab_mode", { enum: ["custom_design", "custom_text", "standard"] }),
+    labFields: jsonb("lab_fields").$type<StoreLabField[]>().notNull().default([]),
     active: boolean("active").notNull().default(true),
     sortOrder: integer("sort_order").notNull().default(0),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
@@ -1073,6 +1106,12 @@ export const storeOrderItems = pgTable(
     // SwaggPress items: which partner variant to send.
     labVariantId: integer("lab_variant_id"),
     labProductId: integer("lab_product_id"),
+    // The options the client picked, e.g. { Trim: "With trim" }.
+    options: jsonb("options").$type<Record<string, string>>(),
+    // Custom Text & Photos products: the answers by field label, and the
+    // gallery photos chosen for photo fields.
+    fields: jsonb("fields").$type<Record<string, string>>(),
+    fieldPhotoIds: jsonb("field_photo_ids").$type<string[]>(),
     // Designed in the gallery designer: its print files replace the photo.
     designId: uuid("design_id").references(() => storeDesigns.id, { onDelete: "set null" }),
   },

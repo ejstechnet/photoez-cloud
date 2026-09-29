@@ -28,6 +28,25 @@ export type SwaggProduct = {
   variants: SwaggVariant[];
   // How it's designed: SwaggPress's product canvas, print areas and mockups.
   design?: SwaggDesign;
+  // Options besides color and size; each choice's price change in dollars.
+  options?: {
+    name: string;
+    required: boolean;
+    choices: { label: string; mod: number }[];
+    show_if?: { option: string; choice: string } | null;
+  }[];
+  // How customers buy it, and the fields a custom_text product asks for.
+  purchase_mode?: "custom_design" | "custom_text" | "standard";
+  custom_fields?: {
+    key: string;
+    label: string;
+    placeholder?: string;
+    max?: number;
+    required?: boolean;
+    type?: "text" | "select" | "image";
+    options?: string[];
+    show_if?: { option: string; choice: string } | null;
+  }[];
 };
 
 type SwaggArea = { x: number; y: number; w: number; h: number };
@@ -114,7 +133,12 @@ export async function swaggPlaceOrder(
   apiKey: string,
   order: {
     partner_ref: string;
-    items: { variant_id?: number; product_id?: number; qty: number; image_url: string; back_image_url?: string; preview_url?: string; print_style?: "panel" | "wrap"; note?: string }[];
+    items: { variant_id?: number; product_id?: number; qty: number; image_url: string; back_image_url?: string; preview_url?: string; print_style?: "panel" | "wrap";
+      options?: Record<string, string>;
+      custom_text?: Record<string, string>;
+      asset_urls?: string[];
+      note?: string;
+    }[];
     ship_to: SwaggShipTo;
     shipping_rate_id: string;
   },

@@ -4,6 +4,10 @@ import { test } from "node:test";
 import {
   cartTotals,
   itemUnitCents,
+  optionsCents,
+  shownOptions,
+  checkFields,
+  shownFields,
   centeredCrop,
   cropFits,
   cropPixels,
@@ -94,3 +98,57 @@ test("a full wrap adds its upcharge only on products that offer the choice", () 
   assert.equal(itemUnitCents(size, { wrapChoice: false, wrapUpchargeCents: 500 }, true), 2800);
   assert.equal(itemUnitCents(size, null, true), 2800);
 });
+
+test("options add their price changes and required ones must be picked", () => {
+  const defs = [
+    { name: "Trim", required: true, choices: [{ label: "Without trim", modCents: 0 }, { label: "With trim", modCents: 500 }] },
+    { name: "Box", required: false, choices: [{ label: "Gift box", modCents: 300 }] },
+  ];
+  assert.deepEqual(optionsCents(defs, { Trim: "with trim" }), { cents: 500, picks: { Trim: "With trim" } });
+  assert.deepEqual(optionsCents(defs, { Trim: "With trim", Box: "Gift box" }), { cents: 800, picks: { Trim: "With trim", Box: "Gift box" } });
+  assert.deepEqual(optionsCents(defs, {}), { error: "Please choose Trim." });
+  assert.ok("error" in optionsCents(defs, { Trim: "Silver" }));
+  assert.deepEqual(optionsCents([], null), { cents: 0, picks: {} });
+  assert.equal(itemUnitCents({ priceCents: 4000 }, null, false, 500), 4500);
+});
+
+test("an option can show only when an earlier option has a certain choice", () => {
+  const defs = [
+    { name: "Trim", required: true, choices: [{ label: "Without trim", modCents: 0 }, { label: "With trim", modCents: 500 }] },
+    {
+      name: "Trim Type",
+      required: true,
+      choices: [{ label: "Gold", modCents: 0 }, { label: "Silver", modCents: 200 }],
+      showIf: { option: "Trim", choice: "With trim" },
+    },
+  ];
+  assert.deepEqual(shownOptions(defs, { Trim: "Without trim" }).map((o) => o.name), ["Trim"]);
+  assert.deepEqual(shownOptions(defs, { Trim: "With trim" }).map((o) => o.name), ["Trim", "Trim Type"]);
+  // Hidden: not required, not priced, and a stray pick is dropped.
+  assert.deepEqual(optionsCents(defs, { Trim: "Without trim", "Trim Type": "Silver" }), { cents: 0, picks: { Trim: "Without trim" } });
+  assert.deepEqual(optionsCents(defs, { Trim: "With trim", "Trim Type": "Silver" }), { cents: 700, picks: { Trim: "With trim", "Trim Type": "Silver" } });
+  assert.deepEqual(optionsCents(defs, { Trim: "With trim" }), { error: "Please choose Trim Type." });
+});
+
+test("personalize fields: conditions, required answers and photo limits", () => {
+  const fields = [
+    { key: "trim_type", label: "Trim Type", max: 50, required: true, type: "select" as const, choices: ["Satin", "Sequin"], showIf: { option: "Trim", choice: "With Trim" } },
+    { key: "trim_color", label: "Trim Color", max: 50, required: true, type: "text" as const, choices: [], showIf: { option: "Trim Type", choice: "Satin" } },
+    { key: "name", label: "Graduate Name", max: 10, required: true, type: "text" as const, choices: [] },
+    { key: "photos", label: "Photos", max: 2, required: true, type: "image" as const, choices: [] },
+  ];
+  // Without trim: the trim fields are hidden (and not required).
+  assert.deepEqual(shownFields(fields, { Trim: "Without Trim" }, {}).map((f) => f.key), ["name", "photos"]);
+  assert.deepEqual(checkFields(fields, { Trim: "Without Trim" }, { name: "Mylee", trim_type: "Sequin" }, { photos: ["a"] }), {
+    text: { "Graduate Name": "Mylee", Photos: "1 photo attached" },
+    photoIds: ["a"],
+  });
+  // With trim: Trim Type shows; Trim Color shows only for Satin (a dropdown field controls it).
+  assert.deepEqual(shownFields(fields, { Trim: "with trim" }, { trim_type: "satin" }).map((f) => f.key), ["trim_type", "trim_color", "name", "photos"]);
+  assert.deepEqual(checkFields(fields, { Trim: "With Trim" }, { name: "Mylee" }, { photos: ["a"] }), { error: "Please choose Trim Type." });
+  assert.deepEqual(checkFields(fields, { Trim: "With Trim" }, { name: "Mylee", trim_type: "Satin" }, { photos: ["a"] }), { error: "Please fill in Trim Color." });
+  assert.deepEqual(checkFields(fields, {}, { name: "Mylee Thompson" }, { photos: ["a"] }), { error: "Graduate Name can be up to 10 characters." });
+  assert.deepEqual(checkFields(fields, {}, { name: "Mylee" }, { photos: [] }), { error: "Please choose a photo for Photos." });
+  assert.ok("error" in checkFields(fields, {}, { name: "Mylee" }, { photos: ["a", "b", "c"] }));
+});
+

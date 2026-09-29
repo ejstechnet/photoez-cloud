@@ -4,7 +4,7 @@ import { photographers, photos, storeDesigns, storeOrderItems, storeOrders } fro
 import { emailStoreOrderShipped } from "@/lib/email/notify";
 import { openSecret } from "@/lib/secret-box";
 import { makePrintFile } from "@/lib/store/print-file";
-import { putObject, signedViewUrl, storeOrderFileKey } from "@/lib/storage";
+import { photoKey, putObject, signedViewUrl, storeOrderFileKey } from "@/lib/storage";
 import { swaggOrderStatus, swaggPlaceOrder } from "./client";
 
 // Store orders with SwaggPress items: sent to SwaggPress once paid, then
@@ -62,6 +62,7 @@ export async function submitLabOrder(orderId: string): Promise<{ ok: true } | { 
         preview_url: await signedViewUrl(design.previewKey),
         // Full wrap on a "customer chooses" product (SwaggPress adds its upcharge).
         print_style: (design.design as { printStyle?: string }).printStyle === "wrap" ? ("wrap" as const) : ("panel" as const),
+        options: item.options ?? {},
         note: `${item.productName} · ${item.variantLabel} · designed by the client`,
       });
       continue;
@@ -75,6 +76,10 @@ export async function submitLabOrder(orderId: string): Promise<{ ok: true } | { 
       ...(item.labVariantId ? { variant_id: item.labVariantId } : { product_id: item.labProductId! }),
       qty: item.quantity,
       image_url: await signedViewUrl(storageKey),
+      options: item.options ?? {},
+      // Custom Text & Photos: the answers, and the chosen photos (full resolution).
+      ...(item.fields ? { custom_text: item.fields } : {}),
+      ...(item.fieldPhotoIds?.length ? { asset_urls: await fieldPhotoUrls(item.fieldPhotoIds) } : {}),
       note: `${item.productName} · ${item.variantLabel}${item.photoName ? ` · photo ${item.photoName}` : ""}`,
     });
   }
@@ -101,6 +106,12 @@ export async function submitLabOrder(orderId: string): Promise<{ ok: true } | { 
   } catch (error) {
     return fail((error as Error).message);
   }
+}
+
+// Links to the originals of photos chosen for photo fields, for SwaggPress to download.
+async function fieldPhotoUrls(ids: string[]) {
+  const rows = await db.select({ id: photos.id, fileKey: photos.fileKey }).from(photos).where(inArray(photos.id, ids));
+  return Promise.all(rows.map((r) => signedViewUrl(photoKey(r.fileKey, "original"))));
 }
 
 // The overall status: shipped once every part is on its way.
