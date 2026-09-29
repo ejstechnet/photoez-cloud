@@ -12,7 +12,7 @@ import type { ShopPhoto } from "./shop-dialog";
 // and the design is saved for the cart (lib/store/designs.ts).
 
 // Bump when a new designer build is copied in, so browsers load it fresh.
-const DESIGNER_URL = "/vendor/swagg-designer.js?v=2026-09-28l";
+const DESIGNER_URL = "/vendor/swagg-designer.js?v=2026-09-28m";
 
 export type SavedDesign = { id: string; previewUrl: string; design: unknown; printStyle: "panel" | "wrap" };
 
