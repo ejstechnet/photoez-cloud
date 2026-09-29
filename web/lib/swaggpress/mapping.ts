@@ -1,7 +1,7 @@
 // Turning SwaggPress catalog products into the studio's store products, and
 // keeping them in step. Plain functions; tested in mapping.test.ts.
 
-import type { StoreLabDesign, StoreVariant } from "../../db/schema.ts";
+import type { StoreLabDesign, StoreLabField, StoreLabOption, StoreVariant } from "../../db/schema.ts";
 import type { SwaggProduct, SwaggVariant } from "./client.ts";
 
 const cents = (dollars: number) => Math.round(dollars * 100);
@@ -84,4 +84,44 @@ export function swaggDesign(product: SwaggProduct): StoreLabDesign | null {
     wrapUpchargeCents: d.wrap_optional ? cents(d.wrap_upcharge ?? 0) : 0,
     wrapInches: d.wrap_in && d.wrap_in.w > 0 && d.wrap_in.h > 0 ? { w: d.wrap_in.w, h: d.wrap_in.h } : null,
   };
+}
+
+// The product's options (e.g. Trim), with price changes in cents.
+export function swaggOptions(product: SwaggProduct): StoreLabOption[] {
+  return (product.options ?? [])
+    .map((o) => ({
+      name: String(o.name ?? "").trim().slice(0, 60),
+      required: Boolean(o.required),
+      choices: (o.choices ?? [])
+        .map((c) => ({ label: String(c.label ?? "").trim().slice(0, 80), modCents: cents(Number(c.mod) || 0) }))
+        .filter((c) => c.label),
+      showIf: o.show_if?.option && o.show_if.choice ? { option: String(o.show_if.option), choice: String(o.show_if.choice) } : null,
+    }))
+    .filter((o) => o.name && o.choices.length > 0);
+}
+
+// How clients order the product (null when SwaggPress didn't say).
+export function swaggMode(product: SwaggProduct): "custom_design" | "custom_text" | "standard" | null {
+  const mode = product.purchase_mode;
+  return mode === "custom_design" || mode === "custom_text" || mode === "standard" ? mode : null;
+}
+
+// The fields a Custom Text & Photos product asks for.
+export function swaggFields(product: SwaggProduct): StoreLabField[] {
+  if (swaggMode(product) !== "custom_text") return [];
+  return (product.custom_fields ?? [])
+    .map((f) => {
+      const type: StoreLabField["type"] = f.type === "select" || f.type === "image" ? f.type : "text";
+      return {
+        key: String(f.key ?? "").slice(0, 40),
+        label: String(f.label ?? "").trim().slice(0, 80),
+        placeholder: String(f.placeholder ?? "").slice(0, 120),
+        max: Math.max(1, Math.min(type === "image" ? 10 : 500, Math.round(Number(f.max) || (type === "image" ? 1 : 50)))),
+        required: Boolean(f.required),
+        type,
+        choices: type === "select" ? (f.options ?? []).map((c) => String(c).trim().slice(0, 80)).filter(Boolean) : [],
+        showIf: f.show_if?.option && f.show_if.choice ? { option: String(f.show_if.option), choice: String(f.show_if.choice) } : null,
+      };
+    })
+    .filter((f) => f.key && f.label && (f.type !== "select" || f.choices.length > 0));
 }

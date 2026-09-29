@@ -77,13 +77,60 @@ export function cropPixels(crop: StoreCrop, photo: { width: number; height: numb
 export type PricedLine = { unitCents: number; quantity: number; fulfillment?: "self" | "swaggpress" };
 
 // One item's price: the size's price, plus the full-wrap upcharge when the
-// client chose a full wrap on a product that offers the choice.
+// client chose a full wrap on a product that offers the choice, plus the
+// chosen options' price changes (optionsCents).
 export function itemUnitCents(
   variant: { priceCents: number },
   design: { wrapChoice?: boolean; wrapUpchargeCents?: number } | null | undefined,
   wrap: boolean,
+  optionCents = 0,
 ) {
-  return variant.priceCents + (wrap && design?.wrapChoice ? (design.wrapUpchargeCents ?? 0) : 0);
+  return variant.priceCents + (wrap && design?.wrapChoice ? (design.wrapUpchargeCents ?? 0) : 0) + optionCents;
+}
+
+type OptionDefs = {
+  name: string;
+  required: boolean;
+  choices: { label: string; modCents: number }[];
+  showIf?: { option: string; choice: string } | null;
+}[];
+
+// The options that show, given the picks so far: an option with showIf only
+// shows when that earlier option (itself showing) has that choice.
+export function shownOptions<T extends OptionDefs[number]>(defs: T[], chosen: Record<string, string> | null | undefined): T[] {
+  const picked: Record<string, string> = {};
+  const out: T[] = [];
+  for (const o of defs) {
+    if (o.showIf && (picked[o.showIf.option] ?? "").toLowerCase() !== o.showIf.choice.toLowerCase()) continue;
+    out.push(o);
+    const pick = (chosen?.[o.name] ?? "").trim();
+    const choice = o.choices.find((c) => c.label.toLowerCase() === pick.toLowerCase());
+    if (choice) picked[o.name] = choice.label;
+  }
+  return out;
+}
+
+// What the chosen options add (e.g. Trim: With trim → +500), checking every
+// required option is picked and every pick exists. Returns the clean picks.
+export function optionsCents(
+  defs: OptionDefs,
+  chosen: Record<string, string> | null | undefined,
+): { cents: number; picks: Record<string, string> } | { error: string } {
+  let cents = 0;
+  const picks: Record<string, string> = {};
+  // Options that don't show aren't required and don't change the price.
+  for (const o of shownOptions(defs, chosen)) {
+    const pick = (chosen?.[o.name] ?? "").trim();
+    if (!pick) {
+      if (o.required) return { error: `Please choose ${o.name}.` };
+      continue;
+    }
+    const choice = o.choices.find((c) => c.label.toLowerCase() === pick.toLowerCase());
+    if (!choice) return { error: `The ${o.name} you chose isn't available anymore. Please remove it and add it again.` };
+    cents += choice.modCents;
+    picks[o.name] = choice.label;
+  }
+  return { cents, picks };
 }
 
 // Totals for a cart. Handling is once per order. The studio's own shipping
@@ -135,3 +182,75 @@ export function trackingUrl(carrier: string | null, tracking: string | null) {
       return null;
   }
 }
+
+type FieldDef = {
+  key: string;
+  label: string;
+  max: number;
+  required: boolean;
+  type: "text" | "select" | "image";
+  choices: string[];
+  showIf?: { option: string; choice: string } | null;
+};
+
+// The fields that show: a field with showIf shows once that option (or an
+// earlier dropdown field, by its label) has that choice.
+export function shownFields<T extends FieldDef>(
+  fields: T[],
+  optionPicks: Record<string, string>,
+  answers: Record<string, string> | null | undefined,
+): T[] {
+  const picked = new Map(Object.entries(optionPicks).map(([k, v]) => [k.toLowerCase(), v.toLowerCase()]));
+  const out: T[] = [];
+  for (const f of fields) {
+    if (f.showIf && picked.get(f.showIf.option.toLowerCase()) !== f.showIf.choice.toLowerCase()) continue;
+    out.push(f);
+    if (f.type === "select") {
+      const answer = (answers?.[f.key] ?? "").trim().toLowerCase();
+      const choice = f.choices.find((c) => c.toLowerCase() === answer);
+      if (choice) picked.set(f.label.toLowerCase(), choice.toLowerCase());
+    }
+  }
+  return out;
+}
+
+// Checks a Custom Text & Photos product's answers: required fields filled,
+// dropdown choices real, text not too long, photo counts within limits.
+// Returns the answers by label (what SwaggPress and the studio see) and the
+// chosen photos. Fields that don't show are left out.
+export function checkFields(
+  fields: FieldDef[],
+  optionPicks: Record<string, string>,
+  answers: Record<string, string> | null | undefined,
+  photoPicks: Record<string, string[]> | null | undefined,
+): { text: Record<string, string>; photoIds: string[] } | { error: string } {
+  const text: Record<string, string> = {};
+  const photoIds: string[] = [];
+  for (const f of shownFields(fields, optionPicks, answers)) {
+    if (f.type === "image") {
+      const ids = [...new Set(photoPicks?.[f.key] ?? [])];
+      if (ids.length > f.max) return { error: `Choose up to ${f.max} photo${f.max === 1 ? "" : "s"} for ${f.label}.` };
+      if (f.required && ids.length === 0) return { error: `Please choose a photo for ${f.label}.` };
+      if (ids.length) {
+        text[f.label] = `${ids.length} photo${ids.length === 1 ? "" : "s"} attached`;
+        photoIds.push(...ids);
+      }
+      continue;
+    }
+    const value = (answers?.[f.key] ?? "").trim();
+    if (!value) {
+      if (f.required) return { error: f.type === "select" ? `Please choose ${f.label}.` : `Please fill in ${f.label}.` };
+      continue;
+    }
+    if (f.type === "select") {
+      const choice = f.choices.find((c) => c.toLowerCase() === value.toLowerCase());
+      if (!choice) return { error: `Please choose ${f.label} again.` };
+      text[f.label] = choice;
+    } else {
+      if (value.length > f.max) return { error: `${f.label} can be up to ${f.max} characters.` };
+      text[f.label] = value;
+    }
+  }
+  return { text, photoIds: [...new Set(photoIds)] };
+}
+

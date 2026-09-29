@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { formatPrice } from "@/lib/booking/format";
 import type { Storefront } from "@/lib/store/checkout";
-import { cartTotals, itemUnitCents } from "@/lib/store/rules";
+import { cartTotals, checkFields, itemUnitCents, optionsCents } from "@/lib/store/rules";
 import { checkoutStoreCart, quoteCartShipping } from "../actions";
 import type { ShopPhoto } from "./shop-dialog";
 import type { useCart } from "./use-cart";
@@ -43,7 +43,12 @@ export function CartPanel({
     const product = store.products.find((p) => p.id === item.productId);
     const variant = product?.variants.find((v) => v.id === item.variantId);
     const photo = photos.find((p) => p.id === item.photoId);
-    return product && variant && photo ? [{ item, product, variant, photo }] : [];
+    if (!product || !variant || !photo) return [];
+    const picked = optionsCents(product.options, item.options);
+    const unitCents = itemUnitCents(variant, product.design, Boolean(item.wrap), "cents" in picked ? picked.cents : 0);
+    const filled = checkFields(product.fields, "picks" in picked ? picked.picks : {}, item.fields, item.fieldPhotos);
+    const personalized = "text" in filled ? Object.entries(filled.text) : [];
+    return [{ item, product, variant, photo, unitCents, personalized }];
   });
   const count = lines.reduce((sum, l) => sum + l.item.quantity, 0);
   const labLines = lines.filter((l) => l.product.fulfillment === "swaggpress");
@@ -53,7 +58,7 @@ export function CartPanel({
   const rate = liveQuote?.rates.find((r) => r.id === rateId) ?? null;
   const needsShipping = labLines.length > 0;
   const totals = cartTotals(
-    lines.map((l) => ({ unitCents: itemUnitCents(l.variant, l.product.design, Boolean(l.item.wrap)), quantity: l.item.quantity, fulfillment: l.product.fulfillment })),
+    lines.map((l) => ({ unitCents: l.unitCents, quantity: l.item.quantity, fulfillment: l.product.fulfillment })),
     store,
     rate?.amountCents ?? 0,
   );
@@ -65,6 +70,9 @@ export function CartPanel({
       quantity: item.quantity,
       crop: item.crop,
       designId: item.designId ?? null,
+      options: item.options ?? {},
+      fields: item.fields ?? {},
+      fieldPhotos: item.fieldPhotos ?? {},
     }));
 
   function getRates() {
@@ -118,7 +126,7 @@ export function CartPanel({
                 <p className="py-10 text-center text-muted">Your cart is empty. Tap 🛍️ on any photo to order prints and more.</p>
               ) : (
                 <ul className="space-y-4">
-                  {lines.map(({ item, product, variant, photo }) => (
+                  {lines.map(({ item, product, variant, photo, unitCents, personalized }) => (
                     <li key={item.key} className="flex gap-3">
                       {item.designId ? (
                         // eslint-disable-next-line @next/next/no-img-element
@@ -131,6 +139,14 @@ export function CartPanel({
                         <p className="font-semibold">
                           {product.name} · {variant.label}
                         </p>
+                        {personalized.length > 0 && (
+                          <p className="line-clamp-2 text-xs text-muted">{personalized.map(([k, v]) => `${k}: ${v}`).join(" · ")}</p>
+                        )}
+                        {item.options && Object.keys(item.options).length > 0 && (
+                          <p className="truncate text-xs font-semibold">
+                            {Object.entries(item.options).map(([k, v]) => `${k}: ${v}`).join(" · ")}
+                          </p>
+                        )}
                         <p className="truncate text-xs text-muted">
                           {item.designId ? `Your design${item.wrap && product.design?.wrapChoice ? " · Full wrap" : ""}` : `Photo ${photo.number} · ${photo.name}`}
                         </p>
@@ -147,7 +163,7 @@ export function CartPanel({
                           </button>
                         </div>
                       </div>
-                      <p className="text-sm font-semibold">{formatPrice(itemUnitCents(variant, product.design, Boolean(item.wrap)) * item.quantity)}</p>
+                      <p className="text-sm font-semibold">{formatPrice(unitCents * item.quantity)}</p>
                     </li>
                   ))}
                 </ul>

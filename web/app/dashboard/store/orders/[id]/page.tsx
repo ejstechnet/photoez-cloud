@@ -106,6 +106,11 @@ export default async function StoreOrderPage({ params }: PageProps<"/dashboard/s
                   )}
                 </p>
                 <p className="truncate text-sm text-muted">
+                  {item.options && Object.keys(item.options).length > 0 && (
+                    <span className="mr-2 font-semibold text-foreground">
+                      {Object.entries(item.options).map(([k, v]) => `${k}: ${v}`).join(" · ")} ·
+                    </span>
+                  )}
                   {item.designed ? "Designed by the client" : item.photoName}
                   {item.crop ? " · cropped by the client" : ""}
                 </p>

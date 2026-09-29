@@ -20,6 +20,48 @@ export function SwaggCard({
   const [state, formAction, pending] = useActionState(connectSwagg, {});
   const [working, start] = useTransition();
   const [refreshed, setRefreshed] = useState<{ message: string; ok: boolean } | null>(null);
+  // "Change API key": paste a new key without disconnecting first (e.g. after
+  // making a new key at swaggpress.com, which switches the old one off).
+  // Open while changing the key; a successful save (a new state with
+  // `connected`) closes it, an error keeps it open.
+  const [openedWith, setOpenedWith] = useState<typeof state | null>(null);
+  const changingKey = openedWith !== null && (state === openedWith || !state.connected);
+  const setChangingKey = (open: boolean | ((was: boolean) => boolean)) => {
+    const next = typeof open === "function" ? open(changingKey) : open;
+    setOpenedWith(next ? state : null);
+  };
+  const keySaved = Boolean(business && state.connected && !changingKey);
+  const keyForm = (
+    <form action={formAction} className="mt-5 space-y-3">
+      {!business && (
+        <ol className="list-decimal space-y-1 pl-5 text-sm">
+          <li>
+            At{" "}
+            <a href="https://swaggpress.com/public/account/partner.php" target="_blank" rel="noopener" className="link">
+              swaggpress.com
+            </a>
+            , go to My Account → Photographer Partner, join, and save a card.
+          </li>
+          <li>Copy your API key (it starts with spk_) and paste it here.</li>
+        </ol>
+      )}
+      <label className="block">
+        <span className="text-sm font-semibold">{business ? "New SwaggPress API key" : "SwaggPress API key"}</span>
+        <input name="apiKey" type="password" autoComplete="off" placeholder="spk_…" className={`mt-1.5 ${inputClass}`} />
+      </label>
+      <FormError message={state.message} />
+      <div className="flex flex-wrap items-center gap-3">
+        <SubmitButton pending={pending} fullWidth={false}>
+          {business ? "Save new key" : "Connect"}
+        </SubmitButton>
+        {business && (
+          <button type="button" className="btn-secondary px-4 py-2 text-xs" onClick={() => setChangingKey(false)}>
+            Cancel
+          </button>
+        )}
+      </div>
+    </form>
+  );
   return (
     <section className="card p-6 sm:p-8">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -54,6 +96,9 @@ export function SwaggCard({
             <button type="button" className="btn-secondary px-4 py-2 text-xs" disabled={working} onClick={() => start(async () => setRefreshed(await refreshSwagg()))}>
               {working ? "Refreshing…" : "Refresh"}
             </button>
+            <button type="button" className="btn-secondary px-4 py-2 text-xs" onClick={() => setChangingKey((v) => !v)}>
+              Change API key
+            </button>
             <button
               type="button"
               className="text-xs font-bold tracking-wider text-danger uppercase hover:underline"
@@ -67,28 +112,11 @@ export function SwaggCard({
             <p className={`text-sm font-semibold ${refreshed.ok ? "text-lime-ink" : "text-danger"}`}>{refreshed.message}</p>
           )}
           {syncedAt && <p className="text-xs text-muted">Products, prices and sizes last updated {syncedAt}.</p>}
+          {keySaved && <p className="text-sm font-semibold text-lime-ink">✓ API key saved.</p>}
+          {changingKey && keyForm}
         </div>
       ) : (
-        <form action={formAction} className="mt-5 space-y-3">
-          <ol className="list-decimal space-y-1 pl-5 text-sm">
-            <li>
-              At{" "}
-              <a href="https://swaggpress.com/public/account/partner.php" target="_blank" rel="noopener" className="link">
-                swaggpress.com
-              </a>
-              , go to My Account → Photographer Partner, join, and save a card.
-            </li>
-            <li>Copy your API key (it starts with spk_) and paste it here.</li>
-          </ol>
-          <label className="block">
-            <span className="text-sm font-semibold">SwaggPress API key</span>
-            <input name="apiKey" type="password" autoComplete="off" placeholder="spk_…" className={`mt-1.5 ${inputClass}`} />
-          </label>
-          <FormError message={state.message} />
-          <SubmitButton pending={pending} fullWidth={false}>
-            Connect
-          </SubmitButton>
-        </form>
+        keyForm
       )}
     </section>
   );

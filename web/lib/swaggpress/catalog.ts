@@ -4,7 +4,7 @@ import { db } from "@/db";
 import { photographers, storeProducts } from "@/db/schema";
 import { openSecret, sealSecret } from "@/lib/secret-box";
 import { isSwaggPressKey, swaggCatalog, SwaggPressError, type SwaggCatalog } from "./client";
-import { swaggDesign, swaggImages, swaggVariants, syncSwaggVariants } from "./mapping";
+import { swaggDesign, swaggFields, swaggImages, swaggMode, swaggOptions, swaggVariants, syncSwaggVariants } from "./mapping";
 
 // A studio's SwaggPress connection and the products it added from the
 // SwaggPress catalog. Wholesale prices, sizes, and photos follow SwaggPress
@@ -81,6 +81,9 @@ export async function addSwaggProduct(photographerId: string, labProductId: numb
       labProductId,
       labImageUrls: swaggImages(product),
       labDesign: swaggDesign(product),
+      labOptions: swaggOptions(product),
+      labMode: swaggMode(product),
+      labFields: swaggFields(product),
       sortOrder: n,
     })
     .returning({ id: storeProducts.id });
@@ -124,7 +127,14 @@ export async function syncSwaggProducts(photographerId: string, catalog?: SwaggC
         variants,
         labUnavailable: !lab,
         ...(lab
-          ? { labImageUrls: swaggImages(lab), labDesign: swaggDesign(lab), cropToSize: variants.some((v) => v.widthIn !== null) }
+          ? {
+              labImageUrls: swaggImages(lab),
+              labDesign: swaggDesign(lab),
+              labOptions: swaggOptions(lab),
+              labMode: swaggMode(lab),
+              labFields: swaggFields(lab),
+              cropToSize: variants.some((v) => v.widthIn !== null),
+            }
           : {}),
       })
       .where(eq(storeProducts.id, product.id));

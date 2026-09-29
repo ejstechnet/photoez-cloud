@@ -5,8 +5,9 @@ import Cropper, { type Area } from "react-easy-crop";
 import type { StoreCrop } from "@/db/schema";
 import { formatPrice } from "@/lib/booking/format";
 import type { Storefront } from "@/lib/store/checkout";
-import { MAX_QUANTITY, centeredCrop, itemUnitCents, variantRatio } from "@/lib/store/rules";
+import { MAX_QUANTITY, centeredCrop, checkFields, itemUnitCents, optionsCents, shownOptions, variantRatio } from "@/lib/store/rules";
 import { DesignerOverlay, type SavedDesign } from "./designer-overlay";
+import { PersonalizeFields } from "./personalize-fields";
 
 export type ShopPhoto = { id: string; number: number; name: string; aspect: number; previewUrl: string; thumbUrl: string };
 
@@ -34,6 +35,9 @@ export function ShopDialog({
     crop: StoreCrop | null;
     designId: string | null;
     wrap: boolean;
+    options: Record<string, string>;
+    fields: Record<string, string>;
+    fieldPhotos: Record<string, string[]>;
   }) => void;
   onClose: () => void;
 }) {
@@ -46,7 +50,28 @@ export function ShopDialog({
   const [design, setDesign] = useState<SavedDesign | null>(null);
   const [designing, setDesigning] = useState(false);
   const wrap = design?.printStyle === "wrap";
-  const unitCents = variant ? itemUnitCents(variant, product?.design, wrap) : 0;
+  // Options besides size (e.g. Trim), each choice may change the price.
+  const [picks, setPicks] = useState<Record<string, string>>({});
+  const productOptions = product?.options ?? [];
+  // Required options start on their first choice.
+  const effectivePicks = Object.fromEntries(
+    productOptions.map((o) => [o.name, picks[o.name] ?? (o.required ? o.choices[0].label : "")]),
+  );
+  // Options that only show when an earlier option has a certain choice.
+  const visibleOptions = shownOptions(productOptions, effectivePicks);
+  const pickedOptions = optionsCents(productOptions, effectivePicks);
+  const optionsReady = !("error" in pickedOptions);
+  const unitCents = variant ? itemUnitCents(variant, product?.design, wrap, optionsReady ? pickedOptions.cents : 0) : 0;
+  // Custom Text & Photos products: fill in the fields SwaggPress asks for.
+  const productFields = product?.fields ?? [];
+  const [answers, setAnswers] = useState<Record<string, string>>({});
+  const [fieldPhotos, setFieldPhotos] = useState<Record<string, string[]>>({});
+  // The first photo field starts with the photo the client tapped.
+  const firstPhotoField = productFields.find((f) => f.type === "image");
+  const effectiveFieldPhotos =
+    firstPhotoField && fieldPhotos[firstPhotoField.key] === undefined ? { ...fieldPhotos, [firstPhotoField.key]: [photo.id] } : fieldPhotos;
+  const filled = checkFields(productFields, optionsReady ? pickedOptions.picks : {}, answers, effectiveFieldPhotos);
+  const [fieldError, setFieldError] = useState<string | null>(null);
   // Sizes with a width and height are cropped to that shape; others aren't.
   const ratio = variant && !designable ? variantRatio(variant) : null;
   // The crop frame follows the photo's orientation until the client turns it.
@@ -63,8 +88,24 @@ export function ShopDialog({
   function add() {
     if (!product || !variant) return;
     if (designable && !design) return;
+    if (!optionsReady) return;
+    if ("error" in filled) {
+      setFieldError(filled.error);
+      return;
+    }
     const crop = ratio ? (area ?? centeredCrop({ width: photo.aspect, height: 1 }, ratio)) : null;
-    onAdd({ productId: product.id, variantId: variant.id, photoId: photo.id, quantity, crop, designId: design?.id ?? null, wrap });
+    onAdd({
+      productId: product.id,
+      variantId: variant.id,
+      photoId: photo.id,
+      quantity,
+      crop,
+      designId: design?.id ?? null,
+      wrap,
+      options: optionsReady ? pickedOptions.picks : {},
+      fields: answers,
+      fieldPhotos: effectiveFieldPhotos,
+    });
   }
 
   const pill = (active: boolean) =>
@@ -99,6 +140,10 @@ export function ShopDialog({
                 setVariantId(null);
                 setArea(null);
                 setDesign(null);
+                setPicks({});
+                setAnswers({});
+                setFieldPhotos({});
+                setFieldError(null);
               }}
             >
               <span className="flex items-center gap-3">
@@ -153,6 +198,54 @@ export function ShopDialog({
                 </button>
               ))}
             </div>
+          </>
+        )}
+
+        {variant && visibleOptions.length > 0 && (
+          <div className="mt-6 grid gap-3 sm:grid-cols-2">
+            {visibleOptions.map((o) => (
+              <label key={o.name} className="block">
+                <span className="text-sm font-bold tracking-wider text-muted uppercase">
+                  {o.name}
+                  {o.required ? "" : " (optional)"}
+                </span>
+                <select
+                  className="mt-1.5 h-11 w-full rounded-xl border-2 border-border bg-background px-3"
+                  value={effectivePicks[o.name] ?? ""}
+                  onChange={(e) => setPicks((prev) => ({ ...prev, [o.name]: e.target.value }))}
+                >
+                  {!o.required && <option value="">None</option>}
+                  {o.choices.map((c) => (
+                    <option key={c.label} value={c.label}>
+                      {c.label}
+                      {c.modCents ? ` (${c.modCents > 0 ? "+" : "−"}${formatPrice(Math.abs(c.modCents))})` : ""}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ))}
+          </div>
+        )}
+
+        {variant && productFields.length > 0 && (
+          <>
+            <p className="mt-6 text-sm font-bold tracking-wider text-muted uppercase">3 · Personalize</p>
+            <p className="mt-1 text-sm text-muted">Tell us what to put on it. We&rsquo;ll create it for you.</p>
+            <PersonalizeFields
+              fields={productFields}
+              optionPicks={optionsReady ? pickedOptions.picks : {}}
+              answers={answers}
+              onAnswer={(key, value) => {
+                setAnswers((prev) => ({ ...prev, [key]: value }));
+                setFieldError(null);
+              }}
+              photoPicks={effectiveFieldPhotos}
+              onPhotos={(key, ids) => {
+                setFieldPhotos((prev) => ({ ...prev, [key]: ids }));
+                setFieldError(null);
+              }}
+              photos={photos}
+            />
           </>
         )}
 
@@ -254,6 +347,11 @@ export function ShopDialog({
             <button type="button" className="btn-primary" onClick={add}>
               Add to cart · {formatPrice(unitCents * quantity)}
             </button>
+            {fieldError && (
+              <p className="w-full text-right text-sm font-semibold text-danger" role="alert">
+                {fieldError}
+              </p>
+            )}
           </div>
         )}
       </div>
