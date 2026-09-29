@@ -117,7 +117,8 @@ export default async function Home() {
 
   return (
     <main className="flex flex-1 flex-col">
-      <section className="relative overflow-hidden bg-brand-deep text-white">
+      {/* Hero and "Grow your business": a deep navy, #060f1e. */}
+      <section className="relative overflow-hidden text-white" style={{ backgroundColor: "#060f1e" }}>
         {/* The photographer-at-work image, faded into the navy on every side so its
             soft white edges never show. Behind the text on wide screens. */}
         <Image
@@ -280,7 +281,7 @@ export default async function Home() {
       </section>
 
       {/* Growing the business: store, directory, referrals. */}
-      <section className="bg-brand-deep text-white">
+      <section className="text-white" style={{ backgroundColor: "#060f1e" }}>
         <div className="mx-auto w-full max-w-7xl px-4 py-20">
           <p className="text-sm font-bold tracking-wider text-lime uppercase">Grow your business</p>
           <h2 className="mt-2 max-w-2xl font-display text-4xl font-bold tracking-tight">
