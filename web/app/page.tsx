@@ -314,7 +314,7 @@ export default async function Home() {
               />
             </a>
             <div>
-              <p className="text-sm font-bold tracking-wider text-coral uppercase">Print &amp; merch partner · Coming soon</p>
+              <p className="text-sm font-bold tracking-wider text-coral uppercase">Print &amp; merch partner</p>
               <p className="mt-2 text-lg leading-relaxed text-foreground/80">
                 <strong className="text-foreground">SwaggPress Creations</strong> prints your clients&rsquo; photos on
                 wide-format printers and presses them onto tees, hoodies, hats, tumblers, and graduate swag, then ships

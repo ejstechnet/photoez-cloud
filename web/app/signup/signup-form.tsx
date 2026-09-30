@@ -8,9 +8,18 @@ import { AuthCard } from "@/components/auth-card";
 import { Field, FormError, SubmitButton } from "@/components/form";
 import { PasswordField } from "@/components/password-field";
 import { REFERRAL_DISCOUNT_PERCENT, TRIAL_DAYS } from "@/lib/plans";
+import { recordSignupSource } from "./actions";
 
 // The sign-up form (page.tsx adds the referral greeting).
-export function SignUpForm({ invitedBy, defaultEmail = "" }: { invitedBy: string | null; defaultEmail?: string }) {
+export function SignUpForm({
+  invitedBy,
+  defaultEmail = "",
+  source = null,
+}: {
+  invitedBy: string | null;
+  defaultEmail?: string;
+  source?: string | null;
+}) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
@@ -33,7 +42,9 @@ export function SignUpForm({ invitedBy, defaultEmail = "" }: { invitedBy: string
       setPending(false);
       return;
     }
-    // Sign-up also logs the photographer in.
+    // Sign-up also logs the photographer in. Where they came from is kept for
+    // the campaign numbers; it never holds up getting to the dashboard.
+    if (source) await recordSignupSource(source).catch(() => undefined);
     router.push("/dashboard");
     router.refresh();
   }
