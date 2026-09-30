@@ -5,6 +5,7 @@ import { photographers } from "@/db/schema";
 import { Logo } from "@/components/brand";
 import { trialDaysLeft } from "@/lib/plans";
 import { requirePhotographer } from "@/lib/session";
+import { isOwnerEmail } from "@/lib/owner";
 import { GearIcon } from "@/components/icons";
 import { NavLink } from "./nav-link";
 import { NavMenu } from "./nav-menu";
@@ -67,6 +68,8 @@ export default async function DashboardLayout({ children }: LayoutProps<"/dashbo
                 { href: "/dashboard/billing", label: "Billing" },
                 { href: "/dashboard/billing#refer", label: "Refer a photographer" },
                 { href: "/dashboard/emails", label: "Email log" },
+                // PhotoEZ Cloud's owner only: tracked sign-ups from ads.
+                ...(isOwnerEmail(user.email) ? [{ href: "/dashboard/signups", label: "Sign-ups" }] : []),
               ]}
             />
           </nav>
