@@ -206,6 +206,8 @@ async function checkCart(galleryId: string, photographerId: string, cart: unknow
       const savedStyle = (design.design as { printStyle?: string }).printStyle;
       const wrap = savedStyle === "wrap" && Boolean(product.design.wrapChoice);
       const allOver = savedStyle === "allover" && Boolean(product.design.allOver);
+      // A back design is its saved back print file, never the browser's word.
+      const hasBack = Boolean(design.backKey) && Boolean(product.design.back) && !wrap;
       lines.push({
         product,
         variant,
@@ -215,9 +217,10 @@ async function checkCart(galleryId: string, photographerId: string, cart: unknow
         designId: design.id,
         wrap,
         allOver,
+        hasBack,
         options: picked.picks,
         ...personalized,
-        unitCents: itemUnitCents(variant, product.design, wrap ? "wrap" : allOver ? "allover" : "panel", picked.cents),
+        unitCents: itemUnitCents(variant, product.design, wrap ? "wrap" : allOver ? "allover" : "panel", picked.cents, hasBack),
       });
       continue;
     }
@@ -236,6 +239,7 @@ async function checkCart(galleryId: string, photographerId: string, cart: unknow
       designId: null as string | null,
       wrap: false,
       allOver: false,
+      hasBack: false,
       options: picked.picks,
       ...personalized,
       unitCents: variant.priceCents + picked.cents,
@@ -388,7 +392,7 @@ export async function startStoreCheckout(options: {
       productId: l.product.id,
       photoId: l.photo.id,
       productName: l.product.name,
-      variantLabel: l.wrap ? `${l.variant.label} · Full wrap` : l.allOver ? `${l.variant.label} · All-over` : l.variant.label,
+      variantLabel: `${l.wrap ? `${l.variant.label} · Full wrap` : l.allOver ? `${l.variant.label} · All-over` : l.variant.label}${l.hasBack ? " · Front & back" : ""}`,
       unitCents: l.unitCents,
       quantity: l.quantity,
       crop: l.crop,
@@ -418,7 +422,7 @@ export async function startStoreCheckout(options: {
             currency: "usd",
             unit_amount: l.unitCents,
             product_data: {
-              name: `${l.product.name} · ${l.variant.label}${l.wrap ? " · Full wrap" : l.allOver ? " · All-over" : ""}${Object.entries(l.options).map(([k, v]) => ` · ${k}: ${v}`).join("")}`, description: l.designId ? "Your design" : `Photo: ${l.photo.name}` },
+              name: `${l.product.name} · ${l.variant.label}${l.wrap ? " · Full wrap" : l.allOver ? " · All-over" : ""}${l.hasBack ? " · Front & back" : ""}${Object.entries(l.options).map(([k, v]) => ` · ${k}: ${v}`).join("")}`, description: l.designId ? "Your design" : `Photo: ${l.photo.name}` },
           },
         })),
         ...(totals.handlingCents > 0

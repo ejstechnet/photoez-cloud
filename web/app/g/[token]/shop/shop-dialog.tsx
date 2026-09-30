@@ -36,6 +36,7 @@ export function ShopDialog({
     designId: string | null;
     wrap: boolean;
     printStyle: "panel" | "wrap" | "allover";
+    hasBack: boolean;
     options: Record<string, string>;
     fields: Record<string, string>;
     fieldPhotos: Record<string, string[]>;
@@ -52,6 +53,7 @@ export function ShopDialog({
   const [designing, setDesigning] = useState(false);
   const wrap = design?.printStyle === "wrap";
   const printStyle = design?.printStyle ?? "panel";
+  const hasBack = Boolean(design?.hasBack && product?.design?.back);
   // Options besides size (e.g. Trim), each choice may change the price.
   const [picks, setPicks] = useState<Record<string, string>>({});
   const productOptions = product?.options ?? [];
@@ -63,7 +65,7 @@ export function ShopDialog({
   const visibleOptions = shownOptions(productOptions, effectivePicks);
   const pickedOptions = optionsCents(productOptions, effectivePicks);
   const optionsReady = !("error" in pickedOptions);
-  const unitCents = variant ? itemUnitCents(variant, product?.design, printStyle, optionsReady ? pickedOptions.cents : 0) : 0;
+  const unitCents = variant ? itemUnitCents(variant, product?.design, printStyle, optionsReady ? pickedOptions.cents : 0, hasBack) : 0;
   // Custom Text & Photos products: fill in the fields SwaggPress asks for.
   const productFields = product?.fields ?? [];
   const [answers, setAnswers] = useState<Record<string, string>>({});
@@ -105,6 +107,7 @@ export function ShopDialog({
       designId: design?.id ?? null,
       wrap,
       printStyle,
+      hasBack,
       options: optionsReady ? pickedOptions.picks : {},
       fields: answers,
       fieldPhotos: effectiveFieldPhotos,
@@ -290,6 +293,9 @@ export function ShopDialog({
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={design.previewUrl} alt="Your design" className="h-48 w-auto rounded-2xl border-2 border-border bg-white object-contain" />
                 <div>
+                  {hasBack && product.design.backUpchargeCents ? (
+                    <p className="mb-2 text-sm font-semibold">Front &amp; back (+{formatPrice(product.design.backUpchargeCents)})</p>
+                  ) : null}
                   {(product.design.wrapChoice || product.design.allOver) && (
                     <p className="mb-2 text-sm font-semibold">
                       {wrap

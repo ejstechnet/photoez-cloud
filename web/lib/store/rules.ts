@@ -78,18 +78,24 @@ export type PricedLine = { unitCents: number; quantity: number; fulfillment?: "s
 
 // One item's price: the size's price, plus the full-wrap or all-over
 // upcharge when the client chose that print style on a product that offers
-// it, plus the chosen options' price changes (optionsCents). `style` true/false
-// is the older "full wrap or not".
+// it, plus the back upcharge when the design has a back, plus the chosen
+// options' price changes (optionsCents). `style` true/false is the older
+// "full wrap or not".
 export function itemUnitCents(
   variant: { priceCents: number },
-  design: { wrapChoice?: boolean; wrapUpchargeCents?: number; allOver?: { upchargeCents: number } | null } | null | undefined,
+  design:
+    | { wrapChoice?: boolean; wrapUpchargeCents?: number; allOver?: { upchargeCents: number } | null; back?: unknown; backUpchargeCents?: number }
+    | null
+    | undefined,
   style: boolean | "panel" | "wrap" | "allover" | null | undefined,
   optionCents = 0,
+  hasBack = false,
 ) {
   const wrap = style === true || style === "wrap";
   const upcharge =
     wrap && design?.wrapChoice ? (design.wrapUpchargeCents ?? 0) : style === "allover" && design?.allOver ? design.allOver.upchargeCents : 0;
-  return variant.priceCents + upcharge + optionCents;
+  const back = hasBack && !wrap && design?.back ? (design.backUpchargeCents ?? 0) : 0;
+  return variant.priceCents + upcharge + back + optionCents;
 }
 
 type OptionDefs = {

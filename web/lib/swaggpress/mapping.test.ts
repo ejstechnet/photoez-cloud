@@ -92,6 +92,7 @@ test("a product's design setup comes along for the gallery designer", () => {
     wrapInches: null,
     allOver: null,
     view3d: null,
+    backUpchargeCents: 0,
   });
   // All-over printing comes along with its upcharge in cents.
   const allOverTee = { ...mug, design: { ...mug.design, full_wrap: false, allover: { upcharge: 10, inches: { w: 20, h: 28 } } } };
