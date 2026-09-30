@@ -20,6 +20,8 @@ export type CartItem = {
   wrap?: boolean;
   // The print style chosen in the designer ("wrap", "allover"…), for the price shown.
   printStyle?: "panel" | "wrap" | "allover";
+  // The design has a back (for the price shown; checkout re-checks).
+  hasBack?: boolean;
   // Option picks, e.g. { Trim: "With trim" } (checkout re-checks and re-prices).
   options?: Record<string, string>;
   // Custom Text & Photos products: answers by field key, and photos for photo fields.

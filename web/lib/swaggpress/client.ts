@@ -65,6 +65,8 @@ export type SwaggDesign = {
   wrap_in?: { w: number; h: number } | null;
   // All-over printing (tees): its upcharge (dollars) and print size per side.
   allover?: { upcharge: number; inches: { w: number; h: number } | null } | null;
+  // Two-sided products: what a back design costs (dollars; 0 = free).
+  back_upcharge?: number;
   // "View in 3D" model in the designer ("tee" or null).
   view3d?: string | null;
 };

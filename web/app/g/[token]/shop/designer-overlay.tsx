@@ -12,9 +12,9 @@ import type { ShopPhoto } from "./shop-dialog";
 // and the design is saved for the cart (lib/store/designs.ts).
 
 // Bump when a new designer build is copied in, so browsers load it fresh.
-const DESIGNER_URL = "/vendor/swagg-designer.js?v=2026-09-29k";
+const DESIGNER_URL = "/vendor/swagg-designer.js?v=2026-09-29l";
 
-export type SavedDesign = { id: string; previewUrl: string; design: unknown; printStyle: "panel" | "wrap" | "allover" };
+export type SavedDesign = { id: string; previewUrl: string; design: unknown; printStyle: "panel" | "wrap" | "allover"; hasBack?: boolean };
 
 type DesignResult = {
   design: unknown;
@@ -107,6 +107,8 @@ export function DesignerOverlay({
               : null,
             // All-over (tees): the whole shirt, edge to edge, for its upcharge.
             view3d: setup.view3d ?? null,
+            // What a back design costs, shown on the Back button.
+            backUpcharge: setup.back && setup.backUpchargeCents ? `+${formatPrice(setup.backUpchargeCents)}` : null,
             allOverChoice: setup.allOver
               ? { upcharge: setup.allOver.upchargeCents ? `+${formatPrice(setup.allOver.upchargeCents)}` : null, printInches: setup.allOver.inches }
               : null,
@@ -136,7 +138,13 @@ export function DesignerOverlay({
               photoIds: result.photoIds,
             });
             if ("error" in saved) throw new Error(saved.error);
-            onSaved({ id: saved.id, previewUrl: saved.previewUrl, design: result.design, printStyle: result.printStyle });
+            onSaved({
+              id: saved.id,
+              previewUrl: saved.previewUrl,
+              design: result.design,
+              printStyle: result.printStyle,
+              hasBack: Boolean(result.printFiles.back),
+            });
           },
         });
       })

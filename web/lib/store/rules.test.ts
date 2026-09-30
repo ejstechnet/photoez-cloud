@@ -160,3 +160,11 @@ test("an all-over print adds its upcharge only when the product offers it", () =
   assert.equal(itemUnitCents(size, { wrapChoice: true, wrapUpchargeCents: 500 }, "wrap"), 3500);
 });
 
+test("a back design adds the back upcharge, only when the product has a back", () => {
+  const size = { priceCents: 3000 };
+  const tee = { back: { mockup: null }, backUpchargeCents: 500 };
+  assert.equal(itemUnitCents(size, tee, "panel", 0, true), 3500);
+  assert.equal(itemUnitCents(size, tee, "panel", 0, false), 3000);
+  assert.equal(itemUnitCents(size, { ...tee, back: null }, "panel", 0, true), 3000);
+  assert.equal(itemUnitCents(size, { ...tee, allOver: { upchargeCents: 1000 } }, "allover", 200, true), 4700);
+});

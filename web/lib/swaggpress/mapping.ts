@@ -84,6 +84,7 @@ export function swaggDesign(product: SwaggProduct): StoreLabDesign | null {
     wrapUpchargeCents: d.wrap_optional ? cents(d.wrap_upcharge ?? 0) : 0,
     wrapInches: d.wrap_in && d.wrap_in.w > 0 && d.wrap_in.h > 0 ? { w: d.wrap_in.w, h: d.wrap_in.h } : null,
     view3d: d.view3d === "tee" ? "tee" : null,
+    backUpchargeCents: d.back ? cents(Number(d.back_upcharge) || 0) : 0,
     allOver: d.allover
       ? {
           upchargeCents: cents(Number(d.allover.upcharge) || 0),

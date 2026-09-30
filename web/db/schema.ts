@@ -1003,6 +1003,8 @@ export type StoreLabDesign = {
   allOver?: { upchargeCents: number; inches: { w: number; h: number } | null } | null;
   // "View in 3D" model in the designer ("tee"); round products always get one.
   view3d?: "tee" | null;
+  // Two-sided products: what a back design costs (charged only when used).
+  backUpchargeCents?: number;
 };
 
 // Something clients can order with one of their photos: a print, canvas,
