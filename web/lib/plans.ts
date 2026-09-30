@@ -37,6 +37,12 @@ export function planFor(feature: Feature): Plan {
 // Haiku 4.5, about $0.00125 a photo ($12.50 for a full Studio month). Free's 100 is about 13 cents.
 export const AI_PHOTO_ALLOWANCE: Record<Plan, number> = { free: 100, pro: 3000, studio: 10000 };
 
+// While a Free studio is on its Pro trial, AI is capped well below Pro's
+// allowance (a full Pro month can cost $7–17, and a trial may never pay).
+// Enough to try every feature properly.
+export const TRIAL_AI_PHOTO_ALLOWANCE = 300;
+export const TRIAL_AI_ASSISTANT_ALLOWANCE = 30;
+
 // Studio Assistant questions a studio can ask each month (Claude Sonnet 5,
 // roughly 1–3 cents a question). Free's 10 is at most about 30 cents.
 export const AI_ASSISTANT_ALLOWANCE: Record<Plan, number> = { free: 10, pro: 300, studio: 1000 };
@@ -78,6 +84,20 @@ export const TRIAL_DAYS = 14;
 // has Pro.
 export function effectivePlan(plan: Plan, trialEndsAt: Date | null, now = new Date()): Plan {
   return plan === "free" && trialEndsAt && trialEndsAt > now ? "pro" : plan;
+}
+
+// A Free studio whose Pro trial is still running.
+export function onTrial(plan: Plan, trialEndsAt: Date | null, now = new Date()) {
+  return plan === "free" && trialEndsAt !== null && trialEndsAt > now;
+}
+
+// This month's AI allowances for a studio: the trial cap while on the trial,
+// otherwise its plan's amount.
+export function aiPhotoLimit(plan: Plan, trialEndsAt: Date | null, now = new Date()) {
+  return onTrial(plan, trialEndsAt, now) ? TRIAL_AI_PHOTO_ALLOWANCE : AI_PHOTO_ALLOWANCE[plan];
+}
+export function aiAssistantLimit(plan: Plan, trialEndsAt: Date | null, now = new Date()) {
+  return onTrial(plan, trialEndsAt, now) ? TRIAL_AI_ASSISTANT_ALLOWANCE : AI_ASSISTANT_ALLOWANCE[plan];
 }
 
 export function trialDaysLeft(trialEndsAt: Date | null, now = new Date()) {

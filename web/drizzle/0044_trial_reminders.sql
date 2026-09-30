@@ -1,0 +1,2 @@
+ALTER TABLE "photographers" ADD COLUMN "trial_mid_reminder_sent_at" timestamp with time zone;--> statement-breakpoint
+ALTER TABLE "photographers" ADD COLUMN "trial_final_reminder_sent_at" timestamp with time zone;

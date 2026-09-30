@@ -372,6 +372,47 @@ export function passwordReset(name: string, url: string): EmailContent {
   };
 }
 
+// Sent 4 days and 1 day before a Free studio's Pro trial ends.
+export function trialEndingStudio(o: {
+  name: string;
+  stage: "mid" | "final";
+  daysLeft: number;
+  endsOn: string;
+  activeGalleries: number;
+  storage: string;
+  freeGalleries: number;
+  freeStorage: string;
+  overGalleries: boolean;
+  overStorage: boolean;
+  billingUrl: string;
+  proMonthlyCents: number;
+}): EmailContent {
+  const days = o.daysLeft === 1 ? "1 day" : `${o.daysLeft} days`;
+  const losing: string[] = [];
+  if (o.overGalleries) {
+    losing.push(`You have ${o.activeGalleries} active galleries; Free includes ${o.freeGalleries}. Nothing is deleted, but you couldn't add new ones until some are marked Completed.`);
+  }
+  if (o.overStorage) {
+    losing.push(`You're using ${o.storage}; Free includes ${o.freeStorage}. Nothing is deleted, but you couldn't upload more.`);
+  }
+  return {
+    subject: o.stage === "final" ? "Your PhotoEZ Cloud Pro trial ends tomorrow" : `Your PhotoEZ Cloud Pro trial has ${days} left`,
+    heading: o.stage === "final" ? "Your Pro trial ends tomorrow" : `${days} left in your Pro trial`,
+    intro: [
+      `Hi ${firstName(o.name)}, your free Pro trial ends on ${o.endsOn}. After that your studio moves to the Free plan unless you choose one. Nothing is deleted either way.`,
+      "Free keeps your studio page, booking, contracts, proofing galleries, payments, reviews, and AI culling. Pro adds unlimited galleries, gallery sales, 150 GB of storage, and far more AI gallery search and Studio Assistant questions.",
+      ...losing,
+    ],
+    details: [
+      ["Active galleries", String(o.activeGalleries)],
+      ["Storage used", o.storage],
+      ["Pro", `${formatPrice(o.proMonthlyCents)}/month, or two months free when billed yearly`],
+    ],
+    button: { label: "Keep Pro", url: o.billingUrl },
+    outro: ["No card is on file, so you won't be charged unless you choose a plan."],
+  };
+}
+
 export function testEmail(studioName: string): EmailContent {
   return {
     subject: `Test email from ${studioName}`,

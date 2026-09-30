@@ -4,7 +4,7 @@ import { db } from "@/db";
 import { aiUsage, photographers, photos } from "@/db/schema";
 import { tagPhoto } from "@/lib/ai/photo-tags";
 import { localDateOf, zonedToUtc } from "@/lib/booking/time";
-import { AI_PHOTO_ALLOWANCE, effectivePlan, hasFeature } from "@/lib/plans";
+import { aiPhotoLimit, effectivePlan, hasFeature } from "@/lib/plans";
 import { photoKey, readObject } from "@/lib/storage";
 
 // Making a gallery searchable: a few photos per call (the dashboard keeps
@@ -27,7 +27,7 @@ export async function photoAllowance(photographerId: string) {
     .from(aiUsage)
     .where(and(eq(aiUsage.photographerId, photographerId), eq(aiUsage.feature, "photo_tag"), gte(aiUsage.createdAt, monthStart)));
   const plan = effectivePlan(studio.plan, studio.trialEndsAt);
-  const limit = AI_PHOTO_ALLOWANCE[plan];
+  const limit = aiPhotoLimit(studio.plan, studio.trialEndsAt);
   return { enabled: hasFeature(plan, "aiSearch"), used, limit, left: Math.max(0, limit - used) };
 }
 

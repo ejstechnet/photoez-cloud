@@ -74,6 +74,10 @@ export const photographers = pgTable("photographers", {
   plan: text("plan", { enum: PLANS }).notNull().default("free"),
   // New sign-ups get Pro free until this moment (no card needed).
   trialEndsAt: timestamp("trial_ends_at", { withTimezone: true }),
+  // When the "trial ending" emails went out (lib/trial-reminders.ts), so each
+  // is sent once.
+  trialMidReminderSentAt: timestamp("trial_mid_reminder_sent_at", { withTimezone: true }),
+  trialFinalReminderSentAt: timestamp("trial_final_reminder_sent_at", { withTimezone: true }),
   // The studio's PhotoEZ Cloud subscription, on the PhotoEZ Cloud Stripe
   // account (not the studio's own connected account).
   billingCustomerId: text("billing_customer_id"),
