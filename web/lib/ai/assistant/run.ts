@@ -3,7 +3,7 @@ import { and, count, eq, gte } from "drizzle-orm";
 import { db } from "@/db";
 import { aiUsage, photographers } from "@/db/schema";
 import { localDateOf, zonedToUtc } from "@/lib/booking/time";
-import { AI_ASSISTANT_ALLOWANCE, effectivePlan, hasFeature } from "@/lib/plans";
+import { aiAssistantLimit, effectivePlan, hasFeature } from "@/lib/plans";
 import { ASSISTANT_TOOLS, runTool, type Proposal } from "./tools";
 
 // The Studio Assistant: answers a photographer's question about their studio
@@ -45,7 +45,7 @@ export async function assistantAllowance(photographerId: string) {
     .from(aiUsage)
     .where(and(eq(aiUsage.photographerId, photographerId), eq(aiUsage.feature, "assistant"), gte(aiUsage.createdAt, monthStart)));
   const plan = effectivePlan(studio.plan, studio.trialEndsAt);
-  const limit = AI_ASSISTANT_ALLOWANCE[plan];
+  const limit = aiAssistantLimit(studio.plan, studio.trialEndsAt);
   return { enabled: hasFeature(plan, "aiSearch"), used, limit, left: Math.max(0, limit - used), timeZone: studio.timeZone };
 }
 
@@ -55,7 +55,7 @@ export async function askAssistant(
   question: string,
 ): Promise<{ answer: string; proposals: Proposal[] } | { error: string }> {
   const allowance = await assistantAllowance(photographerId);
-  if (!allowance.enabled) return { error: "The Studio Assistant is part of the Pro and Studio plans." };
+  if (!allowance.enabled) return { error: "The Studio Assistant isn't available on this plan." };
   if (allowance.left <= 0) return { error: "You've used this month's Studio Assistant questions." };
 
   const ctx = { photographerId, timeZone: allowance.timeZone };

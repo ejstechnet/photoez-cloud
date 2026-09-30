@@ -2,7 +2,14 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
+  AI_ASSISTANT_ALLOWANCE,
+  AI_PHOTO_ALLOWANCE,
   PLAN_LIMITS,
+  TRIAL_AI_ASSISTANT_ALLOWANCE,
+  TRIAL_AI_PHOTO_ALLOWANCE,
+  aiAssistantLimit,
+  aiPhotoLimit,
+  onTrial,
   PLAN_PRICES,
   effectivePlan,
   formatStorage,
@@ -27,7 +34,8 @@ test("the trial gives a Free studio Pro, then ends", () => {
 });
 
 test("prices: yearly is two months free", () => {
-  assert.equal(PLAN_PRICES.pro.month, 1900);
+  assert.equal(PLAN_PRICES.pro.month, 2900);
+  assert.equal(PLAN_PRICES.studio.month, 4900);
   assert.equal(PLAN_PRICES.pro.year, PLAN_PRICES.pro.month * 10);
   assert.equal(PLAN_PRICES.studio.year, PLAN_PRICES.studio.month * 10);
 });
@@ -41,7 +49,11 @@ test("Stripe lookup keys round-trip", () => {
 test("what each plan includes and allows", () => {
   assert.equal(PLAN_LIMITS.free.activeGalleries, 3);
   assert.equal(PLAN_LIMITS.pro.activeGalleries, null);
-  assert.ok(!hasFeature("free", "aiSearch") && hasFeature("pro", "aiSearch"));
+  // Free gets a small AI taste; Pro and Studio get far more.
+  assert.ok(hasFeature("free", "aiSearch"));
+  assert.ok(AI_PHOTO_ALLOWANCE.free > 0 && AI_PHOTO_ALLOWANCE.free < AI_PHOTO_ALLOWANCE.pro);
+  assert.ok(AI_ASSISTANT_ALLOWANCE.free > 0 && AI_ASSISTANT_ALLOWANCE.free < AI_ASSISTANT_ALLOWANCE.pro);
+  assert.ok(!hasFeature("free", "galleryUpsells") && hasFeature("pro", "galleryUpsells"));
   assert.ok(!hasFeature("pro", "removeBranding") && hasFeature("studio", "removeBranding"));
   assert.equal(planFor("removeBranding"), "studio");
   assert.equal(formatStorage(3 * 1024 ** 3), "3 GB");
@@ -50,7 +62,19 @@ test("what each plan includes and allows", () => {
 
 test("a referral earns a month of the referrer's plan, or of Pro on Free", async () => {
   const { referralRewardCents } = await import("./plans.ts");
-  assert.equal(referralRewardCents("studio"), 3900);
-  assert.equal(referralRewardCents("pro"), 1900);
-  assert.equal(referralRewardCents("free"), 1900);
+  assert.equal(referralRewardCents("studio"), 4900);
+  assert.equal(referralRewardCents("pro"), 2900);
+  assert.equal(referralRewardCents("free"), 2900);
+});
+
+test("AI is capped during the trial, between Free's and Pro's allowance", () => {
+  assert.ok(TRIAL_AI_PHOTO_ALLOWANCE > AI_PHOTO_ALLOWANCE.free && TRIAL_AI_PHOTO_ALLOWANCE < AI_PHOTO_ALLOWANCE.pro);
+  assert.ok(TRIAL_AI_ASSISTANT_ALLOWANCE > AI_ASSISTANT_ALLOWANCE.free && TRIAL_AI_ASSISTANT_ALLOWANCE < AI_ASSISTANT_ALLOWANCE.pro);
+  assert.ok(onTrial("free", days(3), now) && !onTrial("free", days(-1), now) && !onTrial("pro", days(3), now));
+  assert.equal(aiPhotoLimit("free", days(3), now), TRIAL_AI_PHOTO_ALLOWANCE);
+  assert.equal(aiAssistantLimit("free", days(3), now), TRIAL_AI_ASSISTANT_ALLOWANCE);
+  // After the trial, Free's own amount; paid plans are never capped.
+  assert.equal(aiPhotoLimit("free", days(-1), now), AI_PHOTO_ALLOWANCE.free);
+  assert.equal(aiPhotoLimit("pro", null, now), AI_PHOTO_ALLOWANCE.pro);
+  assert.equal(aiAssistantLimit("studio", days(3), now), AI_ASSISTANT_ALLOWANCE.studio);
 });

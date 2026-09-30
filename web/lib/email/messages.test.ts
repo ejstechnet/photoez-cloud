@@ -9,6 +9,7 @@ import {
   firstName,
   inquiryReplyClient,
   newInquiryStudio,
+  trialEndingStudio,
   type BookingFacts,
 } from "./messages.ts";
 
@@ -141,4 +142,27 @@ test("referral emails: the credit thank-you and the share line in the finals ema
   const facts = { studioName: "Elle Jones Studios", clientName: "Maya", title: "Fall family", url: "https://x", expires: null };
   assert.equal(galleryFinalsClient(facts, { photoCount: 3 }).outro?.length, 1);
   assert.match(galleryFinalsClient(facts, { photoCount: 3, share }).outro?.[1] ?? "", /\$25 off their first session/);
+});
+
+test("the trial-ending email warns only about limits the studio is over", () => {
+  const base = {
+    name: "Elle Jones",
+    stage: "mid" as const,
+    daysLeft: 4,
+    endsOn: "Friday, October 9, 2026",
+    activeGalleries: 2,
+    storage: "1.2 GB",
+    freeGalleries: 3,
+    freeStorage: "3 GB",
+    overGalleries: false,
+    overStorage: false,
+    billingUrl: "https://photoezcloud.com/dashboard/billing",
+    proMonthlyCents: 2900,
+  };
+  const calm = trialEndingStudio(base);
+  assert.equal(calm.subject, "Your PhotoEZ Cloud Pro trial has 4 days left");
+  assert.ok(!calm.intro.some((p) => p.includes("Free includes")));
+  const over = trialEndingStudio({ ...base, stage: "final", daysLeft: 1, activeGalleries: 5, overGalleries: true });
+  assert.equal(over.subject, "Your PhotoEZ Cloud Pro trial ends tomorrow");
+  assert.ok(over.intro.some((p) => p.includes("5 active galleries")));
 });

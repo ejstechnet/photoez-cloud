@@ -7,6 +7,7 @@ import { payDueClientReferrals } from "@/lib/client-referrals";
 import { runLabOrders } from "@/lib/swaggpress/orders";
 import { removeOldDesigns } from "@/lib/store/designs";
 import { syncSwaggProducts } from "@/lib/swaggpress/catalog";
+import { sendTrialReminders } from "@/lib/trial-reminders";
 import { emailBalanceReminder, emailGalleryExpiring, emailSessionReminder } from "./notify";
 
 // The scheduled reminders (PhotoEZ for WordPress sends these from WP-Cron):
@@ -18,7 +19,7 @@ import { emailBalanceReminder, emailGalleryExpiring, emailSessionReminder } from
 const HOUR = 60 * 60 * 1000;
 
 export async function runReminders(now = new Date()) {
-  const sent = { session: 0, balance: 0, gallery: 0, reviews: 0, giftCards: 0, referrals: 0, labShipped: 0 };
+  const sent = { session: 0, balance: 0, gallery: 0, reviews: 0, giftCards: 0, referrals: 0, labShipped: 0, trialEnding: 0 };
 
   // Session reminder: N hours before, for confirmed bookings.
   const sessionDue = await db
@@ -94,6 +95,12 @@ export async function runReminders(now = new Date()) {
 
   // Client referrals: credit for the client who shared, once their friend's session has happened.
   sent.referrals = await payDueClientReferrals(now);
+
+  // "Your Pro trial is ending" emails, about 4 days and 1 day before.
+  sent.trialEnding = await sendTrialReminders(now).catch((error) => {
+    console.error("Trial reminders failed", error);
+    return 0;
+  });
 
   // SwaggPress: send paid orders, pick up tracking, and keep added products
   // in step with the SwaggPress catalog (each studio at most every 6 hours).

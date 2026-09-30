@@ -10,7 +10,7 @@ import { PasswordField } from "@/components/password-field";
 import { REFERRAL_DISCOUNT_PERCENT, TRIAL_DAYS } from "@/lib/plans";
 
 // The sign-up form (page.tsx adds the referral greeting).
-export function SignUpForm({ invitedBy }: { invitedBy: string | null }) {
+export function SignUpForm({ invitedBy, defaultEmail = "" }: { invitedBy: string | null; defaultEmail?: string }) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
@@ -59,7 +59,7 @@ export function SignUpForm({ invitedBy }: { invitedBy: string | null }) {
       <form onSubmit={handleSubmit} className="space-y-4">
         <Field label="Your name" name="name" autoComplete="name" required />
         <Field label="Business name" name="businessName" autoComplete="organization" hint="Optional" />
-        <Field label="Email" name="email" type="email" autoComplete="email" required />
+        <Field label="Email" name="email" type="email" autoComplete="email" defaultValue={defaultEmail} required />
         <PasswordField
           label="Password"
           name="password"

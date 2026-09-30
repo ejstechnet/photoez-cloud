@@ -74,6 +74,10 @@ export const photographers = pgTable("photographers", {
   plan: text("plan", { enum: PLANS }).notNull().default("free"),
   // New sign-ups get Pro free until this moment (no card needed).
   trialEndsAt: timestamp("trial_ends_at", { withTimezone: true }),
+  // When the "trial ending" emails went out (lib/trial-reminders.ts), so each
+  // is sent once.
+  trialMidReminderSentAt: timestamp("trial_mid_reminder_sent_at", { withTimezone: true }),
+  trialFinalReminderSentAt: timestamp("trial_final_reminder_sent_at", { withTimezone: true }),
   // The studio's PhotoEZ Cloud subscription, on the PhotoEZ Cloud Stripe
   // account (not the studio's own connected account).
   billingCustomerId: text("billing_customer_id"),
@@ -1176,5 +1180,16 @@ export const storeShippingQuotes = pgTable("store_shipping_quotes", {
   // The SwaggPress lines quoted (variant:qty…), so a changed cart needs a new quote.
   itemsKey: text("items_key").notNull(),
   expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+// Email addresses collected on the campaign landing page (/join) before the
+// person has an account. Kept even if they never finish signing up, so there's
+// a list to follow up with. `source` is the ?src= of the link they came from.
+export const leads = pgTable("leads", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  // Lowercased, so the same address is never saved twice.
+  email: text("email").notNull().unique(),
+  source: text("source"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });

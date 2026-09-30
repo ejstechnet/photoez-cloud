@@ -38,6 +38,7 @@ export type EmailKind =
   | "store_order_new"
   | "store_order_shipped"
   | "password_reset"
+  | "trial_reminder"
   | "test";
 
 let transport: nodemailer.Transporter | null | undefined;

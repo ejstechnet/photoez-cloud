@@ -39,6 +39,8 @@ function includes(plan: Plan): string[] {
       "Client proofing galleries with favorites",
       "Take payments, deposits, and gift cards",
       "Reviews, email reminders, and AI culling",
+      `AI gallery search: ${n(AI_PHOTO_ALLOWANCE.free)} photos a month`,
+      `Studio Assistant: ${n(AI_ASSISTANT_ALLOWANCE.free)} questions a month`,
       `${limits.activeGalleries} active galleries`,
       `${formatStorage(limits.storageBytes)} of photo storage`,
     ];

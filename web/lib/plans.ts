@@ -1,7 +1,8 @@
 // Photographer subscription tiers: what each costs, includes, and allows.
 // Paid plans are Stripe subscriptions on the PhotoEZ Cloud account
 // (lib/billing.ts); new sign-ups get a 14-day Pro trial with no card.
-// Decided with Elle 2026-09-27. Tested in plans.test.ts.
+// Decided with Elle 2026-09-27; prices raised to $29/$49 and a small AI taste
+// added to Free on 2026-09-30. Tested in plans.test.ts.
 
 export const PLANS = ["free", "pro", "studio"] as const;
 export type Plan = (typeof PLANS)[number];
@@ -13,7 +14,9 @@ const FEATURES = {
   // Clients can pick more photos than their package includes, for a price.
   galleryUpsells: ["pro", "studio"],
   // AI gallery search (photos described by Claude) and the Studio Assistant.
-  aiSearch: ["pro", "studio"],
+  // Free gets a small monthly taste (the allowances below); Pro and Studio
+  // get the full amounts.
+  aiSearch: ["free", "pro", "studio"],
   // Hiding "Powered by PhotoEZ Cloud" on the studio's pages.
   removeBranding: ["studio"],
 } as const satisfies Record<string, readonly Plan[]>;
@@ -31,12 +34,18 @@ export function planFor(feature: Feature): Plan {
 
 // Photos a studio can have described for gallery search each month.
 // Measured 2026-09-27: ~790 input + ~91 output tokens per photo with Claude
-// Haiku 4.5, about $0.00125 a photo ($12.50 for a full Studio month).
-export const AI_PHOTO_ALLOWANCE: Record<Plan, number> = { free: 0, pro: 3000, studio: 10000 };
+// Haiku 4.5, about $0.00125 a photo ($12.50 for a full Studio month). Free's 100 is about 13 cents.
+export const AI_PHOTO_ALLOWANCE: Record<Plan, number> = { free: 100, pro: 3000, studio: 10000 };
+
+// While a Free studio is on its Pro trial, AI is capped well below Pro's
+// allowance (a full Pro month can cost $7–17, and a trial may never pay).
+// Enough to try every feature properly.
+export const TRIAL_AI_PHOTO_ALLOWANCE = 300;
+export const TRIAL_AI_ASSISTANT_ALLOWANCE = 30;
 
 // Studio Assistant questions a studio can ask each month (Claude Sonnet 5,
-// roughly 1–3 cents a question).
-export const AI_ASSISTANT_ALLOWANCE: Record<Plan, number> = { free: 0, pro: 300, studio: 1000 };
+// roughly 1–3 cents a question). Free's 10 is at most about 30 cents.
+export const AI_ASSISTANT_ALLOWANCE: Record<Plan, number> = { free: 10, pro: 300, studio: 1000 };
 
 // ---- Prices, limits, and the trial ----
 
@@ -47,8 +56,8 @@ export type Interval = (typeof INTERVALS)[number];
 
 // In cents. Yearly is two months free.
 export const PLAN_PRICES: Record<PaidPlan, Record<Interval, number>> = {
-  pro: { month: 1900, year: 19000 },
-  studio: { month: 3900, year: 39000 },
+  pro: { month: 2900, year: 29000 },
+  studio: { month: 4900, year: 49000 },
 };
 
 // Stripe finds each price by this key (lib/billing.ts), so price ids never
@@ -75,6 +84,20 @@ export const TRIAL_DAYS = 14;
 // has Pro.
 export function effectivePlan(plan: Plan, trialEndsAt: Date | null, now = new Date()): Plan {
   return plan === "free" && trialEndsAt && trialEndsAt > now ? "pro" : plan;
+}
+
+// A Free studio whose Pro trial is still running.
+export function onTrial(plan: Plan, trialEndsAt: Date | null, now = new Date()) {
+  return plan === "free" && trialEndsAt !== null && trialEndsAt > now;
+}
+
+// This month's AI allowances for a studio: the trial cap while on the trial,
+// otherwise its plan's amount.
+export function aiPhotoLimit(plan: Plan, trialEndsAt: Date | null, now = new Date()) {
+  return onTrial(plan, trialEndsAt, now) ? TRIAL_AI_PHOTO_ALLOWANCE : AI_PHOTO_ALLOWANCE[plan];
+}
+export function aiAssistantLimit(plan: Plan, trialEndsAt: Date | null, now = new Date()) {
+  return onTrial(plan, trialEndsAt, now) ? TRIAL_AI_ASSISTANT_ALLOWANCE : AI_ASSISTANT_ALLOWANCE[plan];
 }
 
 export function trialDaysLeft(trialEndsAt: Date | null, now = new Date()) {

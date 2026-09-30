@@ -6,7 +6,7 @@ import { IntervalSwitch, PlanCards } from "@/components/plan-cards";
 import { assistantAllowance } from "@/lib/ai/assistant/run";
 import { photoAllowance } from "@/lib/gallery-tagging";
 import { planUsage } from "@/lib/plan-usage";
-import { PLAN_LABELS, TRIAL_DAYS, formatStorage, hasFeature, trialDaysLeft, type Interval } from "@/lib/plans";
+import { PLAN_LABELS, TRIAL_AI_ASSISTANT_ALLOWANCE, TRIAL_AI_PHOTO_ALLOWANCE, TRIAL_DAYS, formatStorage, hasFeature, trialDaysLeft, type Interval } from "@/lib/plans";
 import { requirePhotographer } from "@/lib/session";
 import { refreshSubscription, scheduledChange } from "@/lib/billing";
 import { stripeConfigured } from "@/lib/stripe";
@@ -90,7 +90,8 @@ export default async function BillingPage({ searchParams }: PageProps<"/dashboar
               <p>
                 Your free Pro trial has <strong>{trialLeft === 1 ? "1 day" : `${trialLeft} days`}</strong> left (until{" "}
                 {date(studio.trialEndsAt)}). Choose a plan below to keep Pro; otherwise your studio moves to Free and
-                nothing is deleted.
+                nothing is deleted. During the trial, AI is capped at {TRIAL_AI_PHOTO_ALLOWANCE} photo descriptions and{" "}
+                {TRIAL_AI_ASSISTANT_ALLOWANCE} Assistant questions a month.
               </p>
             )}
             {plan === "free" && trialLeft === 0 && (
