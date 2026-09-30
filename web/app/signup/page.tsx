@@ -3,7 +3,8 @@ import { SignUpForm } from "./signup-form";
 
 // Sign-up, greeting visitors who came through a photographer's referral link.
 export default async function SignUpPage({ searchParams }: PageProps<"/signup">) {
-  const { ref } = await searchParams;
+  const { ref, email } = await searchParams;
   const referrer = typeof ref === "string" ? await referrerByCode(ref.toLowerCase()) : null;
-  return <SignUpForm invitedBy={referrer?.name ?? null} />;
+  // The landing page (/join) passes the address on, so they needn't retype it.
+  return <SignUpForm invitedBy={referrer?.name ?? null} defaultEmail={typeof email === "string" ? email.slice(0, 254) : ""} />;
 }

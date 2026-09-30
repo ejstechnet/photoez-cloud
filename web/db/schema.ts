@@ -1182,3 +1182,14 @@ export const storeShippingQuotes = pgTable("store_shipping_quotes", {
   expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+// Email addresses collected on the campaign landing page (/join) before the
+// person has an account. Kept even if they never finish signing up, so there's
+// a list to follow up with. `source` is the ?src= of the link they came from.
+export const leads = pgTable("leads", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  // Lowercased, so the same address is never saved twice.
+  email: text("email").notNull().unique(),
+  source: text("source"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
