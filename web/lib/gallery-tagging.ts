@@ -44,7 +44,7 @@ export async function tagNextPhotos(
   photographerId: string,
 ): Promise<{ tagged: number; failed: number; remaining: number } | { error: string }> {
   const allowance = await photoAllowance(photographerId);
-  if (!allowance.enabled) return { error: "Gallery search is part of the Pro and Studio plans." };
+  if (!allowance.enabled) return { error: "Gallery search isn't available on this plan." };
   if (allowance.left <= 0) return { error: "You've used this month's gallery search allowance." };
 
   const batch = await db

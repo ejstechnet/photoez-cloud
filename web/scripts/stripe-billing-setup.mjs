@@ -10,8 +10,8 @@ import Stripe from "stripe";
 
 // Keep in step with PLAN_PRICES in lib/plans.ts.
 const PLANS = {
-  pro: { name: "PhotoEZ Cloud Pro", month: 1900, year: 19000 },
-  studio: { name: "PhotoEZ Cloud Studio", month: 3900, year: 39000 },
+  pro: { name: "PhotoEZ Cloud Pro", month: 2900, year: 29000 },
+  studio: { name: "PhotoEZ Cloud Studio", month: 4900, year: 49000 },
 };
 
 const key = process.env.STRIPE_SECRET_KEY;
@@ -45,7 +45,20 @@ for (const [plan, info] of Object.entries(PLANS)) {
       });
       console.log(`Created ${lookup_key}: $${info[interval] / 100}/${interval}`);
     } else if (price.unit_amount !== info[interval]) {
-      console.warn(`! ${lookup_key} is $${price.unit_amount / 100} in Stripe, $${info[interval] / 100} here. Not changed.`);
+      // Stripe prices can't be edited. Make a new one and move the lookup key
+      // to it; the old price stays active, so studios already subscribed keep
+      // paying what they signed up at.
+      const old = price;
+      price = await stripe.prices.create({
+        product: product.id,
+        currency: "usd",
+        unit_amount: info[interval],
+        recurring: { interval },
+        lookup_key,
+        transfer_lookup_key: true,
+        metadata: { app: "photoez_cloud" },
+      });
+      console.log(`Replaced ${lookup_key}: $${old.unit_amount / 100} -> $${info[interval] / 100}/${interval} (current subscribers keep the old price)`);
     }
     prices.push(price.id);
   }

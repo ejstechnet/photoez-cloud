@@ -24,6 +24,10 @@ const QUESTIONS = [
     a: "No. Clients pay you through your own Stripe account on every plan; PhotoEZ Cloud adds no fees.",
   },
   {
+    q: "Is the AI really included on Free?",
+    a: "A small taste of it: 100 photos searched and 10 Studio Assistant questions a month. AI culling runs in your browser, so it's unlimited on every plan. Pro and Studio raise the AI allowances a lot.",
+  },
+  {
     q: "Can I change or cancel my plan?",
     a: "Any time, from Billing in your dashboard. Upgrades start right away; cancelling keeps your plan until the end of the period you've paid for.",
   },
@@ -79,6 +83,14 @@ export default async function PricingPage({ searchParams }: PageProps<"/pricing"
             )}
           />
         </div>
+
+        <section className="card mx-auto mt-12 max-w-3xl p-6 text-center sm:p-8">
+          <h2 className="font-display text-2xl font-bold">Your money stays yours.</h2>
+          <p className="mt-2 text-muted">
+            0% PhotoEZ commission on bookings, gallery sales, deposits, and gift cards, on every plan. Stripe&rsquo;s own
+            processing fees still apply.
+          </p>
+        </section>
 
         <section className="mx-auto mt-20 max-w-3xl">
           <h2 className="text-center font-display text-3xl font-bold">Questions</h2>

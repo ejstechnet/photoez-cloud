@@ -55,7 +55,7 @@ export async function askAssistant(
   question: string,
 ): Promise<{ answer: string; proposals: Proposal[] } | { error: string }> {
   const allowance = await assistantAllowance(photographerId);
-  if (!allowance.enabled) return { error: "The Studio Assistant is part of the Pro and Studio plans." };
+  if (!allowance.enabled) return { error: "The Studio Assistant isn't available on this plan." };
   if (allowance.left <= 0) return { error: "You've used this month's Studio Assistant questions." };
 
   const ctx = { photographerId, timeZone: allowance.timeZone };

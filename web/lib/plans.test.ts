@@ -2,6 +2,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
+  AI_ASSISTANT_ALLOWANCE,
+  AI_PHOTO_ALLOWANCE,
   PLAN_LIMITS,
   PLAN_PRICES,
   effectivePlan,
@@ -27,7 +29,8 @@ test("the trial gives a Free studio Pro, then ends", () => {
 });
 
 test("prices: yearly is two months free", () => {
-  assert.equal(PLAN_PRICES.pro.month, 1900);
+  assert.equal(PLAN_PRICES.pro.month, 2900);
+  assert.equal(PLAN_PRICES.studio.month, 4900);
   assert.equal(PLAN_PRICES.pro.year, PLAN_PRICES.pro.month * 10);
   assert.equal(PLAN_PRICES.studio.year, PLAN_PRICES.studio.month * 10);
 });
@@ -41,7 +44,11 @@ test("Stripe lookup keys round-trip", () => {
 test("what each plan includes and allows", () => {
   assert.equal(PLAN_LIMITS.free.activeGalleries, 3);
   assert.equal(PLAN_LIMITS.pro.activeGalleries, null);
-  assert.ok(!hasFeature("free", "aiSearch") && hasFeature("pro", "aiSearch"));
+  // Free gets a small AI taste; Pro and Studio get far more.
+  assert.ok(hasFeature("free", "aiSearch"));
+  assert.ok(AI_PHOTO_ALLOWANCE.free > 0 && AI_PHOTO_ALLOWANCE.free < AI_PHOTO_ALLOWANCE.pro);
+  assert.ok(AI_ASSISTANT_ALLOWANCE.free > 0 && AI_ASSISTANT_ALLOWANCE.free < AI_ASSISTANT_ALLOWANCE.pro);
+  assert.ok(!hasFeature("free", "galleryUpsells") && hasFeature("pro", "galleryUpsells"));
   assert.ok(!hasFeature("pro", "removeBranding") && hasFeature("studio", "removeBranding"));
   assert.equal(planFor("removeBranding"), "studio");
   assert.equal(formatStorage(3 * 1024 ** 3), "3 GB");
@@ -50,7 +57,7 @@ test("what each plan includes and allows", () => {
 
 test("a referral earns a month of the referrer's plan, or of Pro on Free", async () => {
   const { referralRewardCents } = await import("./plans.ts");
-  assert.equal(referralRewardCents("studio"), 3900);
-  assert.equal(referralRewardCents("pro"), 1900);
-  assert.equal(referralRewardCents("free"), 1900);
+  assert.equal(referralRewardCents("studio"), 4900);
+  assert.equal(referralRewardCents("pro"), 2900);
+  assert.equal(referralRewardCents("free"), 2900);
 });
