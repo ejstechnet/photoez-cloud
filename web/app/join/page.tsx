@@ -18,6 +18,7 @@ import {
 } from "@/components/icons";
 import { PLAN_LABELS, PLAN_PRICES, TRIAL_DAYS } from "@/lib/plans";
 import { cleanSource } from "@/lib/leads";
+import { LegalFooter } from "@/components/legal-page";
 
 export const metadata: Metadata = {
   title: "One app for your whole photography business",
@@ -253,6 +254,7 @@ export default async function JoinPage({ searchParams }: PageProps<"/join">) {
           <div className="flex justify-center">{assurance("text-white/75 lg:justify-center")}</div>
         </div>
       </section>
+      <LegalFooter />
     </main>
   );
 }
