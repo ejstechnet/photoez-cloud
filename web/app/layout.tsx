@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Plus_Jakarta_Sans, Young_Serif } from "next/font/google";
 import "./globals.css";
+import { CookieNotice } from "@/components/cookie-notice";
 
 // Young Serif: a warm, sturdy serif for headings (a nod to PhotoEZ's serif
 // titles), with steady letters at every size. It comes in one weight, so
@@ -25,7 +26,10 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="en" className={`${display.variable} ${sans.variable} h-full antialiased`}>
-      <body className="flex min-h-full flex-col">{children}</body>
+      <body className="flex min-h-full flex-col">
+        {children}
+        <CookieNotice />
+      </body>
     </html>
   );
 }

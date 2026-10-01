@@ -9,6 +9,7 @@ import { db } from "@/db";
 import { inquiries, photographers } from "@/db/schema";
 import { runTriage } from "@/lib/inquiries";
 import { SESSION_LABELS, type SessionType } from "@/lib/session-types";
+import { overLimit } from "@/lib/rate-limit";
 
 // The public inquiry form on a studio page. Anyone can call this, so it
 // guards against spam without a CAPTCHA: a hidden "website" field that only
@@ -45,6 +46,8 @@ export async function submitInquiry(
   const startedAt = Number(formData.get("startedAt"));
   const tooFast = !Number.isFinite(startedAt) || Date.now() - startedAt < MIN_SECONDS_ON_PAGE * 1000;
   if (String(formData.get("website") ?? "") !== "" || tooFast) return { sent: { quote: false } };
+  // And a cap per visitor across all studios (each inquiry runs AI triage).
+  if (await overLimit("inquiry", 10, 60 * 60 * 1000)) return { message: "You've sent several messages already. Please try again in an hour." };
 
   const [studio] = await db
     .select({

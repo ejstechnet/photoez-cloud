@@ -1,4 +1,4 @@
-import nodemailer from "nodemailer";
+import nodemailer, { type Transporter } from "nodemailer";
 import { eq } from "drizzle-orm";
 import { after } from "next/server";
 import { db } from "@/db";
@@ -41,7 +41,7 @@ export type EmailKind =
   | "trial_reminder"
   | "test";
 
-let transport: nodemailer.Transporter | null | undefined;
+let transport: Transporter | null | undefined;
 
 function getTransport() {
   if (transport !== undefined) return transport;

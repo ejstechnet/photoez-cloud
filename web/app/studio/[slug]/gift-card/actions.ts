@@ -9,6 +9,7 @@ import { localDateOf } from "@/lib/booking/time";
 import { checkGiftAmount } from "@/lib/gift-card-rules";
 import { newGiftCode, startGiftCardCheckout } from "@/lib/gift-cards";
 import { paymentAccount } from "@/lib/payments/checkout";
+import { overLimit } from "@/lib/rate-limit";
 
 export type GiftFormState = { message?: string; errors?: Record<string, string> };
 
@@ -26,6 +27,7 @@ const formSchema = z.object({
 // payment), then the buyer goes to Stripe Checkout on the studio's account.
 export async function buyGiftCard(slug: string, _prev: GiftFormState, formData: FormData): Promise<GiftFormState> {
   if (String(formData.get("website") ?? "") !== "") return { message: "Something went wrong. Please try again." };
+  if (await overLimit("gift-card", 10, 60 * 60 * 1000)) return { message: "Too many tries from here. Please wait a little and try again." };
   const [studio] = await db.select().from(photographers).where(eq(photographers.studioSlug, slug.toLowerCase()));
   if (!studio || !studio.giftCardsEnabled) return { message: "Gift cards aren't available right now." };
   const account = await paymentAccount(studio.id);

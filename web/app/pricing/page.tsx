@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Logo } from "@/components/brand";
+import { LegalFooter } from "@/components/legal-page";
 import { ArrowRightIcon } from "@/components/icons";
 import { IntervalSwitch, PlanCards } from "@/components/plan-cards";
 import { PLAN_LABELS, TRIAL_DAYS, type Interval } from "@/lib/plans";
@@ -104,6 +105,7 @@ export default async function PricingPage({ searchParams }: PageProps<"/pricing"
           </dl>
         </section>
       </main>
+      <LegalFooter />
     </div>
   );
 }

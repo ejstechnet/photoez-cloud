@@ -106,6 +106,22 @@ body {
 
   /* Formatted text from the rich-text editor, both while editing and on
      public pages (Tailwind resets list bullets and heading sizes). */
+  /* Terms of Service and Privacy Policy (components/legal-page.tsx). */
+  .legal > * + * {
+    @apply mt-4;
+  }
+  .legal h2 {
+    @apply mt-10 font-display text-2xl;
+  }
+  .legal h3 {
+    @apply mt-6 text-lg font-bold;
+  }
+  .legal ul {
+    @apply list-disc space-y-2 pl-6;
+  }
+  .legal a {
+    @apply font-semibold text-link underline decoration-2 decoration-lime underline-offset-4 hover:decoration-coral;
+  }
   .rich-text {
     @apply leading-relaxed;
   }

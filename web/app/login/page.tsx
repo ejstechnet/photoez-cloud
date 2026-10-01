@@ -7,7 +7,8 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
   // Only allow redirects within this site, so a crafted link can't send
   // someone to another website after they log in.
   const redirectTo =
-    typeof next === "string" && next.startsWith("/") && !next.startsWith("//") ? next : "/dashboard";
+    // (Backslashes too: some browsers read "/\example.com" as "//example.com".)
+    typeof next === "string" && next.startsWith("/") && !next.startsWith("//") && !next.includes("\\") ? next : "/dashboard";
 
   return (
     <AuthCard

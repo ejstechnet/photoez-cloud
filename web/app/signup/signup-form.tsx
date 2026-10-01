@@ -81,6 +81,17 @@ export function SignUpForm({
         />
         <FormError message={error} />
         <SubmitButton pending={pending}>Create account</SubmitButton>
+        <p className="text-center text-xs text-muted">
+          By creating an account, you agree to the{" "}
+          <Link href="/terms" className="link">
+            Terms of Service
+          </Link>{" "}
+          and{" "}
+          <Link href="/privacy" className="link">
+            Privacy Policy
+          </Link>
+          .
+        </p>
       </form>
     </AuthCard>
   );

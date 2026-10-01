@@ -36,6 +36,7 @@ import { contractTemplateFor } from "@/lib/contracts/for-booking";
 import { offeredAddons } from "@/lib/booking/session-addons";
 import { localDateOf } from "@/lib/booking/time";
 import { inspoKey, signedUploadUrl, storedSize } from "@/lib/storage";
+import { overLimit } from "@/lib/rate-limit";
 
 // The public "Book" button. Anyone can call this, so it re-checks everything
 // the page showed: the session is bookable, the time is still open, and the
@@ -87,6 +88,8 @@ export async function prepareInspoUploads(
   if (!Number.isInteger(count) || count < 1 || count > MAX_INSPO_PHOTOS) {
     return { error: `You can add up to ${MAX_INSPO_PHOTOS} photos.` };
   }
+  // Uploads need no account, so each visitor gets a few batches an hour.
+  if (await overLimit("inspo", 10, 60 * 60 * 1000)) return { error: "Too many tries from here. Please wait a little and try again." };
   const [studio] = await db
     .select({ id: photographers.id, inspoMode: photographers.inspoMode })
     .from(photographers)
@@ -107,6 +110,7 @@ export async function createBooking(
   formData: FormData,
 ): Promise<BookingFormState> {
   if (String(formData.get("website") ?? "") !== "") return { message: "Something went wrong. Please try again." };
+  if (await overLimit("booking", 10, 60 * 60 * 1000)) return { message: "Too many tries from here. Please wait a little and try again." };
 
   const parsed = formSchema.safeParse({
     title: String(formData.get("title") ?? ""),
@@ -387,6 +391,8 @@ export async function previewCoupon(
 > {
   const normalized = normalizeCode(code);
   if (!normalized) return { ok: false, message: "Enter a code." };
+  // Codes are guessable only by trying many; a visitor gets a few dozen checks.
+  if (await overLimit("code-check", 30, 10 * 60 * 1000)) return { ok: false, message: "Too many tries from here. Please wait a little and try again." };
   const [studio] = await db
     .select({ id: photographers.id, timeZone: photographers.timeZone })
     .from(photographers)
@@ -410,6 +416,8 @@ export async function previewCoupon(
 // sees their credit amount (nothing else about them).
 export async function creditAvailable(slug: string, email: string): Promise<number> {
   if (!z.email().safeParse(email.trim()).success) return 0;
+  // A balance tied to an email: limited, so addresses can't be checked in bulk.
+  if (await overLimit("code-check", 30, 10 * 60 * 1000)) return 0;
   const [studio] = await db
     .select({ id: photographers.id, timeZone: photographers.timeZone })
     .from(photographers)
@@ -427,6 +435,7 @@ export async function previewGiftCard(
   code: string,
 ): Promise<{ ok: true; code: string; balanceCents: number } | { ok: false; message: string }> {
   if (!code.trim()) return { ok: false, message: "Enter your gift card code." };
+  if (await overLimit("code-check", 30, 10 * 60 * 1000)) return { ok: false, message: "Too many tries from here. Please wait a little and try again." };
   const [studio] = await db.select({ id: photographers.id }).from(photographers).where(eq(photographers.studioSlug, slug));
   const card = studio ? await findUsableCard(studio.id, code) : null;
   if (!card) return { ok: false, message: "That gift card code isn't valid or has no balance left." };
