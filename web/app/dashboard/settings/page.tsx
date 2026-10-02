@@ -26,11 +26,14 @@ import { StudioLogo } from "./studio-logo";
 import { PhotoUpload } from "@/components/photo-upload";
 import { prepareHeadshotUpload, removeHeadshot, saveHeadshot } from "./actions";
 import { WatermarkForm } from "./watermark-form";
+import { CalendarCard } from "./calendar-card";
+import { calendarUrl } from "@/lib/calendar-link";
 
 export default async function SettingsPage() {
   const user = await requirePhotographer();
   const [settings] = await db
     .select({
+      calendarToken: photographers.calendarToken,
       key: photographers.watermarkKey,
       opacity: photographers.watermarkOpacity,
       position: photographers.watermarkPosition,
@@ -181,6 +184,7 @@ export default async function SettingsPage() {
             galleryExpiryReminderDays={settings.galleryExpiryReminderDays}
             paymentsReady={stripeReady}
           />
+          <CalendarCard link={settings.calendarToken ? calendarUrl(settings.calendarToken) : null} />
           <ReviewsCard requestDays={settings.reviewRequestDays} googleUrl={settings.googleReviewUrl} />
           <ClientReferralsCard
             enabled={settings.clientReferralsEnabled}
