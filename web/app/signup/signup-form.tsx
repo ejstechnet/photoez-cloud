@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { authClient } from "@/lib/auth-client";
 import { AuthCard } from "@/components/auth-card";
 import { Field, FormError, SubmitButton } from "@/components/form";
@@ -20,9 +19,10 @@ export function SignUpForm({
   defaultEmail?: string;
   source?: string | null;
 }) {
-  const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+  // After sign-up: the address the confirmation email went to.
+  const [sentTo, setSentTo] = useState<string | null>(null);
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -30,11 +30,14 @@ export function SignUpForm({
     setPending(true);
     setError(null);
 
+    const email = String(form.get("email"));
     const { error } = await authClient.signUp.email({
       name: String(form.get("name")),
       businessName: String(form.get("businessName")) || undefined,
-      email: String(form.get("email")),
+      email,
       password: String(form.get("password")),
+      // Where the confirmation link lands (signed in).
+      callbackURL: "/dashboard",
     });
 
     if (error) {
@@ -42,11 +45,31 @@ export function SignUpForm({
       setPending(false);
       return;
     }
-    // Sign-up also logs the photographer in. Where they came from is kept for
-    // the campaign numbers; it never holds up getting to the dashboard.
-    if (source) await recordSignupSource(source).catch(() => undefined);
-    router.push("/dashboard");
-    router.refresh();
+    // Where they came from is kept for the campaign numbers; it never holds
+    // anything up. Then they confirm their email before they're signed in.
+    if (source) await recordSignupSource(source, email).catch(() => undefined);
+    setSentTo(email);
+    setPending(false);
+  }
+
+  if (sentTo) {
+    return (
+      <AuthCard title="Check your email" subtitle="One last step to open your studio.">
+        <div className="space-y-4">
+          <p>
+            We sent a confirmation link to <strong>{sentTo}</strong>. Click it to confirm your email and open your new
+            studio.
+          </p>
+          <p className="text-sm text-muted">
+            Don&rsquo;t see it? Check your spam or promotions folder. The link works for 24 hours; if it runs out,{" "}
+            <Link href="/login" className="link">
+              log in
+            </Link>{" "}
+            and we&rsquo;ll send a fresh one.
+          </p>
+        </div>
+      </AuthCard>
+    );
   }
 
   return (

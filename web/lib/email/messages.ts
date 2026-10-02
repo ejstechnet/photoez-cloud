@@ -372,6 +372,18 @@ export function passwordReset(name: string, url: string): EmailContent {
   };
 }
 
+// Sent at sign-up (and when an unconfirmed studio tries to log in): confirm
+// the email address before the account can be used.
+export function verifyEmail(name: string, url: string): EmailContent {
+  return {
+    subject: "Confirm your email for PhotoEZ Cloud",
+    heading: "Confirm your email",
+    intro: [`Hi ${firstName(name)}, welcome to PhotoEZ Cloud! Please confirm this is your email address to finish setting up your studio.`],
+    button: { label: "Confirm my email", url },
+    outro: ["This link works for 24 hours. If you didn't sign up for PhotoEZ Cloud, you can ignore this email."],
+  };
+}
+
 // Sent 4 days and 1 day before a Free studio's Pro trial ends.
 export function trialEndingStudio(o: {
   name: string;

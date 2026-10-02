@@ -3,7 +3,7 @@ import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { nextCookies } from "better-auth/next-js";
 import { db } from "@/db";
 import * as schema from "@/db/schema";
-import { passwordReset } from "@/lib/email/messages";
+import { passwordReset, verifyEmail } from "@/lib/email/messages";
 import { sendEmail } from "@/lib/email/send";
 import { TRIAL_DAYS } from "@/lib/plans";
 import { referrerFromCookieHeader } from "@/lib/referrals";
@@ -30,6 +30,27 @@ export const auth = betterAuth({
     },
     // A reset signs out every other browser, in case someone else was in.
     revokeSessionsOnPasswordReset: true,
+    // New studios confirm their email before they can log in.
+    requireEmailVerification: true,
+  },
+  // The confirmation email: sent at sign-up, and again if an unconfirmed
+  // studio tries to log in. The link signs them in.
+  emailVerification: {
+    sendOnSignUp: true,
+    sendOnSignIn: true,
+    autoSignInAfterVerification: true,
+    expiresIn: 24 * 60 * 60,
+    sendVerificationEmail: async ({ user, url }) => {
+      await sendEmail({
+        photographerId: user.id,
+        kind: "email_verification",
+        to: user.email,
+        content: verifyEmail(user.name, url),
+        fromName: "PhotoEZ Cloud",
+        studioName: "PhotoEZ Cloud",
+        footer: "PhotoEZ Cloud account email.",
+      });
+    },
   },
   // Point Better Auth's built-in models at our table names.
   user: {
