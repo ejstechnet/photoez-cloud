@@ -75,7 +75,8 @@ const GB = 1024 ** 3;
 export const PLAN_LIMITS: Record<Plan, { storageBytes: number; activeGalleries: number | null }> = {
   free: { storageBytes: 3 * GB, activeGalleries: 3 },
   pro: { storageBytes: 150 * GB, activeGalleries: null },
-  studio: { storageBytes: 1024 * GB, activeGalleries: null },
+  // Studio: 2 TB (raised from 1 TB on 2026-10-02 to match Pixieset Suite Pro).
+  studio: { storageBytes: 2048 * GB, activeGalleries: null },
 };
 
 export const TRIAL_DAYS = 14;
@@ -107,6 +108,7 @@ export function trialDaysLeft(trialEndsAt: Date | null, now = new Date()) {
 
 // "1.2 GB of 3 GB"
 export function formatStorage(bytes: number) {
+  if (bytes >= 1024 * GB) return `${Math.round((bytes / (1024 * GB)) * 10) / 10} TB`;
   if (bytes >= GB) return `${Math.round((bytes / GB) * 10) / 10} GB`;
   return `${Math.max(0, Math.round(bytes / 1024 ** 2))} MB`;
 }

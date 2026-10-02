@@ -57,6 +57,8 @@ test("what each plan includes and allows", () => {
   assert.ok(!hasFeature("pro", "removeBranding") && hasFeature("studio", "removeBranding"));
   assert.equal(planFor("removeBranding"), "studio");
   assert.equal(formatStorage(3 * 1024 ** 3), "3 GB");
+  assert.equal(formatStorage(2048 * 1024 ** 3), "2 TB");
+  assert.equal(formatStorage(1536 * 1024 ** 3), "1.5 TB");
   assert.equal(formatStorage(250 * 1024 ** 2), "250 MB");
 });
 

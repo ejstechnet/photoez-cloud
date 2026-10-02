@@ -9,6 +9,7 @@ export async function trackedSignups() {
     .select({
       email: leads.email,
       source: leads.source,
+      quiz: leads.quiz,
       createdAt: leads.createdAt,
       name: photographers.name,
       businessName: photographers.businessName,

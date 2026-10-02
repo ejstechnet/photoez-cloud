@@ -9,6 +9,7 @@ import { TRIAL_DAYS } from "@/lib/plans";
 import { referrerFromCookieHeader } from "@/lib/referrals";
 import { leads } from "@/db/schema";
 import { sourceFromCookieHeader } from "@/lib/leads";
+import { answersFromCookieHeader } from "@/lib/quiz";
 
 // Server-side auth setup. BETTER_AUTH_SECRET and BETTER_AUTH_URL are read
 // from web/.env automatically.
@@ -80,11 +81,14 @@ export const auth = betterAuth({
         // a cookie by the sign-up page), for Settings > Sign-ups. Works for
         // email and Google sign-ups alike; never holds sign-up up.
         after: async (user, context) => {
-          const source = sourceFromCookieHeader(context?.headers?.get("cookie"));
-          if (!source) return;
+          const cookie = context?.headers?.get("cookie");
+          const source = sourceFromCookieHeader(cookie);
+          // And their quiz answers, if they took the quiz (app/quiz).
+          const quiz = answersFromCookieHeader(cookie);
+          if (!source && !quiz) return;
           await db
             .insert(leads)
-            .values({ email: user.email.toLowerCase(), source })
+            .values({ email: user.email.toLowerCase(), source, quiz })
             .onConflictDoNothing({ target: leads.email })
             .catch(() => undefined);
         },

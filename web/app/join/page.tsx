@@ -122,6 +122,12 @@ export default async function JoinPage({ searchParams }: PageProps<"/join">) {
             </p>
             <div className="mt-8">{cta()}</div>
             {assurance("text-white/75")}
+            <p className="mt-5 text-white/80">
+              Not sure it fits?{" "}
+              <Link href={`/quiz${source ? `?src=${encodeURIComponent(source)}` : ""}`} className="font-bold text-lime underline underline-offset-4 hover:text-sun">
+                Take the 60-second quiz
+              </Link>
+            </p>
           </div>
           <Image
             src="/home/hero.webp"
