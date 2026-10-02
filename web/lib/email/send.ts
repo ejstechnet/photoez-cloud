@@ -38,6 +38,7 @@ export type EmailKind =
   | "store_order_new"
   | "store_order_shipped"
   | "password_reset"
+  | "email_verification"
   | "trial_reminder"
   | "test";
 

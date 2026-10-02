@@ -21,10 +21,16 @@ export function LoginForm({ redirectTo }: { redirectTo: string }) {
     const { error } = await authClient.signIn.email({
       email: String(form.get("email")),
       password: String(form.get("password")),
+      // For an unconfirmed email, the fresh confirmation link lands here.
+      callbackURL: redirectTo,
     });
 
     if (error) {
-      setError(error.message ?? "Something went wrong. Please try again.");
+      setError(
+        error.code === "EMAIL_NOT_VERIFIED"
+          ? "Please confirm your email first. We just sent you a new confirmation link; click it to log in."
+          : (error.message ?? "Something went wrong. Please try again."),
+      );
       setPending(false);
       return;
     }

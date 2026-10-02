@@ -28,6 +28,7 @@ export const KIND_LABELS: Record<EmailKind, string> = {
   store_order_new: "New store order (to you)",
   store_order_shipped: "Store order shipped",
   password_reset: "Password reset",
+  email_verification: "Email confirmation",
   trial_reminder: "Pro trial ending",
   test: "Test email",
 };
