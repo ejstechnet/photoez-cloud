@@ -12,6 +12,7 @@ export default async function SignUpPage({ searchParams }: PageProps<"/signup">)
       invitedBy={referrer?.name ?? null}
       defaultEmail={typeof email === "string" ? email.slice(0, 254) : ""}
       source={typeof src === "string" ? src : null}
+      google={Boolean(process.env.GOOGLE_CLIENT_ID)}
     />
   );
 }

@@ -1,7 +1,7 @@
 // Tests for the landing page's email checks.   npm test
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { cleanSource, normalizeEmail } from "./leads.ts";
+import { cleanSource, normalizeEmail, sourceFromCookieHeader } from "./leads.ts";
 
 test("emails are trimmed and lowercased; junk is refused", () => {
   assert.equal(normalizeEmail("  Elle@Example.COM "), "elle@example.com");
@@ -18,4 +18,12 @@ test("the source tag is kept short and plain", () => {
   assert.equal(cleanSource(""), null);
   assert.equal(cleanSource(["a"]), null);
   assert.equal(cleanSource("x".repeat(100))?.length, 40);
+});
+
+test("the landing page's tag is read back from its cookie", () => {
+  assert.equal(sourceFromCookieHeader("a=1; pez_src=facebook; b=2"), "facebook");
+  assert.equal(sourceFromCookieHeader("pez_src=FB-Grads"), "fb-grads");
+  assert.equal(sourceFromCookieHeader("other=1"), null);
+  assert.equal(sourceFromCookieHeader("pez_src=%E0%A4%A"), null);
+  assert.equal(sourceFromCookieHeader(null), null);
 });
