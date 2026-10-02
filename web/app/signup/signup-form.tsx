@@ -1,28 +1,40 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { authClient } from "@/lib/auth-client";
 import { AuthCard } from "@/components/auth-card";
 import { Field, FormError, SubmitButton } from "@/components/form";
 import { PasswordField } from "@/components/password-field";
 import { REFERRAL_DISCOUNT_PERCENT, TRIAL_DAYS } from "@/lib/plans";
-import { recordSignupSource } from "./actions";
+import { GoogleButton } from "@/components/google-button";
+import { SOURCE_COOKIE, cleanSource } from "@/lib/leads";
 
 // The sign-up form (page.tsx adds the referral greeting).
 export function SignUpForm({
   invitedBy,
   defaultEmail = "",
   source = null,
+  google = false,
 }: {
   invitedBy: string | null;
   defaultEmail?: string;
   source?: string | null;
+  google?: boolean;
 }) {
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   // After sign-up: the address the confirmation email went to.
   const [sentTo, setSentTo] = useState<string | null>(null);
+
+  // The landing page's tag (?src=facebook) rides along in a cookie for an
+  // hour, so it's saved with the account however they sign up (lib/auth.ts).
+  useEffect(() => {
+    const tag = cleanSource(source);
+    if (!tag) return;
+    const secure = window.location.protocol === "https:" ? "; Secure" : "";
+    document.cookie = `${SOURCE_COOKIE}=${tag}; Max-Age=3600; Path=/; SameSite=Lax${secure}`;
+  }, [source]);
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -45,9 +57,7 @@ export function SignUpForm({
       setPending(false);
       return;
     }
-    // Where they came from is kept for the campaign numbers; it never holds
-    // anything up. Then they confirm their email before they're signed in.
-    if (source) await recordSignupSource(source, email).catch(() => undefined);
+    // They confirm their email before they're signed in.
     setSentTo(email);
     setPending(false);
   }
@@ -90,6 +100,7 @@ export function SignUpForm({
           your first plan payment.
         </p>
       )}
+      {google && <GoogleButton callbackURL="/dashboard" />}
       <form onSubmit={handleSubmit} className="space-y-4">
         <Field label="Your name" name="name" autoComplete="name" required />
         <Field label="Business name" name="businessName" autoComplete="organization" hint="Optional" />
