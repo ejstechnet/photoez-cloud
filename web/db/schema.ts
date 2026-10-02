@@ -130,6 +130,8 @@ export const photographers = pgTable("photographers", {
   // Email: where studio notices go (null = the account email), and whether the
   // AI's replies to inquiries it fully handled go out on their own.
   notifyEmail: text("notify_email"),
+  // The private calendar link's secret (Settings > Calendar); null until made.
+  calendarToken: text("calendar_token").unique(),
   autoSendReplies: boolean("auto_send_replies").notNull().default(false),
   // Automatic reminders, like PhotoEZ for WordPress; null turns one off.
   sessionReminderHours: integer("session_reminder_hours").default(24),
