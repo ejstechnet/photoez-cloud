@@ -1,6 +1,7 @@
 import { requireOwner } from "@/lib/owner";
 import { bySource } from "@/lib/signup-stats";
 import { trackedSignups } from "@/lib/signups";
+import { describeAnswers } from "@/lib/quiz";
 
 export const metadata = { title: "Sign-ups · PhotoEZ Cloud" };
 
@@ -65,6 +66,7 @@ export default async function SignupsPage() {
                     {r.email}
                     {r.source ? ` · ${r.source}` : ""}
                   </span>
+                  {r.quiz && <span className="mt-1 block text-sm text-foreground/80">Quiz: {describeAnswers(r.quiz)}</span>}
                 </span>
                 <span
                   className={`self-start rounded-full px-2.5 py-1 text-[11px] font-bold tracking-wider uppercase sm:self-center ${STATUS_STYLES[r.status] ?? ""}`}

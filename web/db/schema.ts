@@ -1191,5 +1191,7 @@ export const leads = pgTable("leads", {
   // Lowercased, so the same address is never saved twice.
   email: text("email").notNull().unique(),
   source: text("source"),
+  // Their answers to the landing-page quiz (lib/quiz.ts), when they took it.
+  quiz: jsonb("quiz").$type<import("../lib/quiz").QuizAnswers>(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
