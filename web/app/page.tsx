@@ -27,6 +27,8 @@ import { PHOTOEZ_LINKS, WORDPRESS_PLUGINS } from "@/lib/photoez-links";
 import { WordPressMockup } from "@/components/marketing-mockups";
 import type { Metadata } from "next";
 import { JsonLd } from "@/components/json-ld";
+import { BlogCards } from "@/components/blog-cards";
+import { blogPosts } from "@/lib/blog";
 import { PLAN_PRICES } from "@/lib/plans";
 import { siteUrl } from "@/lib/site";
 
@@ -159,6 +161,8 @@ export default async function Home() {
         await db.select({ slug: photographers.studioSlug }).from(photographers).where(eq(photographers.id, session.user.id))
       )[0]?.slug ?? null)
     : null;
+
+  const posts = await blogPosts();
 
   return (
     <main className="flex flex-1 flex-col">
@@ -491,6 +495,29 @@ export default async function Home() {
         </div>
       </section>
 
+      {/* The newest articles from the EJS Tech blog (ejstech.net), read from its feed. */}
+      {posts.length > 0 && (
+        <section className="border-t border-border bg-surface/60">
+          <div className="mx-auto w-full max-w-7xl px-4 py-20">
+            <div className="flex flex-wrap items-end justify-between gap-4">
+              <div>
+                <p className="text-sm font-bold tracking-wider text-coral uppercase">From the blog</p>
+                <h2 className="mt-2 font-display text-4xl font-bold tracking-tight">Straight talk about photography software</h2>
+                <p className="mt-2 max-w-2xl text-muted">
+                  Honest comparisons, workflow tips, and why PhotoEZ exists, from 17 years behind the camera.
+                </p>
+              </div>
+              <Link href="/articles" className="btn-secondary">
+                All articles <ArrowRightIcon size={18} />
+              </Link>
+            </div>
+            <div className="mt-10">
+              <BlogCards posts={posts.slice(0, 3)} />
+            </div>
+          </div>
+        </section>
+      )}
+
       <footer className="mt-auto border-t border-border bg-surface py-10 text-sm text-muted">
         <div className="mx-auto flex max-w-7xl flex-col gap-6 px-4 sm:flex-row sm:items-start sm:justify-between">
           <div>
@@ -521,7 +548,9 @@ export default async function Home() {
             <Link href="/pricing" className="hover:text-foreground">
               Pricing
             </Link>
-            <span />
+            <Link href="/articles" className="hover:text-foreground">
+              Articles &amp; comparisons
+            </Link>
             <Link href="/photographers" className="hover:text-foreground">
               Find a photographer
             </Link>
