@@ -3,6 +3,8 @@ import { db } from "@/db";
 import { invoices } from "@/db/schema";
 import * as messages from "@/lib/email/invoice-messages";
 import { sendToClient, sendToStudio, studioSender } from "@/lib/email/send";
+import { paymentDueText } from "@/lib/sms/messages";
+import { textClient } from "@/lib/sms/send";
 import { formatDay, nextScheduled } from "./math";
 import { invoiceDashboardUrl, invoiceUrl, needsSignature, type Invoice } from "./server";
 
@@ -67,6 +69,17 @@ export async function emailPaymentDue(invoiceId: string, overdue: boolean) {
   if (!next?.dueDate) return false;
   const f = facts(invoice, await studioName(invoice.photographerId));
   const p = { label: next.label, amountCents: next.amountCents, due: formatDay(next.dueDate) };
+  await textClient(invoice.photographerId, "paymentDue", overdue ? "invoice_overdue" : "invoice_reminder", invoice.clientPhone, (name) =>
+    paymentDueText({
+      studio: name,
+      client: invoice.clientName,
+      what: `${next.label.toLowerCase()} for ${invoice.title}`,
+      amountCents: next.amountCents,
+      due: formatDay(next.dueDate!, "short"),
+      url: f.url,
+      overdue,
+    }),
+  );
   return sendToClient(
     invoice.photographerId,
     overdue ? "invoice_overdue" : "invoice_reminder",

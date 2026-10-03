@@ -37,6 +37,7 @@ import { offeredAddons } from "@/lib/booking/session-addons";
 import { localDateOf } from "@/lib/booking/time";
 import { inspoKey, signedUploadUrl, storedSize } from "@/lib/storage";
 import { overLimit } from "@/lib/rate-limit";
+import { setConsent } from "@/lib/sms/send";
 
 // The public "Book" button. Anyone can call this, so it re-checks everything
 // the page showed: the session is bookable, the time is still open, and the
@@ -344,6 +345,11 @@ export async function createBooking(
   } catch (error) {
     if (isOverlapError(error)) return { taken: true };
     throw error;
+  }
+
+  // They ticked "Text me reminders" (shown only when the studio texts).
+  if (data.phone && formData.get("smsOptIn") === "on") {
+    await setConsent(studio.id, data.phone, "in", "booking").catch((error) => console.error("Text consent failed", error));
   }
 
   revalidatePath("/dashboard", "layout");

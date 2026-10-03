@@ -25,6 +25,8 @@ const FEATURES = {
   // Slideshows of the final photos, with the photographer's own song.
   // Decided with Elle 2026-10-02.
   slideshow: ["pro", "studio"],
+  // Text reminders through the studio's own Twilio account (lib/sms).
+  textMessages: ["pro", "studio"],
 } as const satisfies Record<string, readonly Plan[]>;
 
 export type Feature = keyof typeof FEATURES;

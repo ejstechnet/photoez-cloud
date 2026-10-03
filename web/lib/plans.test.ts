@@ -56,6 +56,7 @@ test("what each plan includes and allows", () => {
   assert.ok(!hasFeature("free", "galleryUpsells") && hasFeature("pro", "galleryUpsells"));
   assert.ok(!hasFeature("pro", "removeBranding") && hasFeature("studio", "removeBranding"));
   assert.ok(!hasFeature("free", "invoices") && hasFeature("pro", "invoices") && hasFeature("studio", "invoices"));
+  assert.ok(!hasFeature("free", "textMessages") && hasFeature("pro", "textMessages"));
   assert.ok(!hasFeature("free", "slideshow") && hasFeature("pro", "slideshow") && hasFeature("studio", "slideshow"));
   assert.equal(planFor("removeBranding"), "studio");
   assert.equal(formatStorage(3 * 1024 ** 3), "3 GB");

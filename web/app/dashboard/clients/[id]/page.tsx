@@ -16,6 +16,9 @@ import { updateClient } from "../actions";
 import { ClientForm } from "../client-form";
 import { CreditsCard } from "./credits-card";
 import { DeleteClientButton } from "./delete-client-button";
+import { TextConsent } from "./text-consent";
+import { consentFor, textingOn } from "@/lib/sms/send";
+import { toE164 } from "@/lib/sms/phone";
 
 export default async function EditClientPage({ params }: PageProps<"/dashboard/clients/[id]">) {
   const { id } = await params;
@@ -59,6 +62,10 @@ export default async function EditClientPage({ params }: PageProps<"/dashboard/c
     .where(and(eq(invoices.photographerId, user.id), eq(invoices.clientId, client.id)))
     .orderBy(desc(invoices.createdAt))
     .limit(50);
+  // Text reminders: shown when the studio texts.
+  const texting = await textingOn(user.id);
+  const e164 = toE164(client.phone);
+  const textStatus = texting && e164 ? await consentFor(user.id, e164) : null;
   const balanceCents = credits
     .filter((c) => !c.expired)
     .reduce((sum, c) => sum + c.amountCents - c.usedCents, 0);
@@ -108,6 +115,7 @@ export default async function EditClientPage({ params }: PageProps<"/dashboard/c
           </ul>
         )}
       </section>
+      {texting && <TextConsent clientId={client.id} phone={e164} status={textStatus} />}
       <CreditsCard clientId={client.id} hasEmail={Boolean(client.email)} credits={credits} balanceCents={balanceCents} />
       {share && (
         <section className="card mt-8 p-6 sm:p-8">

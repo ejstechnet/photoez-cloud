@@ -154,6 +154,15 @@ export const photographers = pgTable("photographers", {
   invoiceTaxBps: integer("invoice_tax_bps").notNull().default(0),
   invoiceDepositPercent: integer("invoice_deposit_percent").notNull().default(50),
   invoiceTerms: text("invoice_terms"),
+  // Text messages (Pro and Studio, lib/sms): the studio's OWN Twilio account,
+  // so it pays for its own texts. The auth token is sealed (lib/secret-box.ts).
+  // smsFrom is a phone number (+15035551234) or a Messaging Service id (MG…).
+  twilioAccountSid: text("twilio_account_sid"),
+  twilioAuthToken: text("twilio_auth_token"),
+  smsFrom: text("sms_from"),
+  // Which texts go out, and the studio's own cell for new booking / inquiry alerts.
+  smsTexts: jsonb("sms_texts").$type<import("../lib/sms/messages").SmsSettings>(),
+  smsAlertPhone: text("sms_alert_phone"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
@@ -676,6 +685,45 @@ export const payments = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index("payments_booking_idx").on(t.bookingId), index("payments_invoice_idx").on(t.invoiceId)],
+);
+
+// Who agreed to get texts from a studio, by phone number (+15035551234).
+// "in" comes from the booking form's checkbox or the studio marking a client
+// who agreed; "out" from the client replying STOP, and only their START
+// undoes it. No row means no texts.
+export const smsConsents = pgTable(
+  "sms_consents",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    photographerId: uuid("photographer_id")
+      .notNull()
+      .references(() => photographers.id, { onDelete: "cascade" }),
+    phone: text("phone").notNull(),
+    status: text("status", { enum: ["in", "out"] }).notNull(),
+    // booking: the booking form's checkbox; form: the studio's text sign-up page.
+    source: text("source", { enum: ["booking", "form", "studio", "reply"] }).notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [unique("sms_consents_phone_unique").on(t.photographerId, t.phone)],
+);
+
+// Every text sent (or tried) for a studio, like email_log.
+export const smsLog = pgTable(
+  "sms_log",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    photographerId: uuid("photographer_id")
+      .notNull()
+      .references(() => photographers.id, { onDelete: "cascade" }),
+    kind: text("kind").notNull(),
+    toPhone: text("to_phone").notNull(),
+    body: text("body").notNull(),
+    status: text("status", { enum: ["sent", "failed", "skipped"] }).notNull(),
+    error: text("error"),
+    twilioSid: text("twilio_sid"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("sms_log_photographer_idx").on(t.photographerId, t.createdAt)],
 );
 
 // A quote or an invoice, like InvoiceEZ: line items, tax, and a payment

@@ -60,14 +60,24 @@ export default function TermsPage() {
         taxes, refunds, chargebacks, and the services you provide to your clients.
       </p>
 
-      <h2>5. Store orders and print partners</h2>
+      <h2>5. Text messages</h2>
+      <p>
+        On paid plans you can text your clients through your own Twilio account; Twilio bills you directly and its terms
+        apply. You may only text clients who opted in (for example, by checking the &ldquo;Text me reminders&rdquo; box when
+        booking), only about their sessions, payments, and photos, and you must honor STOP requests, which{" "}
+        {LEGAL.service} records automatically. You&rsquo;re responsible for registering your number with US carriers (A2P
+        10DLC) and for following texting laws such as the TCPA. Clients: message frequency varies, message and data rates
+        may apply, reply STOP to opt out or HELP for help.
+      </p>
+
+      <h2>6. Store orders and print partners</h2>
       <p>
         If you sell products made by a print partner such as SwaggPress Creations, the partner makes and ships those
         orders, and its own terms and policies apply to them. You set your prices and are responsible to your clients for
         those sales; any amount the partner charges you is billed as described when you connect the partner.
       </p>
 
-      <h2>6. Your content</h2>
+      <h2>7. Your content</h2>
       <p>
         You keep all rights to your photos, designs, contracts, and other content (&ldquo;your content&rdquo;). You give us
         permission to store, copy, process, and display your content only as needed to run the Service for you (for
@@ -76,7 +86,7 @@ export default function TermsPage() {
         where required.
       </p>
 
-      <h2>7. Acceptable use</h2>
+      <h2>8. Acceptable use</h2>
       <p>You agree not to use the Service to:</p>
       <ul>
         <li>upload or share anything illegal, infringing, or that exploits minors;</li>
@@ -87,40 +97,40 @@ export default function TermsPage() {
       </ul>
       <p>We may remove content or suspend accounts that break these rules.</p>
 
-      <h2>8. AI features</h2>
+      <h2>9. AI features</h2>
       <p>
         AI features (such as inquiry sorting, drafted replies, photo search, culling help, and the Studio Assistant) can
         make mistakes. Review AI suggestions before relying on them; you&rsquo;re responsible for what you send to your
         clients. The Studio Assistant only takes actions after you approve them.
       </p>
 
-      <h2>9. Privacy</h2>
+      <h2>10. Privacy</h2>
       <p>
         Our <Link href="/privacy">Privacy Policy</Link> explains how we handle information. You&rsquo;re responsible for
         having a lawful basis to collect your clients&rsquo; information and for telling them how you use it.
       </p>
 
-      <h2>10. Ending your account</h2>
+      <h2>11. Ending your account</h2>
       <p>
         You can stop using the Service and ask us to close your account at any time. We may suspend or close accounts that
         break these terms or put the Service or others at risk, and we&rsquo;ll give notice where we reasonably can. After
         closing, download anything you want to keep; we delete account data as described in the Privacy Policy.
       </p>
 
-      <h2>11. Availability and changes</h2>
+      <h2>12. Availability and changes</h2>
       <p>
         We work to keep the Service running and your data safe, but we can&rsquo;t promise it will always be available or
         error-free, and we may change or end features. Keep your own copies of important files, such as your original photos.
       </p>
 
-      <h2>12. Disclaimers</h2>
+      <h2>13. Disclaimers</h2>
       <p>
         The Service is provided &ldquo;as is&rdquo; and &ldquo;as available,&rdquo; without warranties of any kind, to the
         fullest extent the law allows, including warranties of merchantability, fitness for a particular purpose, and
         non-infringement.
       </p>
 
-      <h2>13. Limitation of liability</h2>
+      <h2>14. Limitation of liability</h2>
       <p>
         To the fullest extent the law allows, {LEGAL.company} won&rsquo;t be liable for indirect, incidental, special,
         consequential, or punitive damages, or for lost profits, revenue, data, or goodwill. Our total liability for any
@@ -128,26 +138,26 @@ export default function TermsPage() {
         you haven&rsquo;t paid us.
       </p>
 
-      <h2>14. Indemnity</h2>
+      <h2>15. Indemnity</h2>
       <p>
         You agree to defend and hold {LEGAL.company} harmless from claims arising from your content, your use of the
         Service, your dealings with your clients, or your breaking these terms.
       </p>
 
-      <h2>15. Governing law</h2>
+      <h2>16. Governing law</h2>
       <p>
         These terms are governed by the laws of the State of {LEGAL.state}, USA, without regard to its conflict-of-law
         rules. Any dispute will be handled in the state or federal courts located in {LEGAL.state}, and you and we agree
         to those courts&rsquo; jurisdiction.
       </p>
 
-      <h2>16. Changes to these terms</h2>
+      <h2>17. Changes to these terms</h2>
       <p>
         We may update these terms. We&rsquo;ll post changes here and update the date above, and tell studios about
         significant changes by email or in the dashboard. Continuing to use the Service after a change means you accept it.
       </p>
 
-      <h2>17. Contact</h2>
+      <h2>18. Contact</h2>
       <p>
         {LEGAL.company}, {LEGAL.state}, USA · {mail}
       </p>
