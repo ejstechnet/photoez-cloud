@@ -79,6 +79,8 @@ export default async function SettingsPage() {
       smsFrom: photographers.smsFrom,
       smsAlertPhone: photographers.smsAlertPhone,
       smsTexts: photographers.smsTexts,
+      legalName: photographers.legalName,
+      legalState: photographers.legalState,
     })
     .from(photographers)
     .where(eq(photographers.id, user.id));
@@ -202,6 +204,9 @@ export default async function SettingsPage() {
             alertPhone={settings.smsAlertPhone ? formatPhone(settings.smsAlertPhone) : null}
             texts={settingsWithDefaults(settings.smsTexts)}
             replyUrl={`${siteUrl}/api/twilio/sms/${user.id}`}
+            legalName={settings.legalName}
+            legalState={settings.legalState}
+            slug={settings.studioSlug}
           />
           <CalendarCard link={settings.calendarToken ? calendarUrl(settings.calendarToken) : null} />
           <ReviewsCard requestDays={settings.reviewRequestDays} googleUrl={settings.googleReviewUrl} />

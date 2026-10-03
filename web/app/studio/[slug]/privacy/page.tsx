@@ -18,7 +18,7 @@ async function findStudio(slug: string) {
 
 export async function generateMetadata({ params }: PageProps<"/studio/[slug]/privacy">): Promise<Metadata> {
   const studio = await findStudio((await params).slug);
-  return { title: studio ? `Privacy & text messages · ${studio.businessName || studio.name}` : "Studio not found · PhotoEZ Cloud" };
+  return { title: studio ? `Privacy Policy · ${studio.businessName || studio.name}` : "Studio not found · PhotoEZ Cloud" };
 }
 
 // Each studio's own privacy and text message policy, on its studio site. US
@@ -30,6 +30,9 @@ export default async function StudioPrivacyPage({ params }: PageProps<"/studio/[
   const studio = await findStudio(slug);
   if (!studio) notFound();
   const name = studio.businessName || studio.name;
+  // The registered business behind the studio (carriers match it to the texting registration).
+  const legal = studio.legalName?.trim() || null;
+  const owner = legal && legal.toLowerCase() !== name.toLowerCase() ? legal : null;
   const contact = studio.notifyEmail || studio.email;
   const number = studio.smsFrom?.startsWith("+") ? formatPhone(studio.smsFrom) : null;
   const logoUrl = studio.studioLogoKey ? await signedViewUrl(studio.studioLogoKey) : null;
@@ -39,8 +42,16 @@ export default async function StudioPrivacyPage({ params }: PageProps<"/studio/[
     <div className="flex flex-1 flex-col">
       <StudioNav slug={slug} name={name} logoUrl={logoUrl} logoBg={studio.studioLogoBg} links={await studioLinks(slug)} />
       <main className="legal mx-auto w-full max-w-3xl flex-1 px-4 py-12 leading-relaxed">
-        <h1 className="font-display text-4xl font-bold tracking-tight">Privacy &amp; text message policy</h1>
-        <p className="mt-2 text-muted">{name}</p>
+        <h1 className="font-display text-4xl font-bold tracking-tight">Privacy Policy</h1>
+        <p className="mt-2 text-muted">
+          {name}
+          {owner ? `, operated by ${owner}` : ""} · including our text message (SMS) policy
+        </p>
+        <p>
+          This Privacy Policy explains how {owner ? `${owner}, doing business as ${name}` : name} (&ldquo;we,&rdquo;
+          &ldquo;us&rdquo;) collects, uses, and protects your information. Using our services also means you agree to our{" "}
+          <Link href={`/studio/${slug}/terms`}>Terms and Conditions</Link>.
+        </p>
 
         <h2>What we collect</h2>
         <p>
@@ -99,8 +110,11 @@ export default async function StudioPrivacyPage({ params }: PageProps<"/studio/[
 
         <h2>Contact</h2>
         <p>
-          {name} · {mail}
+          {owner ? `${owner}, doing business as ${name}` : name} · {mail}
           {number ? <> · {number}</> : null}
+        </p>
+        <p>
+          <Link href={`/studio/${slug}/terms`}>Terms and Conditions</Link>
         </p>
         <p className="text-sm text-muted">
           See also the <Link href="/privacy">{LEGAL.service} Privacy Policy</Link>.

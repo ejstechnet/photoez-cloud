@@ -43,10 +43,21 @@ export async function saveTextSettings(_prev: TextsState, formData: FormData): P
   const alertPhone = alertInput ? toE164(alertInput) : null;
   if (alertInput && !alertPhone) return { message: "Enter your cell number for alerts, like (503) 555-1234." };
 
+  const legalName = String(formData.get("legalName") ?? "").trim().slice(0, 150) || null;
+  const legalState = String(formData.get("legalState") ?? "").trim().toUpperCase();
+  if (legalState && !/^[A-Z]{2}$/.test(legalState)) return { message: "Use the 2-letter state for your business, like OR." };
+
   const texts = Object.fromEntries((Object.keys(SMS_LABELS) as SmsKind[]).map((k) => [k, formData.get(k) === "on"])) as SmsSettings;
 
   // A new token (or a new account) is checked with Twilio before it's saved.
-  const update: Partial<typeof photographers.$inferInsert> = { twilioAccountSid: sid, smsFrom: from, smsAlertPhone: alertPhone, smsTexts: texts };
+  const update: Partial<typeof photographers.$inferInsert> = {
+    twilioAccountSid: sid,
+    smsFrom: from,
+    smsAlertPhone: alertPhone,
+    smsTexts: texts,
+    legalName,
+    legalState: legalState || null,
+  };
   if (token) {
     const check = await verifyTwilio(sid, token);
     if ("error" in check) return { message: check.error };
