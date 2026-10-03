@@ -693,6 +693,25 @@ export const payments = pgTable(
   (t) => [index("payments_booking_idx").on(t.bookingId), index("payments_invoice_idx").on(t.invoiceId)],
 );
 
+// A one-time key a studio makes to move its data to (or from) PhotoEZ for
+// WordPress (docs/migration-format.md). Only a hash of the key is kept; it
+// only reads, and it expires after a week.
+export const migrationKeys = pgTable(
+  "migration_keys",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    photographerId: uuid("photographer_id")
+      .notNull()
+      .references(() => photographers.id, { onDelete: "cascade" }),
+    keyHash: text("key_hash").notNull().unique(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
+    revokedAt: timestamp("revoked_at", { withTimezone: true }),
+  },
+  (t) => [index("migration_keys_photographer_idx").on(t.photographerId)],
+);
+
 // Who agreed to get texts from a studio, by phone number (+15035551234).
 // "in" comes from the booking form's checkbox or the studio marking a client
 // who agreed; "out" from the client replying STOP, and only their START

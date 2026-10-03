@@ -372,6 +372,13 @@
       "when": 1790997127231,
       "tag": "0052_tough_taskmaster",
       "breakpoints": true
+    },
+    {
+      "idx": 53,
+      "version": "7",
+      "when": 1791044291279,
+      "tag": "0053_parched_leo",
+      "breakpoints": true
     }
   ]
 }

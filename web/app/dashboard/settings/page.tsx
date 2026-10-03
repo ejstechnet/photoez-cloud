@@ -28,6 +28,8 @@ import { prepareHeadshotUpload, removeHeadshot, saveHeadshot } from "./actions";
 import { WatermarkForm } from "./watermark-form";
 import { CalendarCard } from "./calendar-card";
 import { TextsCard } from "./texts-card";
+import { MigrationCard } from "./migration-card";
+import { migrationKeyRows } from "./migration-data";
 import { hasFeature } from "@/lib/plans";
 import { settingsWithDefaults } from "@/lib/sms/messages";
 import { formatPhone } from "@/lib/sms/phone";
@@ -38,6 +40,7 @@ export default async function SettingsPage() {
   const [settings] = await db
     .select({
       calendarToken: photographers.calendarToken,
+      timeZone: photographers.timeZone,
       key: photographers.watermarkKey,
       opacity: photographers.watermarkOpacity,
       position: photographers.watermarkPosition,
@@ -208,6 +211,7 @@ export default async function SettingsPage() {
             legalState={settings.legalState}
             slug={settings.studioSlug}
           />
+          <MigrationCard siteUrl={siteUrl} keys={await migrationKeyRows(user.id, settings.timeZone)} />
           <CalendarCard link={settings.calendarToken ? calendarUrl(settings.calendarToken) : null} />
           <ReviewsCard requestDays={settings.reviewRequestDays} googleUrl={settings.googleReviewUrl} />
           <ClientReferralsCard
