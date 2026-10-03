@@ -1,4 +1,4 @@
-import { asc, eq } from "drizzle-orm";
+import { asc, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { photographers, studioFaqs, studioPhotos } from "@/db/schema";
 import { SUGGESTED_FAQ_QUESTIONS } from "@/lib/faq";
@@ -27,6 +27,10 @@ import { PhotoUpload } from "@/components/photo-upload";
 import { prepareHeadshotUpload, removeHeadshot, saveHeadshot } from "./actions";
 import { WatermarkForm } from "./watermark-form";
 import { CalendarCard } from "./calendar-card";
+import { TextsCard } from "./texts-card";
+import { hasFeature } from "@/lib/plans";
+import { settingsWithDefaults } from "@/lib/sms/messages";
+import { formatPhone } from "@/lib/sms/phone";
 import { calendarUrl } from "@/lib/calendar-link";
 
 export default async function SettingsPage() {
@@ -70,6 +74,11 @@ export default async function SettingsPage() {
       giftCardAmounts: photographers.giftCardAmounts,
       giftCardMinCents: photographers.giftCardMinCents,
       giftCardMaxCents: photographers.giftCardMaxCents,
+      twilioAccountSid: photographers.twilioAccountSid,
+      hasTwilioToken: sql<boolean>`${photographers.twilioAuthToken} is not null`,
+      smsFrom: photographers.smsFrom,
+      smsAlertPhone: photographers.smsAlertPhone,
+      smsTexts: photographers.smsTexts,
     })
     .from(photographers)
     .where(eq(photographers.id, user.id));
@@ -183,6 +192,16 @@ export default async function SettingsPage() {
             balanceReminderDays={settings.balanceReminderDays}
             galleryExpiryReminderDays={settings.galleryExpiryReminderDays}
             paymentsReady={stripeReady}
+          />
+          <TextsCard
+            allowed={hasFeature(plan.plan, "textMessages")}
+            upgradeLabel={PLAN_LABELS[planFor("textMessages")]}
+            sid={settings.twilioAccountSid}
+            hasToken={settings.hasTwilioToken}
+            from={settings.smsFrom?.startsWith("+") ? formatPhone(settings.smsFrom) : settings.smsFrom}
+            alertPhone={settings.smsAlertPhone ? formatPhone(settings.smsAlertPhone) : null}
+            texts={settingsWithDefaults(settings.smsTexts)}
+            replyUrl={`${siteUrl}/api/twilio/sms/${user.id}`}
           />
           <CalendarCard link={settings.calendarToken ? calendarUrl(settings.calendarToken) : null} />
           <ReviewsCard requestDays={settings.reviewRequestDays} googleUrl={settings.googleReviewUrl} />

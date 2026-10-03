@@ -11,9 +11,13 @@ import { siteUrl } from "@/lib/site";
 import { clientReferralLink } from "@/lib/client-referrals";
 import * as messages from "./messages";
 import { sendToClient, sendToStudio } from "./send";
+import * as texts from "@/lib/sms/messages";
+import { textClient, textStudio } from "@/lib/sms/send";
 
 // One function per moment an email goes out. Each loads what it needs, so
-// callers just say what happened (usually through afterResponse()).
+// callers just say what happened (usually through afterResponse()). The
+// matching text message (lib/sms) goes out from here too, when the studio
+// texts and the client agreed to texts.
 
 export function formatWhen(instant: Date, timeZone: string) {
   return `${formatDate(instant, timeZone)} at ${formatTime(instant, timeZone)} ${zoneLabel(instant, timeZone)}`;
@@ -82,6 +86,11 @@ export async function emailBookingConfirmed(bookingId: string) {
       dashboardUrl,
     }),
     { bookingId, replyTo: booking.clientEmail },
+  );
+  await textStudio(
+    booking.photographerId,
+    "booking_new",
+    texts.newBookingAlert({ client: booking.clientName, session: booking.sessionName, when: facts.when, url: dashboardUrl }),
   );
 }
 
@@ -178,6 +187,9 @@ export async function emailSessionReminder(bookingId: string) {
   const loaded = await loadBooking(bookingId);
   if (!loaded) return false;
   const { booking, studio, facts } = loaded;
+  await textClient(booking.photographerId, "sessionReminder", "session_reminder", booking.clientPhone, (name) =>
+    texts.sessionReminderText({ studio: name, client: booking.clientName, session: booking.sessionName, when: facts.when, url: facts.manageUrl }),
+  );
   return sendToClient(
     booking.photographerId,
     "session_reminder",
@@ -192,6 +204,16 @@ export async function emailBalanceReminder(bookingId: string) {
   const loaded = await loadBooking(bookingId);
   if (!loaded || loaded.facts.totalCents - loaded.facts.paidCents <= 0) return false;
   const { booking, facts } = loaded;
+  await textClient(booking.photographerId, "paymentDue", "balance_reminder", booking.clientPhone, (name) =>
+    texts.paymentDueText({
+      studio: name,
+      client: booking.clientName,
+      what: `${booking.sessionName} balance`,
+      amountCents: facts.totalCents - facts.paidCents,
+      due: null,
+      url: facts.manageUrl,
+    }),
+  );
   return sendToClient(
     booking.photographerId,
     "balance_reminder",
@@ -205,7 +227,7 @@ export async function emailBalanceReminder(bookingId: string) {
 
 async function loadGallery(galleryId: string) {
   const [row] = await db
-    .select({ gallery: galleries, studio: photographers, clientName: clients.name, clientEmail: clients.email })
+    .select({ gallery: galleries, studio: photographers, clientName: clients.name, clientEmail: clients.email, clientPhone: clients.phone })
     .from(galleries)
     .innerJoin(photographers, eq(photographers.id, galleries.photographerId))
     .leftJoin(clients, eq(clients.id, galleries.clientId))
@@ -223,6 +245,7 @@ async function loadGallery(galleryId: string) {
     gallery,
     facts,
     clientEmail: row.clientEmail,
+    clientPhone: row.clientPhone,
     dashboardUrl: `${siteUrl}/dashboard/galleries/${gallery.id}`,
   };
 }
@@ -267,7 +290,11 @@ export async function emailGalleryLink(galleryId: string): Promise<{ ok: true; t
 // Delivered: the client hears their finals are ready (when we have their email).
 export async function emailFinalsReady(galleryId: string) {
   const loaded = await loadGallery(galleryId);
-  if (!loaded?.clientEmail) return;
+  if (!loaded) return;
+  await textClient(loaded.gallery.photographerId, "galleryReady", "gallery_finals", loaded.clientPhone, (name) =>
+    texts.galleryReadyText({ studio: name, client: loaded.facts.clientName, url: loaded.facts.url }),
+  );
+  if (!loaded.clientEmail) return;
   const { gallery, facts, clientEmail } = loaded;
   await sendToClient(
     gallery.photographerId,
@@ -309,9 +336,13 @@ export async function emailSelectionsSubmitted(galleryId: string) {
 
 export async function emailGalleryExpiring(galleryId: string) {
   const loaded = await loadGallery(galleryId);
-  if (!loaded?.clientEmail || !loaded.facts.expires) return false;
+  if (!loaded?.facts.expires) return false;
   const { gallery, facts, clientEmail } = loaded;
   const delivered = gallery.status === "delivered" || gallery.status === "completed";
+  const texted = await textClient(gallery.photographerId, "galleryExpiring", "gallery_expiring", loaded.clientPhone, (name) =>
+    texts.galleryExpiringText({ studio: name, client: facts.clientName, expires: facts.expires!, url: facts.url, delivered }),
+  );
+  if (!clientEmail) return texted;
   return sendToClient(
     gallery.photographerId,
     "gallery_expiring",
@@ -379,6 +410,15 @@ export async function handleNewInquiry(inquiryId: string) {
       dashboardUrl: `${siteUrl}/dashboard/inquiries/${inquiry.id}`,
     }),
     { inquiryId, replyTo: inquiry.fromEmail ?? triage?.email ?? null },
+  );
+  await textStudio(
+    inquiry.photographerId,
+    "inquiry_new",
+    texts.newInquiryAlert({
+      from: inquiry.fromName ?? triage?.clientName ?? inquiry.fromEmail ?? "someone",
+      summary: triage?.summary ?? null,
+      url: `${siteUrl}/dashboard/inquiries/${inquiry.id}`,
+    }),
   );
 }
 

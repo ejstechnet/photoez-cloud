@@ -10,7 +10,7 @@ export const LEGAL = {
   email: "support@photoezcloud.com",
   state: "Oregon",
   // Change when either document changes (shown at the top of both).
-  updated: "October 1, 2026",
+  updated: "October 2, 2026",
 };
 
 export function LegalPage({ title, children }: { title: string; children: React.ReactNode }) {

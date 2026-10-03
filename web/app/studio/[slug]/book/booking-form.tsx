@@ -1,5 +1,6 @@
 "use client";
 
+import { SmsConsent } from "@/components/sms-consent";
 import { startTransition, useActionState, useState } from "react";
 import Link from "next/link";
 import { Field, FormError, SelectField, SubmitButton, TextAreaField, inputClass } from "@/components/form";
@@ -44,6 +45,7 @@ export function BookingForm({
   questions,
   inspoMode,
   giftCardsOn,
+  textsOn = false,
   friend = null,
 }: {
   slug: string;
@@ -61,6 +63,8 @@ export function BookingForm({
   inspoMode: "off" | "optional" | "required";
   // Show the gift card field (the studio sells gift cards or has issued some).
   giftCardsOn: boolean;
+  // The studio sends text reminders: offer the opt-in checkbox.
+  textsOn?: boolean;
   // Came through a client's share link: the friend discount for a first session.
   friend?: { code: string; name: string; discountCents: number } | null;
 }) {
@@ -425,6 +429,10 @@ export function BookingForm({
             </div>
           )}
           <Field label="Phone" name="phone" type="tel" autoComplete="tel" error={errors.phone} hint="Optional" />
+          {textsOn && (
+            // Unticked by default: texts only go to clients who ask for them.
+            <SmsConsent slug={slug} />
+          )}
           <TextAreaField
             label="Anything we should know?"
             name="notes"

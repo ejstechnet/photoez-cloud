@@ -358,6 +358,13 @@
       "when": 1790990768226,
       "tag": "0050_crazy_dark_beast",
       "breakpoints": true
+    },
+    {
+      "idx": 51,
+      "version": "7",
+      "when": 1790993520528,
+      "tag": "0051_broken_kat_farrell",
+      "breakpoints": true
     }
   ]
 }

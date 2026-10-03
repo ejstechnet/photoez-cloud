@@ -17,6 +17,7 @@ import { richTextHtml, richTextToPlain } from "@/lib/rich-text";
 import { signedViewUrl } from "@/lib/storage";
 import { StudioBar, StudioFooter } from "../studio-bar";
 import { BookingForm } from "./booking-form";
+import { textingOn } from "@/lib/sms/send";
 import { BookingSteps } from "./booking-steps";
 import { Calendar } from "./calendar";
 import { SessionPicker } from "./session-picker";
@@ -270,6 +271,7 @@ export default async function BookPage({ params, searchParams }: PageProps<"/stu
                 questions={questions}
                 inspoMode={studio.inspoMode}
                 giftCardsOn={giftCardsOn}
+                textsOn={await textingOn(studio.id)}
                 friend={friend}
                 summary={
                   <>

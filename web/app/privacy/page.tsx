@@ -87,21 +87,57 @@ export default function PrivacyPage() {
       </p>
 
       <h2>Who we share information with</h2>
-      <p>We share information only as needed to run the service, with these providers:</p>
+      <p>
+        <strong>
+          Mobile phone numbers, phone contact information, and text message (SMS) opt-in data and consent are never sold,
+          and are never shared with third parties or affiliates for their marketing or promotional purposes.
+        </strong>{" "}
+        We don&rsquo;t sell any personal information. We share information only as needed to run the service, and each
+        provider gets only what its job needs:
+      </p>
       <ul>
-        <li><strong>Stripe</strong>: payments for studios&rsquo; plans and for client payments to studios.</li>
+        <li>
+          <strong>Stripe</strong>: payments for studios&rsquo; plans and for client payments to studios (the payer&rsquo;s
+          email and payment details; we don&rsquo;t send Stripe phone numbers).
+        </li>
         <li><strong>Cloudflare</strong> (R2 storage): photos and files, stored privately.</li>
-        <li><strong>Anthropic</strong>: the AI features described above.</li>
+        <li>
+          <strong>Anthropic</strong>: the AI features described above. A phone number reaches it only if it&rsquo;s written
+          inside an inquiry or a studio looks up a client with the Studio Assistant, and only to produce that answer.
+        </li>
+        <li>
+          <strong>Twilio</strong>: delivers text messages for studios that send them, and receives the phone number and
+          message only to deliver texts to clients who opted in.
+        </li>
         <li><strong>Our hosting provider</strong>: the servers that run {LEGAL.service} and send its email.</li>
         <li>
           <strong>Print and product partners</strong>, such as SwaggPress Creations: when a client orders from a studio&rsquo;s
-          store, the photos or designs, product choices, and shipping address are sent to the partner to make and ship the order.
+          store, the photos or designs, product choices, and the shipping name and address are sent to the partner to make
+          and ship the order. Phone numbers are not sent.
         </li>
         <li><strong>Google Fonts</strong>: studio pages may load fonts from Google, which receives your IP address.</li>
       </ul>
       <p>
         We may also share information if the law requires it, to protect the rights and safety of our users or others, or
         as part of a sale or transfer of the business (with this policy continuing to apply).
+      </p>
+
+      <h2>Text messages</h2>
+      <p>
+        Studios can send their clients text reminders (session reminders, payment reminders, and gallery notices) through
+        the studio&rsquo;s own Twilio account. A client only gets texts after opting in, by checking an unchecked &ldquo;Text
+        me reminders&rdquo; box when booking, on the studio&rsquo;s text reminders sign-up page, or by telling the studio they want texts. Message frequency varies; message and
+        data rates may apply. Reply STOP to any text to opt out, or HELP for help. Each studio also has its own text message
+        policy at its studio page&rsquo;s /privacy address.
+      </p>
+      <p>
+        <strong>
+          We do not sell, rent, or share mobile phone numbers or text message opt-in data and consent with third parties or
+          affiliates for marketing or promotional purposes.
+        </strong>{" "}
+        No mobile information will be shared with third parties or affiliates for marketing or promotional purposes. All the
+        categories of sharing above exclude text messaging originator opt-in data and consent; this information will not be
+        shared with any third parties. To deliver texts, the phone number and message go only to Twilio.
       </p>
 
       <h2>Cookies</h2>
