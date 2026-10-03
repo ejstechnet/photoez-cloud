@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Plus_Jakarta_Sans, Young_Serif } from "next/font/google";
 import "./globals.css";
 import { CookieNotice } from "@/components/cookie-notice";
+import { siteUrl } from "@/lib/site";
 
 // Young Serif: a warm, sturdy serif for headings (a nod to PhotoEZ's serif
 // titles), with steady letters at every size. It comes in one weight, so
@@ -18,9 +19,17 @@ const sans = Plus_Jakarta_Sans({
   subsets: ["latin"],
 });
 
+// Site-wide defaults for search engines and link previews. Pages set their
+// own title and description; metadataBase turns relative links (canonical
+// addresses, share images) into full photoezcloud.com addresses.
 export const metadata: Metadata = {
+  metadataBase: new URL(siteUrl),
   title: "PhotoEZ Cloud",
-  description: "AI-assisted studio software for photographers.",
+  description:
+    "All-in-one studio software for photographers: booking, contracts, client galleries, invoices, payments, a print store, and AI help.",
+  applicationName: "PhotoEZ Cloud",
+  openGraph: { siteName: "PhotoEZ Cloud", type: "website", locale: "en_US" },
+  twitter: { card: "summary_large_image" },
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

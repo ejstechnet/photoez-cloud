@@ -71,9 +71,14 @@ export async function generateMetadata({
   const studio = await findStudio(slug);
   if (!studio) return { title: "Studio not found · PhotoEZ Cloud" };
   const name = studio.businessName ?? studio.name;
+  const area = studio.serviceArea?.trim().replace(/[.,;:!]+$/, "") ?? null;
+  const description = studio.tagline ?? `See ${name}'s work, sessions, and reviews, and book a photography session online.`;
   return {
-    title: `${name} · Photography`,
-    description: studio.tagline ?? `Book a session with ${name}.`,
+    // "… · Photography in Portland, OR" when the service area is short enough for a title.
+    title: `${name} · Photography${area && area.length <= 40 ? ` in ${area}` : ""}`,
+    description,
+    alternates: { canonical: `/studio/${slug.toLowerCase()}` },
+    openGraph: { title: `${name} · Photography`, description, url: `/studio/${slug.toLowerCase()}`, siteName: name },
   };
 }
 
@@ -189,6 +194,8 @@ export default async function StudioPage({
         name={name}
         slug={slug.toLowerCase()}
         reviews={studioReviews}
+        description={studio.tagline}
+        areaServed={studio.serviceArea}
       />
       <StudioNav
         slug={slug}

@@ -5,9 +5,11 @@ import { LegalFooter } from "@/components/legal-page";
 import { ArrowRightIcon } from "@/components/icons";
 import { IntervalSwitch, PlanCards } from "@/components/plan-cards";
 import { PLAN_LABELS, TRIAL_DAYS, type Interval } from "@/lib/plans";
+import { JsonLd } from "@/components/json-ld";
 
 export const metadata: Metadata = {
-  title: "Pricing",
+  title: "Pricing: Free, Pro & Studio Plans · PhotoEZ Cloud",
+  alternates: { canonical: "/pricing" },
   description: `PhotoEZ Cloud plans for photographers: Free, Pro, and Studio. Every new studio gets a ${TRIAL_DAYS}-day Pro trial, no card needed.`,
 };
 
@@ -41,6 +43,14 @@ export default async function PricingPage({ searchParams }: PageProps<"/pricing"
 
   return (
     <div className="flex flex-1 flex-col">
+      {/* The questions below, for search results. */}
+      <JsonLd
+        data={{
+          "@context": "https://schema.org",
+          "@type": "FAQPage",
+          mainEntity: QUESTIONS.map(({ q, a }) => ({ "@type": "Question", name: q, acceptedAnswer: { "@type": "Answer", text: a } })),
+        }}
+      />
       <header className="bg-brand text-white">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-5">
           <Logo />

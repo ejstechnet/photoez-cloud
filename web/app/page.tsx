@@ -25,6 +25,51 @@ import {
 } from "@/components/icons";
 import { PHOTOEZ_LINKS, WORDPRESS_PLUGINS } from "@/lib/photoez-links";
 import { WordPressMockup } from "@/components/marketing-mockups";
+import type { Metadata } from "next";
+import { JsonLd } from "@/components/json-ld";
+import { PLAN_PRICES } from "@/lib/plans";
+import { siteUrl } from "@/lib/site";
+
+export const metadata: Metadata = {
+  title: "PhotoEZ Cloud: Studio Software for Photographers | Booking, Galleries, Invoices",
+  description:
+    "Run your photography business in one place: online booking, contracts, client proofing galleries, invoices and payment plans, a print store, text reminders, and AI that sorts inquiries and culls photos. Free plan; Pro trial with no card.",
+  alternates: { canonical: "/" },
+  openGraph: {
+    title: "PhotoEZ Cloud: studio software for photographers",
+    description: "Booking, contracts, galleries, invoices, payments, a print store, and AI in one place. 0% commission.",
+    url: "/",
+  },
+};
+
+// What search engines read about PhotoEZ Cloud itself: the company and the
+// app, with its plan prices.
+const structuredData = [
+  {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    name: "PhotoEZ Cloud",
+    url: siteUrl,
+    logo: `${siteUrl}/icon.svg`,
+    email: "support@photoezcloud.com",
+    parentOrganization: { "@type": "Organization", name: "EJS Tech" },
+  },
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    name: "PhotoEZ Cloud",
+    url: siteUrl,
+    applicationCategory: "BusinessApplication",
+    operatingSystem: "Web",
+    description:
+      "All-in-one studio software for photographers: online booking, contracts, client proofing and delivery galleries, invoices with payment plans, a print and product store, text reminders, and AI inquiry triage, gallery search, and culling.",
+    offers: [
+      { "@type": "Offer", name: "Free", price: "0", priceCurrency: "USD" },
+      { "@type": "Offer", name: "Pro", price: (PLAN_PRICES.pro.month / 100).toFixed(2), priceCurrency: "USD" },
+      { "@type": "Offer", name: "Studio", price: (PLAN_PRICES.studio.month / 100).toFixed(2), priceCurrency: "USD" },
+    ],
+  },
+];
 
 const features = [
   {
@@ -117,6 +162,7 @@ export default async function Home() {
 
   return (
     <main className="flex flex-1 flex-col">
+      <JsonLd data={structuredData} />
       {/* Hero and "Grow your business": a deep navy, #060f1e. */}
       <section className="relative overflow-hidden text-white" style={{ backgroundColor: "#060f1e" }}>
         {/* The photographer-at-work image, faded into the navy on every side so its

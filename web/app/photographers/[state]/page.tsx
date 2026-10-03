@@ -14,6 +14,7 @@ export async function generateMetadata({ params }: PageProps<"/photographers/[st
   return {
     title: `Photographers in ${name} | PhotoEZ Cloud`,
     description: `Find local photographers across ${name}. See their work, reviews, and prices, and book online.`,
+    alternates: { canonical: `/photographers/${state.toLowerCase()}` },
   };
 }
 

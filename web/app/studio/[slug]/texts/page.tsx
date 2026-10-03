@@ -17,7 +17,11 @@ async function findStudio(slug: string) {
 
 export async function generateMetadata({ params }: PageProps<"/studio/[slug]/texts">): Promise<Metadata> {
   const studio = await findStudio((await params).slug);
-  return { title: studio ? `Text reminders · ${studio.businessName || studio.name}` : "Studio not found · PhotoEZ Cloud" };
+  return {
+    title: studio ? `Text reminders · ${studio.businessName || studio.name}` : "Studio not found · PhotoEZ Cloud",
+    // A small sign-up form: no reason for it to show in search results.
+    robots: { index: false, follow: true },
+  };
 }
 
 // A public sign-up for a studio's text reminders: the same opt-in checkbox and
