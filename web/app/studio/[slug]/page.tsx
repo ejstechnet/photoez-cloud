@@ -425,6 +425,14 @@ export default async function StudioPage({
                   </span>
                 ))}
               </div>
+              {sessions.some((session) => session.quote) && (
+                <Link
+                  href={`/studio/${slug.toLowerCase()}/book?quote=${sessions.find((session) => session.quote)!.type}#quote`}
+                  className="btn-secondary mt-4"
+                >
+                  Request a quote
+                </Link>
+              )}
             </div>
           )}
           {faqs.length > 0 && (

@@ -96,8 +96,9 @@ export async function submitInquiry(
     return { message: "Thanks! We already have your messages. The studio will be in touch soon." };
   }
 
-  const quote = studio.quoteOnlyTypes.includes(data.sessionType);
-  const sessionLabel = SESSION_LABELS[data.sessionType as SessionType] ?? "Something else";
+  // A by-quote service, or anything sent from the booking page's quote form (including "Other").
+  const quote = studio.quoteOnlyTypes.includes(data.sessionType) || formData.get("quoteRequest") === "1";
+  const sessionLabel = SESSION_LABELS[data.sessionType as SessionType] ?? (quote ? "Other" : "Something else");
 
   // What the form collected, written out the way the AI triage reads inquiries.
   const message = [

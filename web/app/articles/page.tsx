@@ -13,6 +13,10 @@ export const metadata: Metadata = {
   alternates: { canonical: "/articles" },
 };
 
+// Rendered on each visit: the blog list comes from ejstech.net's feed (kept
+// for an hour in lib/blog.ts), so it can't be saved once at build time.
+export const dynamic = "force-dynamic";
+
 // PhotoEZ Cloud's own articles, then the newest from the EJS Tech blog.
 export default async function ArticlesPage() {
   const posts = await blogPosts();
