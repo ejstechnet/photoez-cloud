@@ -12,7 +12,7 @@ import { loadRules, openDatesInMonth, slotsForDate } from "@/lib/booking/availab
 import { formatDuration, formatPrice } from "@/lib/booking/format";
 import { currentPrice } from "@/lib/booking/pricing";
 import { addMonths, formatDate, formatTime, localDateOf, zoneLabel } from "@/lib/booking/time";
-import { LOCATION_LABELS, type ShootLocation } from "@/lib/session-types";
+import { LOCATION_LABELS, OFFERABLE_TYPES, SESSION_LABELS, type ShootLocation } from "@/lib/session-types";
 import { richTextHtml, richTextToPlain } from "@/lib/rich-text";
 import { signedViewUrl } from "@/lib/storage";
 import { StudioBar, StudioFooter } from "../studio-bar";
@@ -21,6 +21,7 @@ import { textingOn } from "@/lib/sms/send";
 import { BookingSteps } from "./booking-steps";
 import { Calendar } from "./calendar";
 import { SessionPicker } from "./session-picker";
+import { QuoteRequest } from "./quote-request";
 
 // Public booking page: pick a session, a day, and a time, then enter your
 // details. Each choice is a link that adds to the URL
@@ -39,6 +40,8 @@ async function findStudio(slug: string) {
       logoBg: photographers.studioLogoBg,
       inspoMode: photographers.inspoMode,
       giftCardsEnabled: photographers.giftCardsEnabled,
+      offeredTypes: photographers.offeredTypes,
+      quoteOnlyTypes: photographers.quoteOnlyTypes,
     })
     .from(photographers)
     .where(eq(photographers.studioSlug, slug.toLowerCase()));
@@ -155,6 +158,14 @@ export default async function BookPage({ params, searchParams }: PageProps<"/stu
   };
 
   const bookingOpen = sessions.length > 0 && rules.hours.length > 0;
+  // Services the studio prices by quote (weddings, events, product…), for the quote request box.
+  const inquiryTypes = OFFERABLE_TYPES.filter((type) => studio.offeredTypes.includes(type)).map((type) => ({
+    type,
+    label: SESSION_LABELS[type],
+    quote: studio.quoteOnlyTypes.includes(type),
+  }));
+  const quoteLabels = inquiryTypes.filter((t) => t.quote).map((t) => t.label);
+  const askedQuote = one(query.quote);
 
   return (
     <div className="flex flex-1 flex-col">
@@ -163,6 +174,15 @@ export default async function BookPage({ params, searchParams }: PageProps<"/stu
       <main className={`mx-auto w-full flex-1 px-4 py-10 ${session ? "max-w-3xl" : "max-w-7xl"}`}>
         <p className="text-sm font-bold tracking-wider text-lime-ink uppercase">{name}</p>
         <h1 className="mt-1 font-display text-4xl font-bold tracking-tight sm:text-5xl">Book a session</h1>
+        {!session && quoteLabels.length > 0 && (
+          <p className="mt-3 text-muted">
+            Looking for {quoteLabels.join(", ").toLowerCase()}?{" "}
+            <a href="#quote" className="font-semibold text-link underline">
+              Request a quote below
+            </a>
+            .
+          </p>
+        )}
         {one(query.payment) === "cancelled" && (
           <p className="mt-4 rounded-2xl bg-sun/30 px-5 py-4 font-semibold">
             Your payment was cancelled, so that time wasn&apos;t booked. You can pick a time again below.
@@ -287,6 +307,9 @@ export default async function BookPage({ params, searchParams }: PageProps<"/stu
               />
             )}
           </div>
+        )}
+        {!session && (
+          <QuoteRequest slug={slug} studioName={name} sessions={inquiryTypes} initialType={askedQuote} startOpen={askedQuote !== undefined} />
         )}
       </main>
 

@@ -9,21 +9,31 @@ export function InquiryForm({
   studioName,
   sessions,
   fromDirectory = false,
+  initialType,
+  quoteOnly = false,
 }: {
   slug: string;
   studioName: string;
   sessions: { type: string; label: string; quote: boolean }[];
   // The visitor came from the photographer directory (/photographers).
   fromDirectory?: boolean;
+  // A service to start with (e.g. from a "Request a quote" button).
+  initialType?: string;
+  // The booking page's quote request form: only the by-quote services.
+  quoteOnly?: boolean;
 }) {
   const [state, formAction, pending] = useActionState<InquiryFormState, FormData>(
     submitInquiry.bind(null, slug),
     {},
   );
-  const [sessionType, setSessionType] = useState(sessions[0]?.type ?? "other");
+  const offered = quoteOnly ? sessions.filter((s) => s.quote) : sessions;
+  const [sessionType, setSessionType] = useState(
+    offered.some((s) => s.type === initialType) ? initialType! : (offered[0]?.type ?? "other"),
+  );
   const [startedAt] = useState(() => Date.now());
   const errors = state.errors ?? {};
-  const quote = sessions.find((s) => s.type === sessionType)?.quote ?? false;
+  // In the quote form everything is a quote request, "Other" included.
+  const quote = quoteOnly || (offered.find((s) => s.type === sessionType)?.quote ?? false);
 
   if (state.sent) {
     return (
@@ -49,6 +59,7 @@ export function InquiryForm({
       </div>
       <input type="hidden" name="startedAt" value={startedAt} />
       {fromDirectory && <input type="hidden" name="from" value="directory" />}
+      {quoteOnly && <input type="hidden" name="quoteRequest" value="1" />}
 
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="Your name" name="name" autoComplete="name" error={errors.name} required />
@@ -56,19 +67,19 @@ export function InquiryForm({
       </div>
       <div className="grid gap-4 sm:grid-cols-2">
         <SelectField
-          label="What are you looking for?"
+          label={quoteOnly ? "What would you like a quote for?" : "What are you looking for?"}
           name="sessionType"
           value={sessionType}
           onChange={(event) => setSessionType(event.target.value)}
           error={errors.sessionType}
         >
-          {sessions.map((session) => (
+          {offered.map((session) => (
             <option key={session.type} value={session.type}>
               {session.label}
-              {session.quote ? " (quote)" : ""}
+              {session.quote && !quoteOnly ? " (quote)" : ""}
             </option>
           ))}
-          <option value="other">Something else</option>
+          <option value="other">{quoteOnly ? "Other" : "Something else"}</option>
         </SelectField>
         <Field
           label="Phone"
