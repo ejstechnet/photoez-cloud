@@ -30,6 +30,8 @@ import { CalendarCard } from "./calendar-card";
 import { TextsCard } from "./texts-card";
 import { MigrationCard } from "./migration-card";
 import { migrationKeyRows } from "./migration-data";
+import { ImportCard } from "./import-card";
+import { currentImport } from "@/lib/migration/importer";
 import { hasFeature } from "@/lib/plans";
 import { settingsWithDefaults } from "@/lib/sms/messages";
 import { formatPhone } from "@/lib/sms/phone";
@@ -211,6 +213,7 @@ export default async function SettingsPage() {
             legalState={settings.legalState}
             slug={settings.studioSlug}
           />
+          <ImportCard initial={await importView(user.id)} />
           <MigrationCard siteUrl={siteUrl} keys={await migrationKeyRows(user.id, settings.timeZone)} />
           <CalendarCard link={settings.calendarToken ? calendarUrl(settings.calendarToken) : null} />
           <ReviewsCard requestDays={settings.reviewRequestDays} googleUrl={settings.googleReviewUrl} />
@@ -246,4 +249,11 @@ export default async function SettingsPage() {
       </div>
     </div>
   );
+}
+
+// The studio’s WordPress import, for Settings (never the key).
+async function importView(photographerId: string) {
+  const job = await currentImport(photographerId);
+  if (!job) return null;
+  return { studioName: job.studioName, phase: job.phase, totals: job.totals, done: job.done, errors: job.errors, finished: job.phase === "done" };
 }

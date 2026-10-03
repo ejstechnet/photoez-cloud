@@ -1,0 +1,1 @@
+ALTER TABLE "migration_imports" ADD COLUMN "include" jsonb;

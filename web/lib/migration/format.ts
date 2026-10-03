@@ -69,6 +69,35 @@ export type MGallery = {
 
 export type Page<T> = { items: T[]; next: number | null };
 
+// What a studio chose to bring over. galleryIds lists the chosen galleries;
+// clientIds the clients those galleries need (brought over even when
+// "clients" is off, so every gallery keeps its client).
+export type ImportChoice = {
+  clients: boolean;
+  sessions: boolean;
+  contracts: boolean;
+  galleryIds: string[];
+  clientIds: string[];
+};
+
+// Totals for the progress bar, counting only what was chosen.
+export function chosenTotals(
+  counts: Manifest["counts"],
+  choice: ImportChoice,
+  galleries: { id: string; photos: number }[],
+): Record<string, number> {
+  const chosen = new Set(choice.galleryIds);
+  const picked = galleries.filter((g) => chosen.has(g.id));
+  return {
+    clients: choice.clients ? counts.clients : choice.clientIds.length,
+    addons: choice.sessions ? counts.addons : 0,
+    sessionTypes: choice.sessions ? counts.sessionTypes : 0,
+    contracts: choice.contracts ? counts.contracts : 0,
+    galleries: picked.length,
+    photos: picked.reduce((sum, g) => sum + g.photos, 0),
+  };
+}
+
 // A new key: shown to the studio once. Only its hash is stored.
 export function newMigrationKey() {
   return `${KEY_PREFIX}${randomBytes(24).toString("base64url")}`;

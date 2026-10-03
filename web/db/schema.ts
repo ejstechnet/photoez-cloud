@@ -712,6 +712,51 @@ export const migrationKeys = pgTable(
   (t) => [index("migration_keys_photographer_idx").on(t.photographerId)],
 );
 
+// A studio importing itself from PhotoEZ for WordPress (lib/migration/importer.ts):
+// the WordPress site, its migration key (sealed, lib/secret-box.ts), and how
+// far the import has got. One at a time per studio.
+export const migrationImports = pgTable("migration_imports", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  photographerId: uuid("photographer_id")
+    .notNull()
+    .unique()
+    .references(() => photographers.id, { onDelete: "cascade" }),
+  sourceBase: text("source_base").notNull(),
+  keySealed: text("key_sealed").notNull(),
+  studioName: text("studio_name"),
+  phase: text("phase").notNull().default("clients"),
+  offset: integer("offset").notNull().default(0),
+  hideSessions: boolean("hide_sessions").notNull().default(true),
+  // What the studio chose to bring over (null = everything).
+  include: jsonb("include").$type<import("../lib/migration/format").ImportChoice>(),
+  totals: jsonb("totals").$type<Record<string, number>>().notNull().default({}),
+  done: jsonb("done").$type<Record<string, number>>().notNull().default({}),
+  errors: jsonb("errors").$type<{ what: string; why: string }[]>().notNull().default([]),
+  startedAt: timestamp("started_at", { withTimezone: true }).notNull().defaultNow(),
+  finishedAt: timestamp("finished_at", { withTimezone: true }),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+// What an import already brought in: each source record (by kind and the
+// source's ID) and what it became here, so an import can continue after an
+// interruption and never brings anything in twice.
+export const migrationMap = pgTable(
+  "migration_map",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    photographerId: uuid("photographer_id")
+      .notNull()
+      .references(() => photographers.id, { onDelete: "cascade" }),
+    source: text("source").notNull(),
+    kind: text("kind").notNull(),
+    sourceId: text("source_id").notNull(),
+    // The new record's id here; null when it couldn't be imported.
+    destId: text("dest_id"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [unique("migration_map_unique").on(t.photographerId, t.source, t.kind, t.sourceId)],
+);
+
 // Who agreed to get texts from a studio, by phone number (+15035551234).
 // "in" comes from the booking form's checkbox or the studio marking a client
 // who agreed; "out" from the client replying STOP, and only their START
