@@ -11,8 +11,12 @@ export function SmsConsent({ slug, studioName, required = false }: { slug: strin
         <span className="text-muted">
           Message frequency varies. Message and data rates may apply. Reply STOP to opt out, HELP for help.
           {required ? "" : " Not required to book."}{" "}
+          <a href={`/studio/${slug}/terms`} target="_blank" className="underline">
+            Terms
+          </a>{" "}
+          &amp;{" "}
           <a href={`/studio/${slug}/privacy`} target="_blank" className="underline">
-            Text message &amp; privacy policy
+            Privacy Policy
           </a>
         </span>
       </span>

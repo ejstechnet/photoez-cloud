@@ -163,6 +163,12 @@ export const photographers = pgTable("photographers", {
   // Which texts go out, and the studio's own cell for new booking / inquiry alerts.
   smsTexts: jsonb("sms_texts").$type<import("../lib/sms/messages").SmsSettings>(),
   smsAlertPhone: text("sms_alert_phone"),
+  // The business name the studio registered (e.g. its LLC or DBA owner), shown
+  // on its studio Terms and Privacy pages; carriers match it to the texting
+  // registration. Null = the studio name.
+  legalName: text("legal_name"),
+  // The US state the business is in, for the Terms' governing law.
+  legalState: text("legal_state"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });

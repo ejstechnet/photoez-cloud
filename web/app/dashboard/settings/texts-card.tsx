@@ -19,6 +19,9 @@ export function TextsCard({
   alertPhone,
   texts,
   replyUrl,
+  legalName,
+  legalState,
+  slug,
 }: {
   allowed: boolean;
   upgradeLabel: string;
@@ -29,6 +32,10 @@ export function TextsCard({
   texts: SmsSettings;
   // Where Twilio should send replies (for STOP / START).
   replyUrl: string;
+  legalName: string | null;
+  legalState: string | null;
+  // For the links to the studio's Terms, Privacy, and text sign-up pages.
+  slug: string | null;
 }) {
   const [state, formAction, pending] = useActionState(saveTextSettings, {});
   const [testPhone, setTestPhone] = useState(alertPhone ?? "");
@@ -87,6 +94,17 @@ export function TextsCard({
                 placeholder="(503) 555-6789"
                 hint="Where new booking and inquiry texts go. Optional."
               />
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-[1fr_140px]">
+              <Field
+                label="Registered business name"
+                name="legalName"
+                defaultValue={legalName ?? ""}
+                placeholder="e.g. Bright Studio LLC"
+                hint="Exactly as registered with Twilio (your texting brand). Shown on your studio's Terms and Privacy pages."
+              />
+              <Field label="Business state" name="legalState" defaultValue={legalState ?? ""} placeholder="OR" maxLength={2} hint="For your Terms." />
             </div>
 
             <fieldset className="space-y-3">
@@ -150,6 +168,32 @@ export function TextsCard({
                   <CopyLink url={replyUrl} label="Address for Twilio replies" />
                 </div>
               </div>
+
+              {slug && (
+                <div className="text-sm">
+                  <p className="font-semibold">Links for your Twilio registration</p>
+                  <ul className="mt-1 space-y-1 text-muted">
+                    <li>
+                      Terms and Conditions:{" "}
+                      <a href={`/studio/${slug}/terms`} target="_blank" className="link break-all">
+                        {`photoezcloud.com/studio/${slug}/terms`}
+                      </a>
+                    </li>
+                    <li>
+                      Privacy Policy:{" "}
+                      <a href={`/studio/${slug}/privacy`} target="_blank" className="link break-all">
+                        {`photoezcloud.com/studio/${slug}/privacy`}
+                      </a>
+                    </li>
+                    <li>
+                      Opt-in page:{" "}
+                      <a href={`/studio/${slug}/texts`} target="_blank" className="link break-all">
+                        {`photoezcloud.com/studio/${slug}/texts`}
+                      </a>
+                    </li>
+                  </ul>
+                </div>
+              )}
 
               <details className="text-sm">
                 <summary className="cursor-pointer font-semibold">US texting rules (A2P 10DLC)</summary>
