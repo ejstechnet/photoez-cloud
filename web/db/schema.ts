@@ -277,6 +277,11 @@ export const galleries = pgTable(
     // what they cost (paid through Stripe, or owed when it isn't connected).
     extrasCount: integer("extras_count").notNull().default(0),
     extrasCents: integer("extras_cents").notNull().default(0),
+    // Slideshow of the final photos (Pro and Studio, lib/slideshow.ts): on or
+    // off, and an optional song the photographer uploaded for it.
+    slideshowEnabled: boolean("slideshow_enabled").notNull().default(true),
+    slideshowSongKey: text("slideshow_song_key"),
+    slideshowSongName: text("slideshow_song_name"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [

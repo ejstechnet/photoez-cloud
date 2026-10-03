@@ -22,10 +22,12 @@ import { PhotoGrid } from "./photo-grid";
 import { CullingGrid } from "./culling-grid";
 import { SearchCard } from "./search-card";
 import { photoAllowance } from "@/lib/gallery-tagging";
-import { PLAN_LABELS, planFor } from "@/lib/plans";
+import { PLAN_LABELS, hasFeature, planFor } from "@/lib/plans";
+import { studioPlan } from "@/lib/studio-plan";
 import { isCullMetrics } from "@/lib/culling";
 import { ProofRefresher } from "./proof-refresher";
 import { Uploader } from "./uploader";
+import { SlideshowCard } from "./slideshow-card";
 
 export default async function GalleryPage({ params }: PageProps<"/dashboard/galleries/[id]">) {
   const { id } = await params;
@@ -46,6 +48,9 @@ export default async function GalleryPage({ params }: PageProps<"/dashboard/gall
       clientEmail: clients.email,
       reviewStatus: reviews.status,
       bookingId: galleries.bookingId,
+      slideshowEnabled: galleries.slideshowEnabled,
+      slideshowSongKey: galleries.slideshowSongKey,
+      slideshowSongName: galleries.slideshowSongName,
     })
     .from(galleries)
     .leftJoin(clients, eq(clients.id, galleries.clientId))
@@ -71,6 +76,8 @@ export default async function GalleryPage({ params }: PageProps<"/dashboard/gall
     .where(eq(photos.galleryId, gallery.id))
     .orderBy(asc(photos.position));
 
+  const { plan } = await studioPlan(user.id);
+  const songUrl = gallery.slideshowSongKey ? await signedViewUrl(gallery.slideshowSongKey) : null;
   const watermark = await getWatermarkSettings(user.id);
   const [{ staleCount }] = watermark
     ? await db
@@ -234,6 +241,19 @@ export default async function GalleryPage({ params }: PageProps<"/dashboard/gall
             downloads={{ text: describeDownloads(downloads.get(gallery.id)), any: downloads.has(gallery.id) }}
           />
           <Uploader galleryId={gallery.id} kind="final" watermark={null} />
+          <SlideshowCard
+            galleryId={gallery.id}
+            allowed={hasFeature(plan, "slideshow")}
+            upgradeLabel={PLAN_LABELS[planFor("slideshow")]}
+            enabled={gallery.slideshowEnabled}
+            songName={gallery.slideshowSongName}
+            songUrl={songUrl}
+            previewHref={
+              (gallery.status === "delivered" || gallery.status === "completed") && finals.length > 0
+                ? `/g/${gallery.shareToken}?preview=1`
+                : null
+            }
+          />
           {finals.length > 0 && <PhotoGrid galleryId={gallery.id} photos={finals} />}
         </div>
       </section>

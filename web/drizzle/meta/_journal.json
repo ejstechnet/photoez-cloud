@@ -351,6 +351,13 @@
       "when": 1790984725985,
       "tag": "0049_living_red_ghost",
       "breakpoints": true
+    },
+    {
+      "idx": 50,
+      "version": "7",
+      "when": 1790990768226,
+      "tag": "0050_crazy_dark_beast",
+      "breakpoints": true
     }
   ]
 }
