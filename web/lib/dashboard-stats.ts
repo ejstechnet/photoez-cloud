@@ -1,6 +1,6 @@
 import { and, asc, count, eq, gt, gte, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { bookings, clients, galleries, giftCards, inquiries, payments, reviews, storeOrders } from "@/db/schema";
+import { bookings, clients, galleries, giftCards, inquiries, invoices, payments, reviews, storeOrders } from "@/db/schema";
 import { contractTemplateFor, signedContractFor } from "@/lib/contracts/for-booking";
 import { bookingTotal, prepaid } from "@/lib/payments/amounts";
 import { monthRange, periodStart, type Period } from "@/lib/dashboard-periods";
@@ -16,7 +16,7 @@ const SOON_DAYS = 14;
 export async function dashboardStats(photographerId: string, timeZone: string, period: Period, now = new Date()) {
   const start = periodStart(period, now, timeZone);
   const month = monthRange(now, timeZone);
-  const owner = sql`coalesce(${bookings.photographerId}, ${galleries.photographerId}, ${giftCards.photographerId}, ${storeOrders.photographerId}) = ${photographerId}`;
+  const owner = sql`coalesce(${bookings.photographerId}, ${galleries.photographerId}, ${giftCards.photographerId}, ${storeOrders.photographerId}, ${invoices.photographerId}) = ${photographerId}`;
 
   const [revenueRows, galleryRows, readyRows, bookingCounts, inquiryCounts, [{ toApprove }], [{ clientCount }], openBookings, owedGalleries] =
     await Promise.all([
@@ -28,6 +28,7 @@ export async function dashboardStats(photographerId: string, timeZone: string, p
         .leftJoin(galleries, eq(galleries.id, payments.galleryId))
         .leftJoin(giftCards, eq(giftCards.id, payments.giftCardId))
         .leftJoin(storeOrders, eq(storeOrders.id, payments.storeOrderId))
+        .leftJoin(invoices, eq(invoices.id, payments.invoiceId))
         .where(and(eq(payments.status, "paid"), owner, start ? gte(payments.paidAt, start) : undefined))
         .groupBy(payments.kind),
       // Galleries by stage.
@@ -92,6 +93,7 @@ export async function dashboardStats(photographerId: string, timeZone: string, p
     if (row.kind === "gallery_extras") revenue.gallery += row.cents;
     else if (row.kind === "gift_card") revenue.giftCards += row.cents;
     else if (row.kind === "store_order") revenue.store += row.cents;
+    // Deposits, balances, and quote or invoice payments.
     else revenue.booking += row.cents;
   }
 

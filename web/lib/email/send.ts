@@ -40,6 +40,12 @@ export type EmailKind =
   | "password_reset"
   | "email_verification"
   | "trial_reminder"
+  | "invoice_sent"
+  | "invoice_reminder"
+  | "invoice_overdue"
+  | "quote_reminder"
+  | "invoice_payment"
+  | "invoice_update"
   | "test";
 
 let transport: Transporter | null | undefined;

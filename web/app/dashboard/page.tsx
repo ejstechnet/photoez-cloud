@@ -68,7 +68,7 @@ export default async function DashboardPage({ searchParams }: PageProps<"/dashbo
             <p className="font-display text-5xl font-bold sm:text-6xl">{formatPrice(stats.revenue.total)}</p>
             <p className="mt-1 text-sm font-semibold text-white/70">Total collected</p>
           </div>
-          <RevenueStat label="Bookings" value={stats.revenue.booking} note="Deposits and balances" />
+          <RevenueStat label="Bookings" value={stats.revenue.booking} note="Deposits, balances, invoices" />
           <RevenueStat label="Gallery extras" value={stats.revenue.gallery} note="Extra photos sold" />
           <RevenueStat label="Gift cards" value={stats.revenue.giftCards} note="Gift cards sold" />
           <RevenueStat label="Store" value={stats.revenue.store} note="Prints and products" />

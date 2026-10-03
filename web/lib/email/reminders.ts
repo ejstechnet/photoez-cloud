@@ -8,18 +8,19 @@ import { runLabOrders } from "@/lib/swaggpress/orders";
 import { removeOldDesigns } from "@/lib/store/designs";
 import { syncSwaggProducts } from "@/lib/swaggpress/catalog";
 import { sendTrialReminders } from "@/lib/trial-reminders";
+import { sendInvoiceReminders } from "@/lib/invoices/reminders";
 import { emailBalanceReminder, emailGalleryExpiring, emailSessionReminder } from "./notify";
 
 // The scheduled reminders (PhotoEZ for WordPress sends these from WP-Cron):
 // the session reminder, the balance reminder, "your gallery closes soon",
-// and review requests; plus client referral credits.
+// review requests, and quote / invoice reminders; plus client referral credits.
 // The server runs this every 15 minutes (see app/api/cron/reminders). Each
 // reminder is claimed before it's sent, so two runs at once can't send twice.
 
 const HOUR = 60 * 60 * 1000;
 
 export async function runReminders(now = new Date()) {
-  const sent = { session: 0, balance: 0, gallery: 0, reviews: 0, giftCards: 0, referrals: 0, labShipped: 0, trialEnding: 0 };
+  const sent = { session: 0, balance: 0, gallery: 0, reviews: 0, giftCards: 0, referrals: 0, labShipped: 0, trialEnding: 0, invoices: 0 };
 
   // Session reminder: N hours before, for confirmed bookings.
   const sessionDue = await db
@@ -101,6 +102,14 @@ export async function runReminders(now = new Date()) {
     console.error("Trial reminders failed", error);
     return 0;
   });
+
+  // Quotes and invoices: unanswered quotes, payments coming up, and overdue payments.
+  sent.invoices = await sendInvoiceReminders(now)
+    .then((r) => r.quotes + r.upcoming + r.overdue)
+    .catch((error) => {
+      console.error("Invoice reminders failed", error);
+      return 0;
+    });
 
   // SwaggPress: send paid orders, pick up tracking, and keep added products
   // in step with the SwaggPress catalog (each studio at most every 6 hours).

@@ -344,6 +344,13 @@
       "when": 1790963884170,
       "tag": "0048_quick_groot",
       "breakpoints": true
+    },
+    {
+      "idx": 49,
+      "version": "7",
+      "when": 1790984725985,
+      "tag": "0049_living_red_ghost",
+      "breakpoints": true
     }
   ]
 }

@@ -55,6 +55,7 @@ test("what each plan includes and allows", () => {
   assert.ok(AI_ASSISTANT_ALLOWANCE.free > 0 && AI_ASSISTANT_ALLOWANCE.free < AI_ASSISTANT_ALLOWANCE.pro);
   assert.ok(!hasFeature("free", "galleryUpsells") && hasFeature("pro", "galleryUpsells"));
   assert.ok(!hasFeature("pro", "removeBranding") && hasFeature("studio", "removeBranding"));
+  assert.ok(!hasFeature("free", "invoices") && hasFeature("pro", "invoices") && hasFeature("studio", "invoices"));
   assert.equal(planFor("removeBranding"), "studio");
   assert.equal(formatStorage(3 * 1024 ** 3), "3 GB");
   assert.equal(formatStorage(2048 * 1024 ** 3), "2 TB");

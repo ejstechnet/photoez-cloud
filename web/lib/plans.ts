@@ -19,6 +19,9 @@ const FEATURES = {
   aiSearch: ["free", "pro", "studio"],
   // Hiding "Powered by PhotoEZ Cloud" on the studio's pages.
   removeBranding: ["studio"],
+  // Quotes and invoices with deposits and payment plans (lib/invoices).
+  // Decided with Elle 2026-10-02: an incentive to upgrade.
+  invoices: ["pro", "studio"],
 } as const satisfies Record<string, readonly Plan[]>;
 
 export type Feature = keyof typeof FEATURES;

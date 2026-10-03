@@ -19,6 +19,7 @@ import { PLANS } from "../lib/plans";
 import { GALLERY_STATUSES } from "../lib/gallery-status";
 import { PHOTO_KINDS } from "../lib/photo-limits";
 import { WATERMARK_POSITIONS } from "../lib/watermark";
+import { INVOICE_KINDS, INVOICE_STATUSES, type LineItem, type PaymentPlan, type ScheduledPayment } from "../lib/invoices/math";
 
 // A photographer's account. Better Auth uses this as its user table
 // (see lib/auth.ts), so name, email, emailVerified, image, createdAt and
@@ -148,6 +149,11 @@ export const photographers = pgTable("photographers", {
   giftCardAmounts: jsonb("gift_card_amounts").$type<number[]>().notNull().default([5000, 10000, 25000]),
   giftCardMinCents: integer("gift_card_min_cents").default(2500),
   giftCardMaxCents: integer("gift_card_max_cents").default(100000),
+  // Quotes & invoices (Pro and Studio): what new ones start with. Tax is in
+  // basis points (725 = 7.25%).
+  invoiceTaxBps: integer("invoice_tax_bps").notNull().default(0),
+  invoiceDepositPercent: integer("invoice_deposit_percent").notNull().default(50),
+  invoiceTerms: text("invoice_terms"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
@@ -647,7 +653,9 @@ export const payments = pgTable(
     // A payment is for a booking or for a gallery's extra photos.
     bookingId: uuid("booking_id").references(() => bookings.id, { onDelete: "cascade" }),
     galleryId: uuid("gallery_id").references(() => galleries.id, { onDelete: "cascade" }),
-    kind: text("kind", { enum: ["deposit", "balance", "gallery_extras", "gift_card", "store_order"] }).notNull(),
+    kind: text("kind", { enum: ["deposit", "balance", "gallery_extras", "gift_card", "store_order", "invoice"] }).notNull(),
+    // For a quote or invoice payment (lib/invoices): the invoice being paid.
+    invoiceId: uuid("invoice_id").references((): AnyPgColumn => invoices.id, { onDelete: "cascade" }),
     // For a store order (lib/store/checkout.ts): the order being paid for.
     storeOrderId: uuid("store_order_id"),
     // For a gift card purchase: the card being bought.
@@ -662,7 +670,82 @@ export const payments = pgTable(
     paidAt: timestamp("paid_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [index("payments_booking_idx").on(t.bookingId)],
+  (t) => [index("payments_booking_idx").on(t.bookingId), index("payments_invoice_idx").on(t.invoiceId)],
+);
+
+// A quote or an invoice, like InvoiceEZ: line items, tax, and a payment
+// schedule (in full, a deposit and the balance, or a payment plan). The
+// client opens it from a private link (/i/<token>) to approve a quote, sign
+// the contract when there is one, and pay on the studio's Stripe account.
+// Amounts are kept as sent; lib/invoices/math.ts works them out.
+export const invoices = pgTable(
+  "invoices",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    photographerId: uuid("photographer_id")
+      .notNull()
+      .references(() => photographers.id, { onDelete: "cascade" }),
+    clientId: uuid("client_id").references(() => clients.id, { onDelete: "set null" }),
+    // The inquiry it was made from, if any.
+    inquiryId: uuid("inquiry_id").references(() => inquiries.id, { onDelete: "set null" }),
+    kind: text("kind", { enum: INVOICE_KINDS }).notNull(),
+    // e.g. "Q-2026-0001" or "INV-2026-0001", per studio.
+    number: text("number").notNull(),
+    status: text("status", { enum: INVOICE_STATUSES }).notNull().default("draft"),
+    // The client's details as written on this invoice.
+    clientName: text("client_name").notNull(),
+    clientEmail: text("client_email").notNull(),
+    clientPhone: text("client_phone"),
+    title: text("title").notNull(),
+    // The day of the session or event, if there is one.
+    eventDate: date("event_date"),
+    items: jsonb("items").$type<LineItem[]>().notNull(),
+    taxBps: integer("tax_bps").notNull().default(0),
+    subtotalCents: integer("subtotal_cents").notNull(),
+    taxCents: integer("tax_cents").notNull(),
+    totalCents: integer("total_cents").notNull(),
+    plan: jsonb("plan").$type<PaymentPlan>().notNull(),
+    schedule: jsonb("schedule").$type<ScheduledPayment[]>().notNull(),
+    // The last day anything is due (null = nothing has a date).
+    dueDate: date("due_date"),
+    // Paid so far: online payments plus any the studio recorded (cash, check).
+    paidCents: integer("paid_cents").notNull().default(0),
+    manualPayments: jsonb("manual_payments")
+      .$type<{ amountCents: number; note: string; date: string }[]>()
+      .notNull()
+      .default([]),
+    notes: text("notes"),
+    terms: text("terms"),
+    token: text("token").notNull().unique(),
+    // The contract to sign before paying (null = none), and the signed copy.
+    contractTemplateId: uuid("contract_template_id").references(() => contractTemplates.id, { onDelete: "set null" }),
+    contractTitle: text("contract_title"),
+    contractContent: text("contract_content"),
+    signerName: text("signer_name"),
+    signatureType: text("signature_type", { enum: ["draw", "type"] }),
+    signatureData: text("signature_data"),
+    signedAt: timestamp("signed_at", { withTimezone: true }),
+    signerIp: text("signer_ip"),
+    signerUserAgent: text("signer_user_agent"),
+    sentAt: timestamp("sent_at", { withTimezone: true }),
+    viewedAt: timestamp("viewed_at", { withTimezone: true }),
+    approvedAt: timestamp("approved_at", { withTimezone: true }),
+    declinedAt: timestamp("declined_at", { withTimezone: true }),
+    declineReason: text("decline_reason"),
+    paidAt: timestamp("paid_at", { withTimezone: true }),
+    cancelledAt: timestamp("cancelled_at", { withTimezone: true }),
+    // Reminders already sent: the quote's approval nudge, and the scheduled
+    // payment (as "<index>:<due date>") last reminded about or marked overdue.
+    approvalReminderAt: timestamp("approval_reminder_at", { withTimezone: true }),
+    paymentReminderKey: text("payment_reminder_key"),
+    overdueNoticeKey: text("overdue_notice_key"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    unique("invoices_number_unique").on(t.photographerId, t.number),
+    index("invoices_photographer_idx").on(t.photographerId, t.createdAt),
+  ],
 );
 
 // Inspiration photos a client uploaded with their booking (storage keys).

@@ -6,7 +6,16 @@ import { signatureFont } from "./signature-font";
 
 // Sign by drawing (finger, stylus, or mouse) or by typing a name, like
 // PhotoEZ Photography Contracts. The server saves the exact contract shown.
-export function SignForm({ token, defaultName }: { token: string; defaultName: string }) {
+// `sign` swaps in another signing action (a quote or invoice's contract).
+export function SignForm({
+  token,
+  defaultName,
+  sign,
+}: {
+  token: string;
+  defaultName: string;
+  sign?: (input: { signerName: string; type: "draw" | "type"; data: string; agreed: boolean }) => Promise<{ message?: string }>;
+}) {
   const [mode, setMode] = useState<"draw" | "type">("draw");
   const [name, setName] = useState(defaultName);
   const [agreed, setAgreed] = useState(false);
@@ -55,7 +64,8 @@ export function SignForm({ token, defaultName }: { token: string; defaultName: s
     }
     const data = mode === "draw" ? (canvasRef.current?.toDataURL("image/png") ?? "") : name;
     startTransition(async () => {
-      const result = await signContract(token, { signerName: name, type: mode, data, agreed });
+      const input = { signerName: name, type: mode, data, agreed };
+      const result = sign ? await sign(input) : await signContract(token, input);
       if (result?.message) setMessage(result.message);
     });
   }

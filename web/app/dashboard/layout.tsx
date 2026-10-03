@@ -36,6 +36,7 @@ export default async function DashboardLayout({ children }: LayoutProps<"/dashbo
               items={[
                 { href: "/dashboard/inquiries", label: "Inquiries" },
                 { href: "/dashboard/clients", label: "Clients" },
+                { href: "/dashboard/invoices", label: "Quotes & invoices" },
                 { href: "/dashboard/reviews", label: "Reviews" },
               ]}
             />

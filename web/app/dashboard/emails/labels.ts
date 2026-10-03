@@ -30,6 +30,12 @@ export const KIND_LABELS: Record<EmailKind, string> = {
   password_reset: "Password reset",
   email_verification: "Email confirmation",
   trial_reminder: "Pro trial ending",
+  invoice_sent: "Quote or invoice",
+  invoice_reminder: "Payment reminder",
+  invoice_overdue: "Payment overdue",
+  quote_reminder: "Quote reminder",
+  invoice_payment: "Invoice payment",
+  invoice_update: "Quote or invoice update (to you)",
   test: "Test email",
 };
 
