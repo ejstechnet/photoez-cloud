@@ -13,6 +13,8 @@ import { nextPayment } from "./amounts";
 import { createGalleryForBooking } from "@/lib/booking-gallery";
 import { cancelUnpaidStoreOrder, markStoreOrderPaid } from "@/lib/store/checkout";
 import { submitLabOrder } from "@/lib/swaggpress/orders";
+import { refreshPaid } from "@/lib/invoices/server";
+import { emailInvoicePaid } from "@/lib/invoices/notify";
 
 // Stripe Checkout for booking payments, always on the photographer's own
 // connected account. The database only changes when Stripe confirms a payment
@@ -158,6 +160,12 @@ export async function applyCheckoutSession(session: Stripe.Checkout.Session) {
     // A gift card purchase: the card turns on and goes out.
     const { giftCardId } = payment;
     if (giftCardId) afterResponse(() => activatePurchasedCard(giftCardId));
+    // A quote or invoice payment: add it up, then the receipt and the studio's notice.
+    const { invoiceId } = payment;
+    if (invoiceId) {
+      await refreshPaid(invoiceId);
+      afterResponse(() => emailInvoicePaid(invoiceId, payment.amountCents));
+    }
   } else if (session.status === "expired" && payment.status === "pending") {
     await db.update(payments).set({ status: "expired" }).where(eq(payments.id, payment.id));
     if (payment.bookingId) await releaseHold(payment.bookingId);

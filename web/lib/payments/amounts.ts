@@ -13,7 +13,7 @@ export type Priced = {
   creditCents?: number;
   giftCardCents?: number;
 };
-export type Paid = { kind: "deposit" | "balance" | "gallery_extras" | "gift_card" | "store_order"; amountCents: number; status: "pending" | "paid" | "expired" };
+export type Paid = { kind: "deposit" | "balance" | "gallery_extras" | "gift_card" | "store_order" | "invoice"; amountCents: number; status: "pending" | "paid" | "expired" };
 
 // Session + extras, less any coupon.
 export function bookingTotal(b: Priced) {

@@ -5,8 +5,8 @@ import Link from "next/link";
 import { SparklesIcon, UsersIcon } from "@/components/icons";
 import { convertToClient, retriageInquiry, setInquiryStatus } from "../actions";
 
-// Next steps for an inquiry: turn it into a client, mark it replied or
-// archived, or run the AI triage again.
+// Next steps for an inquiry: turn it into a client, send a quote, mark it
+// replied or archived, or run the AI triage again.
 export function InquiryActions({
   inquiryId,
   status,
@@ -32,6 +32,9 @@ export function InquiryActions({
           <UsersIcon size={18} /> Create client
         </button>
       )}
+      <Link href={`/dashboard/invoices/new?kind=quote&inquiry=${inquiryId}`} className="btn-secondary">
+        Create a quote
+      </Link>
       {status === "new" && (
         <button
           type="button"

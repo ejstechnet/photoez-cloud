@@ -1,13 +1,16 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { and, count, desc, eq, isNotNull } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db";
-import { bookings, clients, photographers, sessionCredits } from "@/db/schema";
+import { bookings, clients, invoices, photographers, sessionCredits } from "@/db/schema";
 import { CopyLink } from "@/components/copy-link";
 import { clientReferralLink } from "@/lib/client-referrals";
 import { formatPrice } from "@/lib/booking/format";
 import { localDateOf } from "@/lib/booking/time";
 import { Avatar } from "@/components/avatar";
+import { InvoiceStatusBadge } from "@/components/invoice-document";
+import { isOverdue } from "@/lib/invoices/math";
 import { requirePhotographer } from "@/lib/session";
 import { updateClient } from "../actions";
 import { ClientForm } from "../client-form";
@@ -49,6 +52,13 @@ export default async function EditClientPage({ params }: PageProps<"/dashboard/c
         .from(bookings)
         .where(and(eq(bookings.referredByClientId, client.id), isNotNull(bookings.referredByClientId)))
     : [null];
+  // Their quotes and invoices.
+  const clientInvoices = await db
+    .select()
+    .from(invoices)
+    .where(and(eq(invoices.photographerId, user.id), eq(invoices.clientId, client.id)))
+    .orderBy(desc(invoices.createdAt))
+    .limit(50);
   const balanceCents = credits
     .filter((c) => !c.expired)
     .reduce((sum, c) => sum + c.amountCents - c.usedCents, 0);
@@ -67,6 +77,37 @@ export default async function EditClientPage({ params }: PageProps<"/dashboard/c
       <div className="card mt-8 p-6 sm:p-8">
         <ClientForm action={updateClient.bind(null, client.id)} defaultValues={client} submitLabel="Save changes" />
       </div>
+      <section className="card mt-8 p-6 sm:p-8">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 className="font-display text-2xl font-bold">Quotes &amp; invoices</h2>
+          <div className="flex gap-2">
+            <Link href={`/dashboard/invoices/new?kind=quote&client=${client.id}`} className="btn-secondary">
+              New quote
+            </Link>
+            <Link href={`/dashboard/invoices/new?kind=invoice&client=${client.id}`} className="btn-secondary">
+              New invoice
+            </Link>
+          </div>
+        </div>
+        {clientInvoices.length === 0 ? (
+          <p className="mt-3 text-sm text-muted">None yet.</p>
+        ) : (
+          <ul className="mt-4 divide-y divide-border">
+            {clientInvoices.map((i) => (
+              <li key={i.id}>
+                <Link href={`/dashboard/invoices/${i.id}`} className="flex items-center gap-3 py-3 hover:text-lime-ink">
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate font-semibold">{i.title}</span>
+                    <span className="font-mono text-xs text-muted">{i.number}</span>
+                  </span>
+                  <InvoiceStatusBadge kind={i.kind} status={i.status} overdue={isOverdue(i.schedule, i.paidCents, i.status, today)} />
+                  <span className="w-20 text-right font-semibold tabular-nums">{formatPrice(i.totalCents)}</span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
       <CreditsCard clientId={client.id} hasEmail={Boolean(client.email)} credits={credits} balanceCents={balanceCents} />
       {share && (
         <section className="card mt-8 p-6 sm:p-8">
