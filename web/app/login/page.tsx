@@ -1,6 +1,9 @@
 import Link from "next/link";
 import { AuthCard } from "@/components/auth-card";
 import { LoginForm } from "./login-form";
+import type { Metadata } from "next";
+
+export const metadata: Metadata = { title: "Log In · PhotoEZ Cloud", robots: { index: false, follow: true } };
 import { GoogleButton } from "@/components/google-button";
 
 export default async function LoginPage({ searchParams }: PageProps<"/login">) {

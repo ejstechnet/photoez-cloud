@@ -1,5 +1,12 @@
 import { referrerByCode } from "@/lib/referrals";
 import { SignUpForm } from "./signup-form";
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Start Free · PhotoEZ Cloud",
+  description: "Create your photography studio on PhotoEZ Cloud. Free plan, and a Pro trial with no card needed.",
+  alternates: { canonical: "/signup" },
+};
 
 // Sign-up, greeting visitors who came through a photographer's referral link.
 export default async function SignUpPage({ searchParams }: PageProps<"/signup">) {

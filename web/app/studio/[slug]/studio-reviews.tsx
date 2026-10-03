@@ -92,21 +92,41 @@ export function StudioReviews({ reviews: { list, average } }: { reviews: Loaded 
 
 // schema.org markup so search engines can show the studio's stars. Built only
 // from real, approved reviews on this page.
-export function ReviewsJsonLd({ name, slug, reviews: { list, average } }: { name: string; slug: string; reviews: Loaded }) {
-  if (list.length === 0 || average === null) return null;
+// The studio as a business for search engines, with its star rating and
+// reviews once it has some.
+export function ReviewsJsonLd({
+  name,
+  slug,
+  reviews: { list, average },
+  description = null,
+  areaServed = null,
+}: {
+  name: string;
+  slug: string;
+  reviews: Loaded;
+  description?: string | null;
+  areaServed?: string | null;
+}) {
+  const rated = list.length > 0 && average !== null;
   const data = {
     "@context": "https://schema.org",
-    "@type": "LocalBusiness",
+    "@type": "ProfessionalService",
     name,
     url: `${siteUrl}/studio/${slug}`,
-    aggregateRating: { "@type": "AggregateRating", ratingValue: average, reviewCount: list.length, bestRating: 5 },
-    review: list.slice(0, 10).map((r) => ({
-      "@type": "Review",
-      author: { "@type": "Person", name: r.name },
-      reviewRating: { "@type": "Rating", ratingValue: r.rating, bestRating: 5 },
-      reviewBody: r.body,
-      ...(r.date ? { datePublished: r.date.toISOString().slice(0, 10) } : {}),
-    })),
+    ...(description ? { description } : {}),
+    ...(areaServed ? { areaServed } : {}),
+    ...(rated
+      ? {
+          aggregateRating: { "@type": "AggregateRating", ratingValue: average, reviewCount: list.length, bestRating: 5 },
+          review: list.slice(0, 10).map((r) => ({
+            "@type": "Review",
+            author: { "@type": "Person", name: r.name },
+            reviewRating: { "@type": "Rating", ratingValue: r.rating, bestRating: 5 },
+            reviewBody: r.body,
+            ...(r.date ? { datePublished: r.date.toISOString().slice(0, 10) } : {}),
+          })),
+        }
+      : {}),
   };
   return (
     <script

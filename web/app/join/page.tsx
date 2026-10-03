@@ -28,6 +28,9 @@ export const metadata: Metadata = {
     description: `Retire the pile of apps. Booking to delivery in one place. ${TRIAL_DAYS}-day free trial, no card needed.`,
     images: ["/home/hero.webp"],
   },
+  // The Facebook-ad landing page repeats the home page; keep it out of search
+  // results so the two don't compete.
+  robots: { index: false, follow: true },
 };
 
 // The apps photographers juggle now, and what PhotoEZ Cloud does instead.

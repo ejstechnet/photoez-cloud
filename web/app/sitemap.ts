@@ -14,6 +14,10 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   return [
     { url: `${siteUrl}/`, priority: 1 },
     { url: `${siteUrl}/pricing`, priority: 0.8 },
+    { url: `${siteUrl}/quiz`, priority: 0.5 },
+    { url: `${siteUrl}/signup`, priority: 0.5 },
+    { url: `${siteUrl}/terms`, priority: 0.2 },
+    { url: `${siteUrl}/privacy`, priority: 0.2 },
     { url: `${siteUrl}/photographers`, priority: 0.9 },
     ...states.map((state) => ({ url: `${siteUrl}/photographers/${state}`, priority: 0.7 })),
     ...cities.map((c) => ({

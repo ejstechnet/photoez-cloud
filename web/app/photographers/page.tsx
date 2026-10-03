@@ -9,6 +9,7 @@ export const metadata: Metadata = {
   title: "Find a photographer near you | PhotoEZ Cloud",
   description:
     "Search local photographers by ZIP code or city: weddings, family, newborn, seniors, headshots, and more. See reviews and prices, and book online.",
+  alternates: { canonical: "/photographers" },
 };
 
 // The directory's search page: /photographers?q=98101&r=25&type=wedding
