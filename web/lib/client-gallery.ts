@@ -20,6 +20,8 @@ export async function findGalleryByToken(token: string) {
       freeLimit: galleries.freeLimit,
       shareToken: galleries.shareToken,
       headerImageKey: galleries.headerImageKey,
+      slideshowEnabled: galleries.slideshowEnabled,
+      slideshowSongKey: galleries.slideshowSongKey,
       photographerId: galleries.photographerId,
       galleryExtraPrice: galleries.extraPhotoPriceCents,
       studioExtraPrice: photographers.extraPhotoPriceCents,

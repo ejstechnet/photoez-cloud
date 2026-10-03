@@ -9,6 +9,7 @@ import { ShopDialog } from "./shop/shop-dialog";
 import { useCart } from "./shop/use-cart";
 import { DownloadIcon } from "@/components/icons";
 import { Lightbox } from "@/components/lightbox";
+import { Slideshow } from "@/components/slideshow";
 
 export type FinalTile = {
   id: string;
@@ -34,6 +35,8 @@ export function DeliveryGallery({
   store = null,
   ordered = null,
   orderCancelled = false,
+  slideshow = null,
+  title = "",
 }: {
   // Gallery search is on (the studio's plan, and photos described).
   canSearch?: boolean;
@@ -51,8 +54,12 @@ export function DeliveryGallery({
   // Back from a paid store checkout: the order number.
   ordered?: string | null;
   orderCancelled?: boolean;
+  // The slideshow (Pro and Studio, when the studio left it on), with its song.
+  slideshow?: { songUrl: string | null } | null;
+  title?: string;
 }) {
   const [open, setOpen] = useState<number | null>(null);
+  const [playing, setPlaying] = useState(false);
   // Gallery search results (null = show everything).
   const [found, setFound] = useState<Set<string> | null>(null);
   const shown = found ? tiles.filter((tile) => found.has(tile.id)) : tiles;
@@ -78,9 +85,16 @@ export function DeliveryGallery({
             {tiles.length} {tiles.length === 1 ? "photo" : "photos"} from {studio}, full resolution and ready to keep.
           </p>
         </div>
-        <a href={`/g/${token}/download${preview ? "?preview=1" : ""}`} className="btn-primary">
-          <DownloadIcon size={18} /> Download all · {totalSize}
-        </a>
+        <div className="flex flex-wrap gap-2">
+          {slideshow && tiles.length > 1 && (
+            <button type="button" onClick={() => setPlaying(true)} className="btn-secondary">
+              ▶ Slideshow
+            </button>
+          )}
+          <a href={`/g/${token}/download${preview ? "?preview=1" : ""}`} className="btn-primary">
+            <DownloadIcon size={18} /> Download all · {totalSize}
+          </a>
+        </div>
       </div>
 
       {ordered && (
@@ -171,6 +185,15 @@ export function DeliveryGallery({
         />
       )}
       {store && <CartPanel token={token} store={store} photos={tiles} cart={cart} preview={preview} />}
+
+      {slideshow && playing && (
+        <Slideshow
+          photos={tiles.map((tile) => ({ id: tile.id, url: tile.previewUrl }))}
+          songUrl={slideshow.songUrl}
+          title={title}
+          onClose={() => setPlaying(false)}
+        />
+      )}
 
       {open !== null && (
         <Lightbox

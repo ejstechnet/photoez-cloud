@@ -97,6 +97,12 @@ export function galleryHeaderSourceKey(photographerId: string, galleryId: string
   return `${galleryPrefix(photographerId, galleryId)}header-${source}-source.jpg`;
 }
 
+// The song for a gallery's slideshow (lib/slideshow.ts), in the gallery's
+// folder so deleting the gallery deletes it too.
+export function gallerySongKey(photographerId: string, galleryId: string, version: string, extension: string) {
+  return `${galleryPrefix(photographerId, galleryId)}slideshow-song-${version}.${extension}`;
+}
+
 // The original's version from a banner key; null for banners saved before cropping existed.
 export function headerSourceVersion(headerKey: string) {
   return /\/header-([a-f0-9]{12})-[a-f0-9]{12}\.jpg$/.exec(headerKey)?.[1] ?? null;

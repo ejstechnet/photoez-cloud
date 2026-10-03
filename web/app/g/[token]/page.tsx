@@ -166,6 +166,12 @@ export default async function ClientGalleryPage({ params, searchParams }: PagePr
               store={store}
               ordered={typeof ordered === "string" && /^PEZ-[A-Z0-9]{6}$/.test(ordered) ? ordered : null}
               orderCancelled={order === "cancelled"}
+              slideshow={
+                hasFeature(gallery.plan, "slideshow") && gallery.slideshowEnabled
+                  ? { songUrl: gallery.slideshowSongKey ? await signedViewUrl(gallery.slideshowSongKey) : null }
+                  : null
+              }
+              title={gallery.title}
             />
           )
         ) : tiles.length === 0 ? (

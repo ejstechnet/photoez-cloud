@@ -51,7 +51,7 @@ function includes(plan: Plan): string[] {
     `Studio Assistant: ${n(AI_ASSISTANT_ALLOWANCE[plan])} questions a month`,
   ];
   return plan === "pro"
-    ? ["Everything in Free", "Unlimited active galleries", "Sell extra photos in galleries", "Quotes & invoices with payment plans", ...shared]
+    ? ["Everything in Free", "Unlimited active galleries", "Sell extra photos in galleries", "Quotes & invoices with payment plans", "Slideshows with your own music", ...shared]
     : ["Everything in Pro", ...shared, 'Remove "Powered by PhotoEZ Cloud"'];
 }
 

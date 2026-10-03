@@ -22,6 +22,9 @@ const FEATURES = {
   // Quotes and invoices with deposits and payment plans (lib/invoices).
   // Decided with Elle 2026-10-02: an incentive to upgrade.
   invoices: ["pro", "studio"],
+  // Slideshows of the final photos, with the photographer's own song.
+  // Decided with Elle 2026-10-02.
+  slideshow: ["pro", "studio"],
 } as const satisfies Record<string, readonly Plan[]>;
 
 export type Feature = keyof typeof FEATURES;
