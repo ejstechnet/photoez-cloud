@@ -25,11 +25,17 @@ test("the result: tools replaced, savings, and the plan that fits", () => {
   assert.equal(r.plan, "pro");
   assert.deepEqual(r.replaced.map((t) => t.id), ["honeybook", "pixieset"]);
   assert.equal(r.currentCents, 4500);
-  assert.equal(r.savingsCents, 4500 - r.planCents);
+  // A year of the tools ($45/mo) less a year of Pro billed yearly ($290).
+  assert.equal(r.savingsCents, 4500 * 12 - 29000);
   assert.match(r.answer, /favorite/);
   assert.equal(quizResult({ ...sample, volume: "20+" }).plan, "studio");
   assert.equal(quizResult({ ...sample, volume: "11-20" }).plan, "studio");
   assert.equal(quizResult({ ...sample, shoots: ["portraits"], volume: "11-20" }).plan, "pro");
+  // HoneyBook + Pixieset cover everything but getting found.
+  assert.deepEqual(r.missing.map((f) => f.id), ["marketing"]);
+  assert.equal(quizResult({ ...sample, tools: ["manual"] }).missing.length, 6);
+  assert.deepEqual(quizResult({ ...sample, tools: ["scheduler", "cloud"] }).missing.map((f) => f.id), ["inquiries", "paperwork", "galleries", "store", "marketing"]);
+  assert.equal(quizResult({ ...sample, tools: [] }).missing.length, 0);
   // No savings shown below zero.
   assert.equal(quizResult({ ...sample, tools: ["manual"] }).savingsCents, 0);
 });

@@ -1,5 +1,5 @@
 // The landing-page quiz (/quiz): four quick questions, then a personal
-// result (tools replaced, rough monthly savings, the plan that fits). The
+// result (tools replaced, rough yearly savings, the plan that fits). The
 // answers ride along in a cookie and are saved with the new studio's sign-up
 // (lib/auth.ts), so Settings > Sign-ups shows what people shoot and use.
 import { PLAN_PRICES } from "./plans.ts";
@@ -14,20 +14,34 @@ export const SHOOTS = [
   { id: "other", label: "Something else" },
 ] as const;
 
-// What they use now, with a typical monthly price for the entry plan (billed
-// yearly where that's how it's sold), in cents. Shown as "about".
-export const TOOLS = [
-  { id: "honeybook", label: "HoneyBook", cents: 2900 },
-  { id: "dubsado", label: "Dubsado", cents: 2800 },
-  { id: "studioninja", label: "Studio Ninja", cents: 1600 },
-  { id: "pixieset", label: "Pixieset", cents: 1600 },
-  { id: "shootproof", label: "ShootProof", cents: 800 },
-  { id: "pictime", label: "Pic-Time", cents: 700 },
-  { id: "scheduler", label: "Calendly or Acuity", cents: 1000 },
-  { id: "website", label: "A website builder (Squarespace, Wix, Showit)", cents: 1600 },
-  { id: "cloud", label: "Dropbox or Google Drive for delivery", cents: 1000 },
-  { id: "manual", label: "Spreadsheets, email, and texts", cents: 0 },
+// The jobs PhotoEZ Cloud does, each with what it gives them. The result
+// lists the ones their current tools don't cover, so it never claims
+// another product lacks a particular feature.
+export const FEATURES = [
+  { id: "inquiries", label: "Inquiries answered for you", detail: "AI sorts every new inquiry and drafts a reply in your voice." },
+  { id: "booking", label: "Online booking", detail: "Clients pick a real open time and pay the deposit, with text and email reminders." },
+  { id: "paperwork", label: "Contracts and invoices", detail: "Contracts signed online, quotes and invoices, paid straight to your own Stripe." },
+  { id: "galleries", label: "Proofing galleries", detail: "Clients favorite and select, you deliver finals in a click, and AI search finds any shot." },
+  { id: "store", label: "A print and merch store", detail: "A store in every gallery, with a design studio and 3D preview." },
+  { id: "marketing", label: "Help getting found", detail: "A free directory listing, reviews, client referrals, and gift cards." },
 ] as const;
+type FeatureId = (typeof FEATURES)[number]["id"];
+
+// What they use now, with a typical monthly price for the entry plan (billed
+// yearly where that's how it's sold), in cents. Shown as "about". `covers`
+// is which of the FEATURES jobs that tool already does.
+export const TOOLS: readonly { id: string; label: string; cents: number; covers: readonly FeatureId[] }[] = [
+  { id: "honeybook", label: "HoneyBook", cents: 2900, covers: ["inquiries", "booking", "paperwork"] },
+  { id: "dubsado", label: "Dubsado", cents: 2800, covers: ["inquiries", "booking", "paperwork"] },
+  { id: "studioninja", label: "Studio Ninja", cents: 1600, covers: ["inquiries", "booking", "paperwork"] },
+  { id: "pixieset", label: "Pixieset", cents: 1600, covers: ["galleries", "store"] },
+  { id: "shootproof", label: "ShootProof", cents: 800, covers: ["galleries", "store", "paperwork"] },
+  { id: "pictime", label: "Pic-Time", cents: 700, covers: ["galleries", "store"] },
+  { id: "scheduler", label: "Calendly or Acuity", cents: 1000, covers: ["booking"] },
+  { id: "website", label: "A website builder (Squarespace, Wix, Showit)", cents: 1600, covers: [] },
+  { id: "cloud", label: "Dropbox or Google Drive for delivery", cents: 1000, covers: [] },
+  { id: "manual", label: "Spreadsheets, email, and texts", cents: 0, covers: [] },
+];
 
 export const HEADACHES = [
   {
@@ -136,17 +150,24 @@ export type QuizResult = {
   planCents: number;
   replaced: { id: string; label: string; cents: number }[];
   currentCents: number;
+  // Per year.
   savingsCents: number;
+  // What PhotoEZ Cloud does that none of their current tools cover.
+  missing: { id: string; label: string; detail: string }[];
   answer: string;
 };
 
 // The personal result: the plan that fits, what it replaces, and roughly
-// what they'd save each month.
+// what they'd save in a year. The tools' prices are billed yearly where
+// offered, so they're compared with the plan's yearly price (two months free).
 export function quizResult(a: QuizAnswers): QuizResult {
   const busy = a.volume === "20+" || (a.volume === "11-20" && (a.shoots.includes("weddings") || a.shoots.includes("events")));
   const plan = busy ? "studio" : "pro";
   const planCents = PLAN_PRICES[plan].month;
-  const replaced = TOOLS.filter((t) => a.tools.includes(t.id) && t.id !== "manual").map((t) => ({ ...t }));
+  const replaced = TOOLS.filter((t) => a.tools.includes(t.id) && t.id !== "manual").map(({ id, label, cents }) => ({ id, label, cents }));
+  const covered = new Set(TOOLS.filter((t) => a.tools.includes(t.id)).flatMap((t) => t.covers));
+  // Only once they've said what they use; otherwise there's nothing to compare.
+  const missing = a.tools.length ? FEATURES.filter((f) => !covered.has(f.id)).map((f) => ({ ...f })) : [];
   const currentCents = replaced.reduce((sum, t) => sum + t.cents, 0);
   const headache = HEADACHES.find((h) => h.id === a.headache);
   return {
@@ -154,7 +175,8 @@ export function quizResult(a: QuizAnswers): QuizResult {
     planCents,
     replaced,
     currentCents,
-    savingsCents: Math.max(0, currentCents - planCents),
+    savingsCents: Math.max(0, currentCents * 12 - PLAN_PRICES[plan].year),
+    missing,
     answer: headache?.answer ?? HEADACHES[1].answer,
   };
 }
