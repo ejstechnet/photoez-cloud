@@ -181,7 +181,7 @@ function Result({ answers, signup }: { answers: QuizAnswers; signup: string }) {
             {r.savingsCents > 0 && (
               <>
                 {" "}
-                and saves you about <span className="italic text-sun">{money(r.savingsCents)} a month</span>
+                and saves you about <span className="italic text-sun">{money(r.savingsCents)} a year</span>
               </>
             )}
             .
@@ -207,6 +207,26 @@ function Result({ answers, signup }: { answers: QuizAnswers; signup: string }) {
         </div>
       </div>
 
+      {r.missing.length > 0 && (
+        <div className="mt-4 rounded-3xl bg-white/10 p-6 ring-1 ring-white/10">
+          <p className="text-sm font-bold tracking-wider text-sun uppercase">What you&apos;re missing out on</p>
+          <p className="mt-1 text-sm text-white/60">Your current setup doesn&apos;t do these. PhotoEZ Cloud Pro and Studio both do.</p>
+          <ul className="mt-4 grid gap-3 sm:grid-cols-2">
+            {r.missing.map((f) => (
+              <li key={f.id} className="flex gap-3">
+                <span aria-hidden className="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full bg-lime text-sm font-bold text-brand-deep">
+                  ✓
+                </span>
+                <span>
+                  <span className="block font-semibold text-white">{f.label}</span>
+                  <span className="block text-sm text-white/70">{f.detail}</span>
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       {r.replaced.length > 0 && (
         <div className="mt-4 rounded-3xl bg-white/5 p-6 ring-1 ring-white/10">
           <p className="text-sm font-bold tracking-wider text-white/70 uppercase">What you can retire</p>
@@ -222,7 +242,7 @@ function Result({ answers, signup }: { answers: QuizAnswers; signup: string }) {
               <span className="text-lime">{money(r.planCents)}/mo</span>
             </li>
           </ul>
-          <p className="mt-3 text-xs text-white/50">Typical entry-plan prices, billed yearly where offered. Your own costs may differ.</p>
+          <p className="mt-3 text-xs text-white/50">Typical entry-plan prices, billed yearly where offered. Yearly savings compare a year of these with PhotoEZ Cloud billed yearly. Your own costs may differ.</p>
         </div>
       )}
 
