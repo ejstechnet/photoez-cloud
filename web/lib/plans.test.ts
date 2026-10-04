@@ -17,6 +17,12 @@ import {
   planFor,
   planFromLookupKey,
   priceLookupKey,
+  STORAGE_BLOCK_BYTES,
+  STORAGE_BLOCK_PRICES,
+  canBuyStorage,
+  storageIntervalFromLookupKey,
+  storageLimit,
+  storageLookupKey,
   trialDaysLeft,
 } from "./plans.ts";
 
@@ -82,4 +88,21 @@ test("AI is capped during the trial, between Free's and Pro's allowance", () => 
   assert.equal(aiPhotoLimit("free", days(-1), now), AI_PHOTO_ALLOWANCE.free);
   assert.equal(aiPhotoLimit("pro", null, now), AI_PHOTO_ALLOWANCE.pro);
   assert.equal(aiAssistantLimit("studio", days(3), now), AI_ASSISTANT_ALLOWANCE.studio);
+});
+
+test("extra storage: 500 GB blocks for Pro and Studio only", () => {
+  const GB = 1024 ** 3;
+  assert.equal(STORAGE_BLOCK_BYTES, 500 * GB);
+  assert.deepEqual(STORAGE_BLOCK_PRICES, { month: 1000, year: 10000 });
+  assert.equal(storageLimit("pro", 0), 150 * GB);
+  assert.equal(storageLimit("pro", 2), 1150 * GB);
+  assert.equal(storageLimit("studio", 1), 2548 * GB);
+  // Free can't buy blocks, so any on record don't count.
+  assert.equal(storageLimit("free", 3), 3 * GB);
+  assert.equal(canBuyStorage("free"), false);
+  assert.equal(storageLookupKey("year"), "photoez_storage_year");
+  assert.equal(storageIntervalFromLookupKey("photoez_storage_month"), "month");
+  // A plan's price is never mistaken for storage, or the other way round.
+  assert.equal(storageIntervalFromLookupKey("photoez_pro_month"), null);
+  assert.equal(planFromLookupKey("photoez_storage_month"), null);
 });

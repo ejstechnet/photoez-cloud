@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { db } from "@/db";
 import { photographers } from "@/db/schema";
-import { billingPortalUrl, subscriptionCheckoutUrl } from "@/lib/billing";
+import { billingPortalUrl, setStorageBlocks, subscriptionCheckoutUrl } from "@/lib/billing";
 import { INTERVALS, PAID_PLANS, effectivePlan, hasFeature, type Interval, type PaidPlan } from "@/lib/plans";
 import { requirePhotographer } from "@/lib/session";
 import { stripeConfigured } from "@/lib/stripe";
@@ -36,6 +36,15 @@ export async function manageBilling() {
   const photographer = await requirePhotographer();
   if (!stripeConfigured()) redirect("/dashboard/billing?error=stripe");
   redirect(await billingPortalUrl(photographer.id));
+}
+
+// Extra storage: how many 500 GB blocks to pay for (0 removes them).
+export async function updateStorage(blocks: number): Promise<{ ok: true } | { error: string }> {
+  const photographer = await requirePhotographer();
+  if (!stripeConfigured()) return { error: "Billing isn't set up on this server yet." };
+  const result = await setStorageBlocks(photographer.id, Number(blocks));
+  if ("ok" in result) revalidatePath("/dashboard/billing");
+  return result;
 }
 
 // Studio plan: hide "Powered by PhotoEZ Cloud" on the studio's pages.

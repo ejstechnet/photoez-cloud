@@ -2,7 +2,21 @@ import { eq } from "drizzle-orm";
 import type Stripe from "stripe";
 import { db } from "@/db";
 import { photographers } from "@/db/schema";
-import { REFERRAL_COUPON_ID, hasFeature, planFromLookupKey, priceLookupKey, type Interval, type PaidPlan } from "@/lib/plans";
+import { planUsage } from "@/lib/plan-usage";
+import {
+  MAX_STORAGE_BLOCKS,
+  REFERRAL_COUPON_ID,
+  canBuyStorage,
+  formatStorage,
+  hasFeature,
+  planFromLookupKey,
+  priceLookupKey,
+  storageIntervalFromLookupKey,
+  storageLimit,
+  storageLookupKey,
+  type Interval,
+  type PaidPlan,
+} from "@/lib/plans";
 import { rewardReferral } from "@/lib/referrals";
 import { siteUrl } from "@/lib/site";
 import { stripe } from "@/lib/stripe";
@@ -19,8 +33,43 @@ import { stripe } from "@/lib/stripe";
 // retries the card; anything else (canceled, unpaid, incomplete…) is Free.
 const PAID_STATUSES = new Set(["active", "trialing", "past_due"]);
 
+// What a Stripe price sells: a plan (and its interval) or extra storage.
+// Known by its lookup key, or (for older prices kept by studios who subscribed
+// before a price change, which lose their lookup key) by its product's
+// metadata from scripts/stripe-billing-setup.mjs.
+type PriceKind = { plan: PaidPlan; interval: Interval } | { storage: Interval } | null;
+const productKinds = new Map<string, Stripe.Metadata>();
+
+async function priceKind(price: Stripe.Price): Promise<PriceKind> {
+  const plan = planFromLookupKey(price.lookup_key);
+  if (plan) return plan;
+  const storage = storageIntervalFromLookupKey(price.lookup_key);
+  if (storage) return { storage };
+  const recurring = price.recurring?.interval;
+  const interval: Interval | null = recurring === "month" ? "month" : recurring === "year" ? "year" : null;
+  if (!interval) return null;
+  const productId = typeof price.product === "string" ? price.product : price.product.id;
+  let metadata = productKinds.get(productId);
+  if (!metadata) {
+    const product = typeof price.product === "string" || "deleted" in price.product ? await stripe().products.retrieve(productId) : price.product;
+    metadata = product.metadata ?? {};
+    productKinds.set(productId, metadata);
+  }
+  if (metadata.app !== "photoez_cloud") return null;
+  if (metadata.addon === "storage") return { storage: interval };
+  return metadata.plan === "pro" || metadata.plan === "studio" ? { plan: metadata.plan, interval } : null;
+}
+
+const planOf = async (price: Stripe.Price | undefined) => {
+  const kind = price ? await priceKind(price) : null;
+  return kind && "plan" in kind ? kind : null;
+};
+
 async function priceId(plan: PaidPlan, interval: Interval) {
-  const key = priceLookupKey(plan, interval);
+  return priceByKey(priceLookupKey(plan, interval));
+}
+
+async function priceByKey(key: string) {
   const { data } = await stripe().prices.list({ lookup_keys: [key], active: true, limit: 1 });
   if (!data[0]) throw new Error(`No Stripe price with lookup key ${key}. Run scripts/stripe-billing-setup.mjs.`);
   return data[0].id;
@@ -100,6 +149,8 @@ export async function billingPortalUrl(photographerId: string) {
 // Copies a subscription onto the photographer: plan, interval, status, and
 // renewal date. Safe to run more than once, and in any order.
 export async function syncSubscription(subscription: Stripe.Subscription) {
+  // Extra storage has its own subscription; it never changes the plan.
+  if (await storageItem(subscription)) return syncStorage(subscription);
   const customerId = typeof subscription.customer === "string" ? subscription.customer : subscription.customer.id;
   const [studio] = await db
     .select({ id: photographers.id, subscriptionId: photographers.subscriptionId })
@@ -112,7 +163,7 @@ export async function syncSubscription(subscription: Stripe.Subscription) {
   }
 
   const item = subscription.items.data[0];
-  const bought = planFromLookupKey(item?.price.lookup_key);
+  const bought = await planOf(item?.price);
   const paid = bought !== null && PAID_STATUSES.has(subscription.status);
   await db
     .update(photographers)
@@ -129,6 +180,10 @@ export async function syncSubscription(subscription: Stripe.Subscription) {
       ...(paid ? { trialEndsAt: null } : {}),
     })
     .where(eq(photographers.id, studio.id));
+  // Extra storage follows the plan: it ends when the plan ends.
+  await followPlan(studio.id, paid, subscription.cancel_at_period_end || subscription.cancel_at !== null).catch((e) =>
+    console.error("Couldn't update extra storage to match the plan", e),
+  );
   // A referred studio's first payment earns its referrer a month of credit.
   if (paid) await rewardReferral(studio.id);
 }
@@ -148,9 +203,10 @@ export async function syncCheckoutSession(photographerId: string, sessionId: str
 // show even before (or without) the webhook.
 export async function refreshSubscription(photographerId: string) {
   const [studio] = await db
-    .select({ subscriptionId: photographers.subscriptionId })
+    .select({ subscriptionId: photographers.subscriptionId, storageSubscriptionId: photographers.storageSubscriptionId })
     .from(photographers)
     .where(eq(photographers.id, photographerId));
+  if (studio?.storageSubscriptionId) await syncStorage(await stripe().subscriptions.retrieve(studio.storageSubscriptionId));
   if (!studio?.subscriptionId) return;
   await syncSubscription(await stripe().subscriptions.retrieve(studio.subscriptionId));
 }
@@ -170,6 +226,132 @@ export async function scheduledChange(photographerId: string) {
   const now = Date.now() / 1000;
   const next = schedule.phases.find((phase) => phase.start_date > now);
   const price = next?.items[0]?.price;
-  const bought = price && typeof price !== "string" && !("deleted" in price && price.deleted) ? planFromLookupKey(price.lookup_key) : null;
+  const bought = price && typeof price !== "string" && !("deleted" in price && price.deleted) ? await planOf(price) : null;
   return next && bought ? { ...bought, on: new Date(next.start_date * 1000) } : null;
+}
+
+// ---- Extra storage (lib/plans.ts) ----
+
+// The extra-storage line on a subscription, if it has one.
+async function storageItem(subscription: Stripe.Subscription) {
+  for (const item of subscription.items.data) {
+    const kind = await priceKind(item.price);
+    if (kind && "storage" in kind) return item;
+  }
+  return undefined;
+}
+
+// Copies the storage subscription onto the photographer: how many blocks are
+// paid for, and when it renews.
+async function syncStorage(subscription: Stripe.Subscription) {
+  const customerId = typeof subscription.customer === "string" ? subscription.customer : subscription.customer.id;
+  const [studio] = await db
+    .select({ id: photographers.id, storageSubscriptionId: photographers.storageSubscriptionId })
+    .from(photographers)
+    .where(eq(photographers.billingCustomerId, customerId));
+  if (!studio) return;
+  // An older storage subscription ending doesn't touch the current one.
+  if (studio.storageSubscriptionId && studio.storageSubscriptionId !== subscription.id && !PAID_STATUSES.has(subscription.status)) return;
+  const item = await storageItem(subscription);
+  const live = PAID_STATUSES.has(subscription.status);
+  await db
+    .update(photographers)
+    .set({
+      extraStorageBlocks: live ? (item?.quantity ?? 0) : 0,
+      storageSubscriptionId: live ? subscription.id : null,
+      storagePeriodEnd: live && item ? new Date(item.current_period_end * 1000) : null,
+    })
+    .where(eq(photographers.id, studio.id));
+}
+
+// When the plan ends, extra storage ends with it; when the plan is set to
+// cancel at the end of its period (or that's undone), storage does the same.
+async function followPlan(photographerId: string, paid: boolean, cancelling: boolean) {
+  const [studio] = await db
+    .select({ storageSubscriptionId: photographers.storageSubscriptionId })
+    .from(photographers)
+    .where(eq(photographers.id, photographerId));
+  if (!studio?.storageSubscriptionId) return;
+  const storage = await stripe().subscriptions.retrieve(studio.storageSubscriptionId);
+  if (!PAID_STATUSES.has(storage.status)) return syncStorage(storage);
+  if (!paid) return syncStorage(await stripe().subscriptions.cancel(storage.id, { prorate: true }));
+  if (storage.cancel_at_period_end !== cancelling) {
+    await syncStorage(await stripe().subscriptions.update(storage.id, { cancel_at_period_end: cancelling }));
+  }
+}
+
+// Sets how many extra storage blocks a studio pays for (0 removes them all).
+// Adding charges the difference now, on the plan's card and billing interval;
+// removing credits the unused time to the next bill.
+export async function setStorageBlocks(photographerId: string, blocks: number): Promise<{ ok: true } | { error: string }> {
+  if (!Number.isInteger(blocks) || blocks < 0 || blocks > MAX_STORAGE_BLOCKS) return { error: "Choose how much storage to add." };
+  const [studio] = await db
+    .select({
+      plan: photographers.plan,
+      subscriptionId: photographers.subscriptionId,
+      status: photographers.subscriptionStatus,
+      interval: photographers.planInterval,
+      cancelling: photographers.cancelAtPeriodEnd,
+      storageSubscriptionId: photographers.storageSubscriptionId,
+      current: photographers.extraStorageBlocks,
+    })
+    .from(photographers)
+    .where(eq(photographers.id, photographerId));
+  if (!studio) return { error: "Studio not found." };
+  if (blocks === studio.current) return { ok: true };
+  if (!canBuyStorage(studio.plan) || !studio.subscriptionId || !PAID_STATUSES.has(studio.status ?? "")) {
+    return { error: "Extra storage is for the Pro and Studio plans. Choose a plan first." };
+  }
+  if (blocks > studio.current && studio.cancelling) {
+    return { error: "Your plan is set to end. Keep it in Manage billing first, then add storage." };
+  }
+  // Space already in use can't be given back.
+  const usage = await planUsage(photographerId);
+  if (blocks < studio.current && usage.storageBytes > storageLimit(studio.plan, blocks)) {
+    return {
+      error: `You're using ${formatStorage(usage.storageBytes)}, more than ${formatStorage(storageLimit(studio.plan, blocks))}. Delete some photos before removing that much storage.`,
+    };
+  }
+
+  try {
+    const existing = studio.storageSubscriptionId ? await stripe().subscriptions.retrieve(studio.storageSubscriptionId) : null;
+    const item = existing ? await storageItem(existing) : undefined;
+    if (existing && item && PAID_STATUSES.has(existing.status)) {
+      if (blocks === 0) {
+        await syncStorage(await stripe().subscriptions.cancel(existing.id, { prorate: true }));
+      } else {
+        const adding = blocks > (item.quantity ?? 0);
+        await syncStorage(
+          await stripe().subscriptions.update(existing.id, {
+            items: [{ id: item.id, quantity: blocks }],
+            // More storage is charged now; less is credited to the next bill.
+            proration_behavior: adding ? "always_invoice" : "create_prorations",
+            ...(adding ? { payment_behavior: "error_if_incomplete" as const } : {}),
+          }),
+        );
+      }
+    } else if (blocks > 0) {
+      // Charged on the card the plan uses, billed monthly or yearly like the plan.
+      const plan = await stripe().subscriptions.retrieve(studio.subscriptionId);
+      const card = typeof plan.default_payment_method === "string" ? plan.default_payment_method : plan.default_payment_method?.id;
+      await syncStorage(
+        await stripe().subscriptions.create({
+          customer: await billingCustomer(photographerId),
+          items: [{ price: await priceByKey(storageLookupKey(studio.interval === "year" ? "year" : "month")), quantity: blocks }],
+          ...(card ? { default_payment_method: card } : {}),
+          payment_behavior: "error_if_incomplete",
+          metadata: { photographerId, addon: "storage" },
+        }),
+      );
+    }
+  } catch (e) {
+    console.error("Extra storage change failed", e);
+    const declined = e && typeof e === "object" && "type" in e && (e as { type: unknown }).type === "StripeCardError";
+    return {
+      error: declined
+        ? "Your card was declined. Update it in Manage billing, then try again."
+        : "Stripe couldn't make that change right now. Try again in a minute.",
+    };
+  }
+  return { ok: true };
 }
