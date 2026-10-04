@@ -170,22 +170,26 @@ export default async function Home() {
       {/* Hero and "Grow your business": a deep navy, #060f1e. */}
       <section className="relative overflow-hidden text-white" style={{ backgroundColor: "#060f1e" }}>
         {/* The photographer-at-work image, faded into the navy on every side so its
-            soft white edges never show. Behind the text on wide screens. */}
-        <Image
-          src="/home/hero.webp"
-          alt="A smiling photographer shooting with her camera, surrounded by PhotoEZ Cloud cards: a new inquiry sorted by AI, photos found, a gallery delivered, a client gallery, and a booking confirmed."
-          width={2800}
-          height={1867}
-          priority
-          // Starts right after the text column and fits the whole image (cards included) in what's left.
-          className="pointer-events-none absolute inset-y-0 right-0 hidden h-full w-[min(68%,calc(100%_-_440px))] object-contain object-right lg:block"
-          style={{
-            maskImage:
-              "linear-gradient(to right, transparent 0%, black 13%), linear-gradient(to top, transparent 0%, black 12%), linear-gradient(to bottom, transparent 0%, black 8%), linear-gradient(to left, transparent 0%, black 6%)",
-            maskComposite: "intersect",
-            WebkitMaskComposite: "source-in",
-          }}
-        />
+            soft white edges never show. Behind the text on wide screens, in a
+            centered 1440px area so very wide screens get even space on both
+            sides (narrower screens: the area is the full width). */}
+        <div className="pointer-events-none absolute inset-y-0 left-1/2 hidden w-full max-w-[1440px] -translate-x-1/2 lg:block">
+          <Image
+            src="/home/hero.webp"
+            alt="A smiling photographer shooting with her camera, surrounded by PhotoEZ Cloud cards: a new inquiry sorted by AI, photos found, a gallery delivered, a client gallery, and a booking confirmed."
+            width={2800}
+            height={1867}
+            priority
+            // Starts right after the text column and fits the whole image (cards included) in what's left.
+            className="absolute inset-y-0 right-0 h-full w-[min(68%,calc(100%_-_440px))] object-contain object-right"
+            style={{
+              maskImage:
+                "linear-gradient(to right, transparent 0%, black 13%), linear-gradient(to top, transparent 0%, black 12%), linear-gradient(to bottom, transparent 0%, black 8%), linear-gradient(to left, transparent 0%, black 6%)",
+              maskComposite: "intersect",
+              WebkitMaskComposite: "source-in",
+            }}
+          />
+        </div>
         <div className="pointer-events-none absolute -bottom-32 left-1/4 size-80 rounded-full bg-coral/20 blur-3xl" />
 
         <header className="relative mx-auto flex max-w-7xl items-center justify-between px-4 py-5">
