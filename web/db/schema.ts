@@ -88,6 +88,11 @@ export const photographers = pgTable("photographers", {
   planInterval: text("plan_interval", { enum: ["month", "year"] }),
   currentPeriodEnd: timestamp("current_period_end", { withTimezone: true }),
   cancelAtPeriodEnd: boolean("cancel_at_period_end").notNull().default(false),
+  // Extra storage (lib/plans.ts): 500 GB blocks on their own subscription,
+  // kept in step with Stripe by lib/billing.ts.
+  extraStorageBlocks: integer("extra_storage_blocks").notNull().default(0),
+  storageSubscriptionId: text("storage_subscription_id"),
+  storagePeriodEnd: timestamp("storage_period_end", { withTimezone: true }),
   // Studio plan: hide "Powered by PhotoEZ Cloud" on the studio's pages.
   hideBranding: boolean("hide_branding").notNull().default(false),
   // Photographer directory (/photographers): opted in, and where the studio

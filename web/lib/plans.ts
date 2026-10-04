@@ -87,6 +87,27 @@ export const PLAN_LIMITS: Record<Plan, { storageBytes: number; activeGalleries: 
   studio: { storageBytes: 2048 * GB, activeGalleries: null },
 };
 
+// Extra storage (decided with Elle 2026-10-04): Pro and Studio studios can add
+// blocks of 500 GB, $10 a month or $100 a year each, on a small subscription
+// of their own beside the plan (Stripe's billing portal can't switch plans on
+// a subscription that has a second product). Lookup keys work like the plans'.
+export const STORAGE_BLOCK_BYTES = 500 * GB;
+export const STORAGE_BLOCK_PRICES: Record<Interval, number> = { month: 1000, year: 10000 };
+export const MAX_STORAGE_BLOCKS = 20;
+export const storageLookupKey = (interval: Interval) => `photoez_storage_${interval}`;
+export function storageIntervalFromLookupKey(key: string | null | undefined): Interval | null {
+  const match = /^photoez_storage_(month|year)$/.exec(key ?? "");
+  return match ? (match[1] as Interval) : null;
+}
+
+// Which plans can buy extra storage (Free upgrades instead).
+export const canBuyStorage = (plan: Plan) => plan === "pro" || plan === "studio";
+
+// A plan's storage plus any extra blocks it's allowed to use.
+export function storageLimit(plan: Plan, extraBlocks: number) {
+  return PLAN_LIMITS[plan].storageBytes + (canBuyStorage(plan) ? Math.max(0, extraBlocks) * STORAGE_BLOCK_BYTES : 0);
+}
+
 export const TRIAL_DAYS = 14;
 
 // The plan a studio gets right now: during the free trial, a Free studio

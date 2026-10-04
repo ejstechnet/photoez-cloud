@@ -6,6 +6,8 @@ import {
   PLAN_LABELS,
   PLAN_LIMITS,
   PLAN_PRICES,
+  STORAGE_BLOCK_BYTES,
+  STORAGE_BLOCK_PRICES,
   TRIAL_DAYS,
   formatStorage,
   type Interval,
@@ -46,7 +48,7 @@ function includes(plan: Plan): string[] {
     ];
   }
   const shared = [
-    `${formatStorage(limits.storageBytes)} of photo storage`,
+    `${formatStorage(limits.storageBytes)} of photo storage, plus more any time (${formatStorage(STORAGE_BLOCK_BYTES)} for $${STORAGE_BLOCK_PRICES.month / 100}/mo)`,
     `AI gallery search: ${n(AI_PHOTO_ALLOWANCE[plan])} photos a month`,
     `Studio Assistant: ${n(AI_ASSISTANT_ALLOWANCE[plan])} questions a month`,
   ];

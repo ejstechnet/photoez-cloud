@@ -65,6 +65,37 @@ for (const [plan, info] of Object.entries(PLANS)) {
   portalProducts.push({ product: product.id, prices });
 }
 
+// Extra storage: 500 GB blocks, sold by quantity on a subscription of its own
+// (lib/billing.ts). Kept in step with STORAGE_BLOCK_PRICES in lib/plans.ts.
+// Not in the portal's plan switcher; studios change it on the Billing page.
+const STORAGE = { name: "PhotoEZ Cloud Extra Storage (500 GB)", month: 1000, year: 10000 };
+{
+  const lookupKeys = ["month", "year"].map((interval) => `photoez_storage_${interval}`);
+  const { data: existing } = await stripe.prices.list({ lookup_keys: lookupKeys, active: true, expand: ["data.product"] });
+  let product = existing[0]?.product;
+  if (!product) {
+    product = await stripe.products.create({ name: STORAGE.name, metadata: { app: "photoez_cloud", addon: "storage" } });
+    console.log(`Created product ${product.name}`);
+  }
+  for (const interval of ["month", "year"]) {
+    const lookup_key = `photoez_storage_${interval}`;
+    const price = existing.find((p) => p.lookup_key === lookup_key);
+    if (!price || price.unit_amount !== STORAGE[interval]) {
+      await stripe.prices.create({
+        product: product.id,
+        currency: "usd",
+        unit_amount: STORAGE[interval],
+        recurring: { interval },
+        lookup_key,
+        // Moves the key to the new price; studios already paying keep theirs.
+        ...(price ? { transfer_lookup_key: true } : {}),
+        metadata: { app: "photoez_cloud" },
+      });
+      console.log(`${price ? "Replaced" : "Created"} ${lookup_key}: $${STORAGE[interval] / 100}/${interval} per 500 GB`);
+    }
+  }
+}
+
 const features = {
   customer_update: { enabled: true, allowed_updates: ["email", "address", "name"] },
   invoice_history: { enabled: true },

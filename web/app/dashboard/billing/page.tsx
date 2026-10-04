@@ -6,12 +6,24 @@ import { IntervalSwitch, PlanCards } from "@/components/plan-cards";
 import { assistantAllowance } from "@/lib/ai/assistant/run";
 import { photoAllowance } from "@/lib/gallery-tagging";
 import { planUsage } from "@/lib/plan-usage";
-import { PLAN_LABELS, TRIAL_AI_ASSISTANT_ALLOWANCE, TRIAL_AI_PHOTO_ALLOWANCE, TRIAL_DAYS, formatStorage, hasFeature, trialDaysLeft, type Interval } from "@/lib/plans";
+import {
+  PLAN_LABELS,
+  PLAN_LIMITS,
+  TRIAL_AI_ASSISTANT_ALLOWANCE,
+  TRIAL_AI_PHOTO_ALLOWANCE,
+  TRIAL_DAYS,
+  canBuyStorage,
+  formatStorage,
+  hasFeature,
+  trialDaysLeft,
+  type Interval,
+} from "@/lib/plans";
 import { requirePhotographer } from "@/lib/session";
 import { refreshSubscription, scheduledChange } from "@/lib/billing";
 import { stripeConfigured } from "@/lib/stripe";
 import { manageBilling, subscribe } from "./actions";
 import { BrandingToggle } from "./branding-toggle";
+import { StorageCard } from "./storage-card";
 import { CopyLink } from "@/components/copy-link";
 import { referralSummary } from "@/lib/referrals";
 import { siteUrl } from "@/lib/site";
@@ -35,6 +47,7 @@ export default async function BillingPage({ searchParams }: PageProps<"/dashboar
       periodEnd: photographers.currentPeriodEnd,
       cancelling: photographers.cancelAtPeriodEnd,
       hideBranding: photographers.hideBranding,
+      storagePeriodEnd: photographers.storagePeriodEnd,
       timeZone: photographers.timeZone,
     })
     .from(photographers)
@@ -148,6 +161,27 @@ export default async function BillingPage({ searchParams }: PageProps<"/dashboar
           </p>
         </section>
       </div>
+
+      <StorageCard
+        current={usage.extraBlocks}
+        planBytes={PLAN_LIMITS[plan].storageBytes}
+        usedBytes={usage.storageBytes}
+        interval={studio.planInterval === "year" ? "year" : "month"}
+        renews={studio.storagePeriodEnd ? `Extra storage renews on ${date(studio.storagePeriodEnd)}.` : null}
+        blocked={
+          !stripeConfigured()
+            ? "Billing isn't set up on this server yet."
+            : !subscribed || !canBuyStorage(studio.subscribedPlan)
+              ? trialLeft > 0
+                ? "Extra storage can be added once you choose Pro or Studio below."
+                : complimentary
+                  ? "Your plan is complimentary. Email us if you need more storage."
+                  : "Extra storage is for the Pro and Studio plans. Choose a plan below first."
+              : studio.cancelling
+                ? "Your plan is set to end. Keep it in Manage billing to add storage."
+                : null
+        }
+      />
 
       <section className="mt-12">
         <div className="flex flex-wrap items-end justify-between gap-4">

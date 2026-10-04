@@ -393,6 +393,13 @@
       "when": 1791057773737,
       "tag": "0055_strange_jane_foster",
       "breakpoints": true
+    },
+    {
+      "idx": 56,
+      "version": "7",
+      "when": 1791136373261,
+      "tag": "0056_storage_addon",
+      "breakpoints": true
     }
   ]
 }
