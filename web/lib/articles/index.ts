@@ -14,6 +14,9 @@ export type ArticleMeta = {
   updated?: string;
   category: string;
   readMinutes: number;
+  // The article's picture (in public/), shown at its top and on its card, and
+  // a 1200x630 copy for link previews.
+  image?: { src: string; width: number; height: number; alt: string; share: string };
 };
 
 export const ARTICLES: { meta: ArticleMeta; Body: ComponentType }[] = [{ meta: introducingPhotoezCloud, Body: IntroducingPhotoezCloud }];
