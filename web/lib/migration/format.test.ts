@@ -45,5 +45,17 @@ test("totals count only what was chosen", () => {
     contracts: 0,
     galleries: 2,
     photos: 40,
+    bookings: 0,
+    credits: 0,
+    reviews: 0,
+    invoices: 0,
   });
+  // Version 2 parts count only when chosen, and a version 1 source has none.
+  const v2 = { ...counts, bookings: 11, credits: 1, reviews: 3, invoices: 2 };
+  const all = { clients: true, sessions: true, contracts: true, galleryIds: [], clientIds: [], bookings: true, credits: false, reviews: true, invoices: true };
+  assert.deepEqual(
+    [chosenTotals(v2, all, galleries).bookings, chosenTotals(v2, all, galleries).credits, chosenTotals(v2, all, galleries).invoices],
+    [11, 0, 2],
+  );
+  assert.equal(chosenTotals(counts, all, galleries).bookings, 0);
 });

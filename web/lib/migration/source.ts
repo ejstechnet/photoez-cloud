@@ -1,17 +1,26 @@
-import { and, asc, count, eq, gt, inArray, isNull } from "drizzle-orm";
+import { and, asc, count, eq, gt, inArray, isNull, ne } from "drizzle-orm";
 import { db } from "@/db";
 import {
   addons,
+  bookingAddons,
+  bookingInspoPhotos,
+  bookings,
   clients,
   contractTemplates,
   favorites,
   galleries,
+  invoices,
   migrationKeys,
+  payments,
   photographers,
   photos,
+  reviews,
+  sessionCredits,
   sessionTypeAddons,
   sessionTypes,
+  signedContracts,
 } from "@/db/schema";
+import { bookingTotal } from "@/lib/payments/amounts";
 import { LOCATION_LABELS, type ShootLocation } from "@/lib/session-types";
 import { photoKey, signedViewUrl } from "@/lib/storage";
 import {
@@ -22,9 +31,13 @@ import {
   keyFromHeader,
   toPage,
   type MAddon,
+  type MBooking,
   type MClient,
   type MContract,
+  type MCredit,
   type MGallery,
+  type MInvoice,
+  type MReview,
   type MSessionType,
   type Manifest,
 } from "./format";
@@ -50,7 +63,7 @@ export async function studioForRequest(request: Request): Promise<string | null>
 }
 
 export async function manifest(photographerId: string): Promise<Manifest> {
-  const [[studio], [c], [g], [p], [st], [ad], [ct]] = await Promise.all([
+  const [[studio], [c], [g], [p], [st], [ad], [ct], [bk], [cr], [rv], [iv]] = await Promise.all([
     db
       .select({ name: photographers.name, businessName: photographers.businessName, email: photographers.email, timeZone: photographers.timeZone })
       .from(photographers)
@@ -61,14 +74,34 @@ export async function manifest(photographerId: string): Promise<Manifest> {
     db.select({ n: count() }).from(sessionTypes).where(eq(sessionTypes.photographerId, photographerId)),
     db.select({ n: count() }).from(addons).where(eq(addons.photographerId, photographerId)),
     db.select({ n: count() }).from(contractTemplates).where(eq(contractTemplates.photographerId, photographerId)),
+    db.select({ n: count() }).from(bookings).where(movableBookings(photographerId)),
+    db.select({ n: count() }).from(sessionCredits).where(eq(sessionCredits.photographerId, photographerId)),
+    db.select({ n: count() }).from(reviews).where(eq(reviews.photographerId, photographerId)),
+    db.select({ n: count() }).from(invoices).where(eq(invoices.photographerId, photographerId)),
   ]);
   return {
     format: MIGRATION_FORMAT,
     version: MIGRATION_VERSION,
     source: "cloud",
     studio: { name: studio.businessName || studio.name, email: studio.email, timeZone: studio.timeZone },
-    counts: { clients: c.n, galleries: g.n, photos: p.n, sessionTypes: st.n, addons: ad.n, contracts: ct.n },
+    counts: {
+      clients: c.n,
+      galleries: g.n,
+      photos: p.n,
+      sessionTypes: st.n,
+      addons: ad.n,
+      contracts: ct.n,
+      bookings: bk.n,
+      credits: cr.n,
+      reviews: rv.n,
+      invoices: iv.n,
+    },
   };
+}
+
+// Bookings worth moving: everything but deposit holds that were never paid.
+function movableBookings(photographerId: string) {
+  return and(eq(bookings.photographerId, photographerId), ne(bookings.status, "pending_payment"));
 }
 
 export async function clientPage(photographerId: string, offset: number, limit: number) {
@@ -206,4 +239,180 @@ export async function originalUrl(photographerId: string, photoId: string) {
     .innerJoin(galleries, eq(galleries.id, photos.galleryId))
     .where(and(eq(photos.id, photoId), eq(galleries.photographerId, photographerId)));
   return row ? signedViewUrl(photoKey(row.fileKey, "original")) : null;
+}
+
+// ---- Version 2 ----
+
+export async function bookingPage(photographerId: string, offset: number, limit: number) {
+  const rows = await db
+    .select()
+    .from(bookings)
+    .where(movableBookings(photographerId))
+    .orderBy(asc(bookings.createdAt), asc(bookings.id))
+    .offset(offset)
+    .limit(limit + 1);
+  const page = rows.slice(0, limit);
+  const ids = page.map((b) => b.id);
+  const [extras, paid, signed, inspo, linked] = ids.length
+    ? await Promise.all([
+        db.select().from(bookingAddons).where(inArray(bookingAddons.bookingId, ids)),
+        db
+          .select({ bookingId: payments.bookingId, amountCents: payments.amountCents })
+          .from(payments)
+          .where(and(inArray(payments.bookingId, ids), eq(payments.status, "paid"))),
+        db.select().from(signedContracts).where(inArray(signedContracts.bookingId, ids)),
+        db.select().from(bookingInspoPhotos).where(inArray(bookingInspoPhotos.bookingId, ids)).orderBy(asc(bookingInspoPhotos.position)),
+        db.select({ id: galleries.id, bookingId: galleries.bookingId }).from(galleries).where(inArray(galleries.bookingId, ids)),
+      ])
+    : [[], [], [], [], []];
+  const items: MBooking[] = page.map((b) => {
+    const contract = signed.find((s) => s.bookingId === b.id);
+    return {
+      id: b.id,
+      clientId: b.clientId,
+      clientName: b.clientName,
+      clientEmail: b.clientEmail,
+      clientPhone: b.clientPhone,
+      sessionTypeId: b.sessionTypeId,
+      sessionName: b.sessionName,
+      title: b.title,
+      startsAt: b.startsAt.toISOString(),
+      endsAt: b.endsAt.toISOString(),
+      status: b.status === "cancelled" ? "cancelled" : b.status === "completed" || b.startsAt < new Date() ? "completed" : "confirmed",
+      totalCents: bookingTotal(b),
+      addonsCents: b.addonsCents,
+      depositPercent: b.depositPercent,
+      paidCents: paid.filter((p) => p.bookingId === b.id).reduce((sum, p) => sum + p.amountCents, 0),
+      creditCents: b.creditCents + b.giftCardCents,
+      addons: extras
+        .filter((a) => a.bookingId === b.id)
+        .map((a) => ({ addonId: a.addonId, name: a.name, priceCents: a.priceCents, quantity: a.quantity, includedQuantity: a.includedQuantity })),
+      answers: (b.answers ?? []).map((a) => ({ label: a.label, value: a.value })),
+      notes: b.notes,
+      galleryId: linked.find((g) => g.bookingId === b.id)?.id ?? null,
+      createdAt: b.createdAt.toISOString(),
+      cancelledAt: b.cancelledAt?.toISOString() ?? null,
+      signedContract: contract
+        ? {
+            title: contract.title,
+            contentHtml: contract.content,
+            signerName: contract.signerName,
+            signatureType: contract.signatureType,
+            signatureData: contract.signatureData,
+            signedAt: contract.signedAt.toISOString(),
+            clientIp: contract.clientIp,
+          }
+        : null,
+      inspoPhotos: inspo
+        .filter((i) => i.bookingId === b.id)
+        .map((i, n) => ({ id: `inspo-${i.id}`, name: `inspiration-${n + 1}.jpg`, contentType: "image/jpeg" })),
+    };
+  });
+  return { items, next: rows.length > limit ? offset + limit : null };
+}
+
+export async function creditPage(photographerId: string, offset: number, limit: number) {
+  const rows = await db
+    .select()
+    .from(sessionCredits)
+    .where(eq(sessionCredits.photographerId, photographerId))
+    .orderBy(asc(sessionCredits.createdAt), asc(sessionCredits.id))
+    .offset(offset)
+    .limit(limit + 1);
+  const items: MCredit[] = rows.map((c) => ({
+    id: c.id,
+    clientEmail: c.clientEmail,
+    clientName: c.clientName,
+    amountCents: c.amountCents,
+    usedCents: c.usedCents,
+    reason: c.reason,
+    sourceBookingId: c.sourceBookingId,
+    expiresOn: c.expiresOn,
+    createdAt: c.createdAt.toISOString(),
+  }));
+  return toPage(items, offset, limit);
+}
+
+export async function reviewPage(photographerId: string, offset: number, limit: number) {
+  const rows = await db
+    .select()
+    .from(reviews)
+    .where(eq(reviews.photographerId, photographerId))
+    .orderBy(asc(reviews.createdAt), asc(reviews.id))
+    .offset(offset)
+    .limit(limit + 1);
+  const items: MReview[] = rows.map((r) => ({
+    id: r.id,
+    galleryId: r.galleryId,
+    clientName: r.clientName,
+    clientEmail: r.clientEmail,
+    status: r.status,
+    displayName: r.displayName,
+    rating: r.rating,
+    body: r.body,
+    photoId: r.photoId,
+    photoConsent: r.photoConsent,
+    requestedAt: r.requestedAt.toISOString(),
+    submittedAt: r.submittedAt?.toISOString() ?? null,
+    approvedAt: r.approvedAt?.toISOString() ?? null,
+  }));
+  return toPage(items, offset, limit);
+}
+
+export async function invoicePage(photographerId: string, offset: number, limit: number) {
+  const rows = await db
+    .select()
+    .from(invoices)
+    .where(eq(invoices.photographerId, photographerId))
+    .orderBy(asc(invoices.createdAt), asc(invoices.id))
+    .offset(offset)
+    .limit(limit + 1);
+  const items: MInvoice[] = rows.map((i) => ({
+    id: i.id,
+    kind: i.kind,
+    number: i.number,
+    status: i.status,
+    clientId: i.clientId,
+    clientName: i.clientName,
+    clientEmail: i.clientEmail,
+    clientPhone: i.clientPhone,
+    title: i.title,
+    eventDate: i.eventDate,
+    dueDate: i.dueDate,
+    items: i.items.map((li) => ({ description: li.description, quantity: li.quantity, unitCents: li.unitCents })),
+    taxBps: i.taxBps,
+    subtotalCents: i.subtotalCents,
+    taxCents: i.taxCents,
+    totalCents: i.totalCents,
+    depositPercent: i.plan.mode === "full" ? 0 : i.plan.depositPercent,
+    paidCents: i.paidCents,
+    notes: i.notes,
+    terms: i.terms,
+    createdAt: i.createdAt.toISOString(),
+    approvedAt: i.approvedAt?.toISOString() ?? null,
+    paidAt: i.paidAt?.toISOString() ?? null,
+    signedContract:
+      i.signedAt && i.signatureType && i.signatureData && i.contractContent
+        ? {
+            title: i.contractTitle,
+            contentHtml: i.contractContent,
+            signerName: i.signerName ?? i.clientName,
+            signatureType: i.signatureType,
+            signatureData: i.signatureData,
+            signedAt: i.signedAt.toISOString(),
+            clientIp: i.signerIp,
+          }
+        : null,
+  }));
+  return toPage(items, offset, limit);
+}
+
+// A link to one booking inspiration photo, if it belongs to the key's studio.
+export async function inspoUrl(photographerId: string, inspoId: string) {
+  const [row] = await db
+    .select({ fileKey: bookingInspoPhotos.fileKey })
+    .from(bookingInspoPhotos)
+    .innerJoin(bookings, eq(bookings.id, bookingInspoPhotos.bookingId))
+    .where(and(eq(bookingInspoPhotos.id, inspoId), eq(bookings.photographerId, photographerId)));
+  return row ? signedViewUrl(row.fileKey) : null;
 }

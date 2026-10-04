@@ -2,11 +2,16 @@ import { z } from "zod";
 import { pageParams } from "@/lib/migration/format";
 import {
   addonPage,
+  bookingPage,
   clientPage,
   contractPage,
+  creditPage,
   galleryPage,
+  inspoUrl,
+  invoicePage,
   manifest,
   originalUrl,
+  reviewPage,
   sessionTypePage,
   studioForRequest,
 } from "@/lib/migration/source";
@@ -40,11 +45,24 @@ export async function GET(request: Request, { params }: RouteContext<"/api/migra
     case "galleries":
       // Galleries carry their photo lists, so fewer at a time.
       return json(await galleryPage(studio, offset, Math.min(limit, 20)));
+    case "bookings":
+      return json(await bookingPage(studio, offset, Math.min(limit, 50)));
+    case "credits":
+      return json(await creditPage(studio, offset, limit));
+    case "reviews":
+      return json(await reviewPage(studio, offset, limit));
+    case "invoices":
+      return json(await invoicePage(studio, offset, Math.min(limit, 50)));
   }
-  // /photos/<id>/original: a short-lived link straight to the file.
-  if (path.length === 3 && path[0] === "photos" && path[2] === "original" && z.uuid().safeParse(path[1]).success) {
-    const url = await originalUrl(studio, path[1]);
-    return url ? Response.redirect(url, 302) : json({ error: "Photo not found." }, 404);
+  // /photos/<id>/original: a short-lived link straight to the file. Booking
+  // inspiration photos have ids starting "inspo-".
+  if (path.length === 3 && path[0] === "photos" && path[2] === "original") {
+    const inspo = path[1].startsWith("inspo-") ? path[1].slice(6) : null;
+    const id = inspo ?? path[1];
+    if (z.uuid().safeParse(id).success) {
+      const url = inspo ? await inspoUrl(studio, id) : await originalUrl(studio, id);
+      return url ? Response.redirect(url, 302) : json({ error: "Photo not found." }, 404);
+    }
   }
   return json({ error: "Not found." }, 404);
 }
