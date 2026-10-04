@@ -19,7 +19,8 @@ export function MigrationCard({ siteUrl, keys }: { siteUrl: string; keys: KeyRow
       <h2 className="font-display text-2xl font-bold">Move to PhotoEZ for WordPress</h2>
       <p className="mt-1 text-sm text-muted">
         Switching to your own WordPress site? The free <strong>PhotoEZ Migration</strong> plugin copies your clients, galleries
-        with all their photos and picks, session types and add-ons, and contract templates. Your PhotoEZ Cloud account isn&apos;t
+        with all their photos and picks, session types and add-ons, contract templates, bookings with signed contracts, session
+        credits, reviews, and quotes and invoices. Your PhotoEZ Cloud account isn&apos;t
         changed, so you can check everything before you switch.
       </p>
 

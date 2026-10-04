@@ -13,6 +13,10 @@ const LABELS: [string, string][] = [
   ["contracts", "Contract templates"],
   ["galleries", "Galleries"],
   ["photos", "Photos"],
+  ["bookings", "Bookings"],
+  ["credits", "Session credits"],
+  ["reviews", "Reviews"],
+  ["invoices", "Quotes & invoices"],
 ];
 const PHASES: Record<string, string> = {
   clients: "Bringing in clients…",
@@ -20,6 +24,10 @@ const PHASES: Record<string, string> = {
   session_types: "Bringing in session types…",
   contracts: "Bringing in contract templates…",
   galleries: "Bringing in galleries and photos…",
+  bookings: "Bringing in bookings and signed contracts…",
+  credits: "Bringing in session credits…",
+  reviews: "Bringing in reviews…",
+  invoices: "Bringing in quotes and invoices…",
   done: "Import finished!",
 };
 
@@ -34,7 +42,7 @@ export function ImportCard({ initial }: { initial: ImportView | null }) {
   const [running, setRunning] = useState(false);
   // After Connect: what the site has, and what's ticked.
   const [preview, setPreview] = useState<SourcePreview | null>(null);
-  const [parts, setParts] = useState({ clients: true, sessions: true, contracts: true });
+  const [parts, setParts] = useState({ clients: true, sessions: true, contracts: true, bookings: true, credits: true, reviews: true, invoices: true });
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [message, setMessage] = useState<{ text: string; error: boolean } | null>(
     initial && !initial.finished ? { text: "Paused. Click Continue to pick up where it stopped.", error: false } : null,
@@ -50,7 +58,7 @@ export function ImportCard({ initial }: { initial: ImportView | null }) {
         break;
       }
       if (r.job?.finished) {
-        setMessage({ text: "All done! Check your clients, galleries, Booking setup, and contracts.", error: false });
+        setMessage({ text: "All done! Check your clients, galleries, bookings, Booking setup, contracts, and invoices.", error: false });
         break;
       }
     }
@@ -80,7 +88,7 @@ export function ImportCard({ initial }: { initial: ImportView | null }) {
   async function start() {
     if (!preview) return;
     const galleries = preview.galleries.filter((g) => picked.has(g.id));
-    if (!parts.clients && !parts.sessions && !parts.contracts && galleries.length === 0) {
+    if (!Object.values(parts).some(Boolean) && galleries.length === 0) {
       setMessage({ text: "Tick at least one thing to bring over.", error: true });
       return;
     }
@@ -92,6 +100,8 @@ export function ImportCard({ initial }: { initial: ImportView | null }) {
       hideSessions,
       include: {
         ...parts,
+        // An older plugin doesn't offer these.
+        ...(preview.counts.bookings === undefined && { bookings: false, credits: false, reviews: false, invoices: false }),
         galleryIds: galleries.map((g) => g.id),
         clientIds: [...new Set(galleries.map((g) => g.clientId).filter((id): id is string => Boolean(id)))],
       },
@@ -118,8 +128,9 @@ export function ImportCard({ initial }: { initial: ImportView | null }) {
 
   const totals = job?.totals ?? {};
   const done = job?.done ?? {};
-  const total = (totals.clients ?? 0) + (totals.photos ?? 0) + 5;
-  const have = (done.clients ?? 0) + (done.photos ?? 0) + ["addons", "session_types", "contracts", "galleries", "done"].indexOf(job?.phase ?? "") + 1;
+  const steps = ["addons", "session_types", "contracts", "galleries", "bookings", "credits", "reviews", "invoices", "done"];
+  const total = (totals.clients ?? 0) + (totals.photos ?? 0) + (totals.bookings ?? 0) + steps.length;
+  const have = (done.clients ?? 0) + (done.photos ?? 0) + (done.bookings ?? 0) + steps.indexOf(job?.phase ?? "") + 1;
   const pct = job?.finished ? 100 : Math.max(3, Math.min(99, Math.round((have / total) * 100)));
 
   return (
@@ -127,14 +138,15 @@ export function ImportCard({ initial }: { initial: ImportView | null }) {
       <h2 className="font-display text-2xl font-bold">Move from PhotoEZ for WordPress</h2>
       <p className="mt-1 text-sm text-muted">
         Coming from PhotoEZ on your own WordPress site? Bring your clients, galleries with every photo and client pick, session
-        types and add-ons, and contract templates here. Anything you already have with the same email or name is kept, not
+        types and add-ons, contract templates, bookings with signed contracts, session credits, reviews, and InvoiceEZ quotes and
+        invoices here. Anything you already have with the same email or name is kept, not
         duplicated, and nothing on your WordPress site changes.
       </p>
 
       {!job ? (
         <div className="mt-5 space-y-4">
           <ol className="list-decimal space-y-1.5 pl-5 text-sm">
-            <li>On your WordPress site, install the free PhotoEZ Migration plugin (version 1.1 or newer).</li>
+            <li>On your WordPress site, install the free PhotoEZ Migration plugin (version 1.3 or newer brings bookings, credits, reviews, and invoices too).</li>
             <li>
               In WordPress, go to <strong>PhotoEZ → Migration</strong>, and under <strong>Move to PhotoEZ Cloud</strong> click{" "}
               <strong>Make a migration key</strong>.
@@ -184,6 +196,19 @@ export function ImportCard({ initial }: { initial: ImportView | null }) {
                     ["clients", "Clients", `${preview.counts.clients} clients. If you leave this off, clients of the galleries you choose still come, so each gallery keeps its client.`],
                     ["sessions", "Session types & add-ons", `${preview.counts.sessionTypes} session types, ${preview.counts.addons} add-ons`],
                     ["contracts", "Contract templates", `${preview.counts.contracts} templates`],
+                    // Only offered by sites with PhotoEZ Migration 1.3 or newer.
+                    ...(preview.counts.bookings === undefined
+                      ? []
+                      : ([
+                          [
+                            "bookings",
+                            "Bookings & signed contracts",
+                            `${preview.counts.bookings} bookings, with signed contracts, inspiration photos, and what's been paid. Upcoming ones carry on here: reminders, then the balance.`,
+                          ],
+                          ["credits", "Session credits", `${preview.counts.credits ?? 0} credits`],
+                          ["reviews", "Reviews", `${preview.counts.reviews ?? 0} reviews and review requests`],
+                          ["invoices", "Quotes & invoices", `${preview.counts.invoices ?? 0} quotes and invoices, with what's been paid and signed`],
+                        ] as const)),
                   ] as const
                 ).map(([k, label, note]) => (
                   <label key={k} className="flex items-start gap-3">
@@ -271,16 +296,23 @@ export function ImportCard({ initial }: { initial: ImportView | null }) {
             {PHASES[job.phase] ?? ""} <span className="font-normal text-muted">{pct}%</span>
           </p>
           <dl className="grid max-w-md grid-cols-2 gap-x-6 gap-y-1 text-sm">
-            {LABELS.map(([k, label]) => (
+            {LABELS.filter(([k]) => totals[k] !== undefined || done[k] !== undefined).map(([k, label]) => (
               <div key={k} className="contents">
                 <dt className="text-muted">{label}</dt>
                 <dd>
                   <strong>{done[k] ?? 0}</strong>
                   {totals[k] !== undefined && ` of ${totals[k]}`}
+                  {(done[`${k}Skipped`] ?? 0) > 0 && <span className="text-muted"> · {done[`${k}Skipped`]} already here</span>}
                 </dd>
               </div>
             ))}
           </dl>
+          {LABELS.some(([k]) => (done[`${k}Skipped`] ?? 0) > 0) && (
+            <p className="text-sm text-muted">
+              <strong className="text-foreground">Already here</strong> means you already had it, from an earlier import or with
+              the same email or name, so it wasn&apos;t copied again. Nothing is duplicated.
+            </p>
+          )}
           {message && <Message text={message.text} error={message.error} />}
           {job.errors.length > 0 && (
             <details className="text-sm" open={job.finished}>

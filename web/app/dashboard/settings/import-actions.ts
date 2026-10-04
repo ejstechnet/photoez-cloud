@@ -35,6 +35,10 @@ export async function beginImport(input: {
     contracts: Boolean(input.include.contracts),
     galleryIds: input.include.galleryIds.map(String).slice(0, 5000),
     clientIds: input.include.clientIds.map(String).slice(0, 5000),
+    bookings: Boolean(input.include.bookings),
+    credits: Boolean(input.include.credits),
+    reviews: Boolean(input.include.reviews),
+    invoices: Boolean(input.include.invoices),
   };
   const result = await startImport(
     user.id,

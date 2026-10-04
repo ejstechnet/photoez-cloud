@@ -1,25 +1,52 @@
 import { randomBytes, randomUUID } from "node:crypto";
-import { and, eq, max, sql } from "drizzle-orm";
+import { and, eq, isNull, max, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
   addons,
+  bookingAddons,
+  bookingInspoPhotos,
+  bookings,
   clients,
   contractTemplates,
   favorites,
   galleries,
+  invoices,
   migrationImports,
   migrationMap,
+  payments,
   photographers,
   photos,
+  reviews,
+  sessionCredits,
   sessionTypeAddons,
   sessionTypes,
+  signedContracts,
 } from "@/db/schema";
+import { localDateOf } from "@/lib/booking/time";
+import { buildSchedule, finalDueDate, nextScheduled, statusAfterPayment, type PaymentPlan } from "@/lib/invoices/math";
+import { newInvoiceToken, nextNumber } from "@/lib/invoices/server";
 import { galleryLimitError, storageLimitError } from "@/lib/plan-usage";
 import { MAX_PHOTO_BYTES, PHOTO_TYPES } from "@/lib/photo-limits";
 import { sanitizeRichText } from "@/lib/rich-text";
 import { openSecret, sealSecret } from "@/lib/secret-box";
-import { photoKey, photoPrefix, putObject, readObject, sessionImageKey } from "@/lib/storage";
-import { MIGRATION_FORMAT, chosenTotals, type ImportChoice, type MAddon, type MClient, type MContract, type MGallery, type MSessionType, type Manifest, type Page } from "./format";
+import { inspoKey, photoKey, photoPrefix, putObject, readObject, sessionImageKey } from "@/lib/storage";
+import {
+  MIGRATION_FORMAT,
+  chosenTotals,
+  type ImportChoice,
+  type MAddon,
+  type MBooking,
+  type MClient,
+  type MContract,
+  type MCredit,
+  type MGallery,
+  type MInvoice,
+  type MReview,
+  type MSessionType,
+  type MSignature,
+  type Manifest,
+  type Page,
+} from "./format";
 import { makeVariants, type Watermark } from "./variants";
 import sharp from "sharp";
 
@@ -27,11 +54,13 @@ import sharp from "sharp";
 // read-only API, docs/migration-format.md), a little at a time: each step runs
 // for up to ~20 seconds and saves where it got to, and the Settings page keeps
 // calling the next step with a progress bar. Order: clients → add-ons →
-// session types → contracts → galleries (each gallery's photos right after it).
+// session types → contracts → galleries (each gallery's photos right after it)
+// → bookings (signed contracts, inspiration photos) → credits → reviews →
+// quotes/invoices.
 // Anything already here with the same email or name is reused, not duplicated.
 
 const STEP_MS = 20_000;
-const PHASES = ["clients", "addons", "session_types", "contracts", "galleries", "done"] as const;
+const PHASES = ["clients", "addons", "session_types", "contracts", "galleries", "bookings", "credits", "reviews", "invoices", "done"] as const;
 type Phase = (typeof PHASES)[number];
 const MAX_ERRORS = 200;
 
@@ -178,7 +207,7 @@ export async function startImport(
     hideSessions,
     include,
     totals: include ? chosenTotals(manifest.counts, include, galleries) : { ...manifest.counts },
-    done: { clients: 0, addons: 0, sessionTypes: 0, contracts: 0, galleries: 0, photos: 0 },
+    done: { clients: 0, addons: 0, sessionTypes: 0, contracts: 0, galleries: 0, photos: 0, bookings: 0, credits: 0, reviews: 0, invoices: 0 },
     errors: [],
     startedAt: new Date(),
     finishedAt: null,
@@ -258,6 +287,13 @@ class Step {
     this.done[kind] = (this.done[kind] ?? 0) + 1;
   }
 
+  // Done, but not copied: it was brought over before, or this studio already
+  // has it (same email or name). Shown as "already here" next to the count.
+  private alreadyHere(kind: string, n = 1) {
+    this.done[kind] = (this.done[kind] ?? 0) + n;
+    this.done[`${kind}Skipped`] = (this.done[`${kind}Skipped`] ?? 0) + n;
+  }
+
   private error(what: string, why: string) {
     if (this.errors.length < MAX_ERRORS) this.errors.push({ what, why });
   }
@@ -310,6 +346,19 @@ class Step {
       case "galleries":
         if (inc && inc.galleryIds.length === 0) return this.next();
         return this.gallery(deadline);
+      // Version 2 parts: only when chosen (so never for older imports).
+      case "bookings":
+        if (!inc?.bookings) return this.next();
+        return this.page<MBooking>("bookings", 5, (b) => this.booking(b));
+      case "credits":
+        if (!inc?.credits) return this.next();
+        return this.page<MCredit>("credits", 100, (c) => this.credit(c));
+      case "reviews":
+        if (!inc?.reviews) return this.next();
+        return this.page<MReview>("reviews", 100, (r) => this.review(r));
+      case "invoices":
+        if (!inc?.invoices) return this.next();
+        return this.page<MInvoice>("invoices", 20, (i) => this.invoice(i));
     }
   }
 
@@ -323,7 +372,8 @@ class Step {
   // ---- Records ----
 
   private async client(c: MClient) {
-    if (!(await this.mapped("client", c.id))) {
+    if (await this.mapped("client", c.id)) return this.alreadyHere("clients");
+    {
       const email = c.email?.trim().toLowerCase() || null;
       // The same person already here (by email): keep them, don't duplicate.
       const [existing] = email
@@ -342,6 +392,7 @@ class Step {
             .returning({ id: clients.id })
         )[0].id;
       await this.remember("client", c.id, id);
+      if (existing) return this.alreadyHere("clients");
     }
     this.count("clients");
   }
@@ -351,7 +402,8 @@ class Step {
   }
 
   private async addon(a: MAddon) {
-    if (!(await this.mapped("addon", a.id))) {
+    if (await this.mapped("addon", a.id)) return this.alreadyHere("addons");
+    {
       const existing = await this.byName(
         await db
           .select({ id: addons.id })
@@ -375,12 +427,14 @@ class Step {
             .returning({ id: addons.id })
         )[0].id;
       await this.remember("addon", a.id, id);
+      if (existing) return this.alreadyHere("addons");
     }
     this.count("addons");
   }
 
   private async sessionType(s: MSessionType) {
-    if (!(await this.mapped("session_type", s.id))) {
+    if (await this.mapped("session_type", s.id)) return this.alreadyHere("sessionTypes");
+    {
       const existing = await this.byName(
         await db
           .select({ id: sessionTypes.id })
@@ -391,6 +445,7 @@ class Step {
       if (existing) {
         // Keep the studio's own; don't change it or add a duplicate.
         await this.remember("session_type", s.id, existing);
+        return this.alreadyHere("sessionTypes");
       } else {
         const id = randomUUID();
         let imageKey: string | null = null;
@@ -437,7 +492,8 @@ class Step {
   }
 
   private async contract(c: MContract) {
-    if (!(await this.mapped("contract", c.id))) {
+    if (await this.mapped("contract", c.id)) return this.alreadyHere("contracts");
+    {
       const existing = await this.byName(
         await db
           .select({ id: contractTemplates.id })
@@ -461,6 +517,7 @@ class Step {
         )[0].id;
       }
       await this.remember("contract", c.id, id);
+      if (existing) return this.alreadyHere("contracts");
     }
     this.count("contracts");
   }
@@ -481,6 +538,9 @@ class Step {
 
     const mappedGallery = await this.mapped("gallery", g.id);
     if (await this.mapped("gallery_done", g.id)) {
+      // Brought over before.
+      this.alreadyHere("galleries");
+      this.alreadyHere("photos", g.photos.length);
       this.offset++;
       return;
     }
@@ -593,6 +653,260 @@ class Step {
     this.count("photos");
   }
 
+  // ---- Version 2: bookings, credits, reviews, quotes/invoices ----
+
+  // The client for a booking or invoice: the one imported for it, or the same
+  // email already here, or a new one.
+  private async clientFor(sourceId: string | null, name: string, email: string, phone: string | null) {
+    const mapped = sourceId ? await this.mapped("client", sourceId) : null;
+    if (mapped?.id) return mapped.id;
+    const clean = email.trim().toLowerCase();
+    if (!clean) return null;
+    const [existing] = await db
+      .select({ id: clients.id })
+      .from(clients)
+      .where(and(eq(clients.photographerId, this.photographerId), sql`lower(${clients.email}) = ${clean}`))
+      .limit(1);
+    if (existing) return existing.id;
+    const [row] = await db
+      .insert(clients)
+      .values({ photographerId: this.photographerId, name: (name || clean).slice(0, 120), email: clean, phone: phone?.slice(0, 40) || null })
+      .returning({ id: clients.id });
+    return row.id;
+  }
+
+  private async booking(b: MBooking) {
+    if (await this.mapped("booking", b.id)) return this.alreadyHere("bookings");
+    const startsAt = new Date(b.startsAt);
+    const endsAt = new Date(b.endsAt);
+    if (Number.isNaN(startsAt.getTime()) || Number.isNaN(endsAt.getTime())) {
+      this.error(`Booking for ${b.clientName}`, "Its date couldn't be read.");
+      return this.remember("booking", b.id, null);
+    }
+    const sessionType = b.sessionTypeId ? await this.mapped("session_type", b.sessionTypeId) : null;
+    const clientId = await this.clientFor(b.clientId, b.clientName, b.clientEmail, b.clientPhone);
+    const createdAt = new Date(b.createdAt);
+    const total = Math.max(0, Math.round(b.totalCents));
+    const addonsCents = Math.max(0, Math.min(total, Math.round(b.addonsCents)));
+    // Over, or cancelled: its reminders belong to the old system. An upcoming
+    // one carries on as normal here (reminder, then the balance).
+    const settled = b.status !== "confirmed" || startsAt < new Date();
+    const id = randomUUID();
+    await db.insert(bookings).values({
+      id,
+      photographerId: this.photographerId,
+      sessionTypeId: sessionType?.id ?? null,
+      clientId,
+      sessionName: b.sessionName.slice(0, 120) || "Session",
+      title: b.title?.slice(0, 200) || null,
+      priceCents: total - addonsCents,
+      addonsCents,
+      depositPercent: Math.max(0, Math.min(100, Math.round(b.depositPercent))),
+      creditCents: Math.max(0, Math.round(b.creditCents)),
+      startsAt,
+      endsAt: endsAt > startsAt ? endsAt : new Date(startsAt.getTime() + 60 * 60 * 1000),
+      status: b.status,
+      clientName: b.clientName.slice(0, 120) || "Client",
+      clientEmail: b.clientEmail.trim().toLowerCase(),
+      clientPhone: b.clientPhone?.slice(0, 40) || null,
+      notes: b.notes || null,
+      manageToken: randomBytes(24).toString("base64url"),
+      cancelledAt: b.cancelledAt ? new Date(b.cancelledAt) : b.status === "cancelled" ? new Date() : null,
+      reminderSentAt: settled ? new Date() : null,
+      balanceReminderSentAt: settled ? new Date() : null,
+      answers: b.answers.filter((a) => a.label && a.value).map((a) => ({ label: a.label.slice(0, 200), type: "text" as const, value: a.value.slice(0, 2000) })),
+      createdAt: Number.isNaN(createdAt.getTime()) ? new Date() : createdAt,
+    });
+    for (const a of b.addons) {
+      const addon = a.addonId ? await this.mapped("addon", a.addonId) : null;
+      await db.insert(bookingAddons).values({
+        bookingId: id,
+        addonId: addon?.id ?? null,
+        name: a.name.slice(0, 120) || "Extra",
+        priceCents: Math.max(0, Math.round(a.priceCents)),
+        quantity: Math.max(0, Math.round(a.quantity)),
+        includedQuantity: Math.max(0, Math.round(a.includedQuantity)),
+      });
+    }
+    // What the client already paid on the old system, so the balance is right.
+    if (b.paidCents > 0) await this.paidBefore({ bookingId: id, kind: "deposit" }, b.paidCents, createdAt);
+    if (b.signedContract) {
+      const s = signature(b.signedContract);
+      if (s) await db.insert(signedContracts).values({ bookingId: id, title: s.title ?? "Contract", content: s.content, signerName: s.signerName, signatureType: s.signatureType, signatureData: s.signatureData, signedAt: s.signedAt, clientIp: s.clientIp });
+    }
+    for (const [n, photo] of b.inspoPhotos.entries()) {
+      try {
+        const jpeg = await sharp(await this.remote.original(photo.id)).rotate().resize({ width: 1600, height: 1600, fit: "inside", withoutEnlargement: true }).jpeg({ quality: 82 }).toBuffer();
+        const key = inspoKey(this.photographerId, id, n);
+        await putObject(key, jpeg, "image/jpeg");
+        await db.insert(bookingInspoPhotos).values({ bookingId: id, fileKey: key, position: n });
+      } catch {
+        this.error(`Inspiration photo for ${b.clientName}'s booking`, "It couldn't be copied.");
+      }
+    }
+    // The booking's gallery, when that gallery came over too.
+    const gallery = b.galleryId ? await this.mapped("gallery", b.galleryId) : null;
+    if (gallery?.id) {
+      await db.update(galleries).set({ bookingId: id }).where(and(eq(galleries.id, gallery.id), isNull(galleries.bookingId)));
+    }
+    await this.remember("booking", b.id, id);
+    this.count("bookings");
+  }
+
+  // A payment made before the move, recorded as paid (no Stripe charge here).
+  private async paidBefore(target: { bookingId: string; kind: "deposit" }, cents: number, when: Date) {
+    await db.insert(payments).values({
+      ...target,
+      amountCents: Math.round(cents),
+      status: "paid",
+      stripeAccountId: "imported",
+      stripeCheckoutSessionId: `imported_${randomUUID()}`,
+      paidAt: Number.isNaN(when.getTime()) ? new Date() : when,
+    });
+  }
+
+  private async credit(c: MCredit) {
+    if (await this.mapped("credit", c.id)) return this.alreadyHere("credits");
+    {
+      const source = c.sourceBookingId ? await this.mapped("booking", c.sourceBookingId) : null;
+      const createdAt = new Date(c.createdAt);
+      const [row] = await db
+        .insert(sessionCredits)
+        .values({
+          photographerId: this.photographerId,
+          clientEmail: c.clientEmail.trim().toLowerCase(),
+          clientName: c.clientName.slice(0, 120) || c.clientEmail,
+          amountCents: Math.max(0, Math.round(c.amountCents)),
+          usedCents: Math.max(0, Math.min(Math.round(c.amountCents), Math.round(c.usedCents))),
+          reason: c.reason.slice(0, 200) || "Credit",
+          sourceBookingId: source?.id ?? null,
+          expiresOn: /^\d{4}-\d{2}-\d{2}$/.test(c.expiresOn ?? "") ? c.expiresOn : null,
+          createdAt: Number.isNaN(createdAt.getTime()) ? new Date() : createdAt,
+        })
+        .returning({ id: sessionCredits.id });
+      await this.remember("credit", c.id, row.id);
+    }
+    this.count("credits");
+  }
+
+  private async review(r: MReview) {
+    if (await this.mapped("review", r.id)) return this.alreadyHere("reviews");
+    {
+      const gallery = r.galleryId ? await this.mapped("gallery", r.galleryId) : null;
+      // A gallery has one review; one already here wins.
+      const [taken] = gallery?.id ? await db.select({ id: reviews.id }).from(reviews).where(eq(reviews.galleryId, gallery.id)) : [];
+      if (taken) return this.remember("review", r.id, taken.id).then(() => this.alreadyHere("reviews"));
+      const photo = r.photoId ? await this.mapped("photo", r.photoId) : null;
+      const date = (v: string | null) => (v && !Number.isNaN(new Date(v).getTime()) ? new Date(v) : null);
+      const [row] = await db
+        .insert(reviews)
+        .values({
+          photographerId: this.photographerId,
+          galleryId: gallery?.id ?? null,
+          clientName: r.clientName.slice(0, 120) || "Client",
+          clientEmail: r.clientEmail.trim().toLowerCase(),
+          token: randomBytes(24).toString("base64url"),
+          status: r.status,
+          displayName: r.displayName?.slice(0, 80) || null,
+          rating: r.rating === null ? null : Math.max(1, Math.min(5, Math.round(r.rating))),
+          body: r.body || null,
+          photoId: photo?.id ?? null,
+          photoConsent: r.photoConsent,
+          requestedAt: date(r.requestedAt) ?? new Date(),
+          submittedAt: date(r.submittedAt),
+          approvedAt: date(r.approvedAt),
+        })
+        .returning({ id: reviews.id });
+      await this.remember("review", r.id, row.id);
+    }
+    this.count("reviews");
+  }
+
+  private async invoice(i: MInvoice) {
+    if (await this.mapped("invoice", i.id)) return this.alreadyHere("invoices");
+    {
+      const timeZone = await this.loadTimeZone();
+      const createdAt = Number.isNaN(new Date(i.createdAt).getTime()) ? new Date() : new Date(i.createdAt);
+      const day = (v: string | null) => (v && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : null);
+      const total = Math.max(0, Math.round(i.totalCents));
+      const paid = Math.max(0, Math.min(total, Math.round(i.paidCents)));
+      const plan: PaymentPlan = i.depositPercent > 0 && i.depositPercent < 100 ? { mode: "deposit", depositPercent: Math.round(i.depositPercent) } : { mode: "full" };
+      const schedule = buildSchedule(total, plan, day(i.dueDate));
+      // The number it had, unless this studio already uses it.
+      const number = (await this.numberFree(i.number)) ? i.number.slice(0, 40) : await nextNumber(this.photographerId, i.kind, Number(localDateOf(createdAt, timeZone).slice(0, 4)));
+      let status = i.status;
+      if (paid > 0 && (status === "sent" || status === "approved")) status = statusAfterPayment(total, paid);
+      // Reminders the old system already took care of aren't sent again: the
+      // quote nudge, and a payment that's already overdue.
+      const due = nextScheduled(schedule, paid);
+      const today = localDateOf(new Date(), timeZone);
+      const overdueKey = due?.dueDate && due.dueDate < today ? `${due.index}:${due.dueDate}` : null;
+      const s = i.signedContract ? signature(i.signedContract) : null;
+      const [row] = await db
+        .insert(invoices)
+        .values({
+          photographerId: this.photographerId,
+          clientId: await this.clientFor(i.clientId, i.clientName, i.clientEmail, i.clientPhone),
+          kind: i.kind,
+          number,
+          status,
+          clientName: i.clientName.slice(0, 120) || "Client",
+          clientEmail: i.clientEmail.trim().toLowerCase(),
+          clientPhone: i.clientPhone?.slice(0, 40) || null,
+          title: i.title.slice(0, 500) || "Invoice",
+          eventDate: day(i.eventDate),
+          items: i.items.map((li) => ({ description: li.description.slice(0, 500), quantity: Number(li.quantity) || 1, unitCents: Math.round(li.unitCents) })),
+          taxBps: Math.max(0, Math.round(i.taxBps)),
+          subtotalCents: Math.round(i.subtotalCents),
+          taxCents: Math.round(i.taxCents),
+          totalCents: total,
+          plan,
+          schedule,
+          dueDate: finalDueDate(schedule),
+          paidCents: paid,
+          manualPayments: paid > 0 ? [{ amountCents: paid, note: "Paid before moving to PhotoEZ Cloud", date: (i.paidAt ?? i.createdAt).slice(0, 10) }] : [],
+          notes: i.notes || null,
+          terms: i.terms || null,
+          token: newInvoiceToken(),
+          contractTitle: s?.title ?? null,
+          contractContent: s?.content ?? null,
+          signerName: s?.signerName ?? null,
+          signatureType: s?.signatureType ?? null,
+          signatureData: s?.signatureData ?? null,
+          signedAt: s?.signedAt ?? null,
+          signerIp: s?.clientIp ?? null,
+          sentAt: status === "draft" ? null : createdAt,
+          approvedAt: i.approvedAt ? new Date(i.approvedAt) : null,
+          paidAt: status === "paid" ? (i.paidAt ? new Date(i.paidAt) : createdAt) : null,
+          cancelledAt: status === "cancelled" ? createdAt : null,
+          approvalReminderAt: i.kind === "quote" ? new Date() : null,
+          overdueNoticeKey: overdueKey,
+          createdAt,
+        })
+        .returning({ id: invoices.id });
+      await this.remember("invoice", i.id, row.id);
+    }
+    this.count("invoices");
+  }
+
+  private async numberFree(number: string) {
+    if (!number.trim()) return false;
+    const [taken] = await db
+      .select({ id: invoices.id })
+      .from(invoices)
+      .where(and(eq(invoices.photographerId, this.photographerId), eq(invoices.number, number.slice(0, 40))))
+      .limit(1);
+    return !taken;
+  }
+
+  private timeZone: string | undefined;
+  private async loadTimeZone() {
+    if (this.timeZone) return this.timeZone;
+    const [studio] = await db.select({ timeZone: photographers.timeZone }).from(photographers).where(eq(photographers.id, this.photographerId));
+    this.timeZone = studio?.timeZone ?? "America/Los_Angeles";
+    return this.timeZone;
+  }
+
   // The studio's watermark, loaded once per step (null when it has none).
   private async loadWatermark() {
     if (this.watermark !== undefined) return this.watermark;
@@ -613,4 +927,21 @@ export function locationCode(text: string | null): "studio" | "outdoor" | "on_lo
   if (t.includes("studio")) return "studio";
   if (/outdoor|outside|park|beach|nature/.test(t)) return "outdoor";
   return "on_location";
+}
+
+// A signed contract from the other side, cleaned up; null when it can't be
+// trusted (no signature, or an unreadable date).
+export function signature(s: MSignature) {
+  const signedAt = new Date(s.signedAt);
+  if (Number.isNaN(signedAt.getTime()) || !s.signatureData || !s.contentHtml) return null;
+  const drawn = s.signatureType === "draw" && /^data:image\/png;base64,[A-Za-z0-9+/=]+$/.test(s.signatureData);
+  return {
+    title: s.title?.slice(0, 200) || null,
+    content: sanitizeRichText(s.contentHtml),
+    signerName: (s.signerName || (drawn ? "" : s.signatureData)).slice(0, 120) || "Client",
+    signatureType: drawn ? ("draw" as const) : ("type" as const),
+    signatureData: drawn ? s.signatureData : s.signatureData.slice(0, 120),
+    signedAt,
+    clientIp: s.clientIp?.slice(0, 64) || null,
+  };
 }
