@@ -119,7 +119,8 @@ body {
   .legal ul {
     @apply list-disc space-y-2 pl-6;
   }
-  .legal a {
+  /* Text links only: a button inside (like an article's sign-up button) keeps its own look. */
+  .legal a:not(.btn-primary, .btn-secondary) {
     @apply font-semibold text-link underline decoration-2 decoration-lime underline-offset-4 hover:decoration-coral;
   }
   .rich-text {
