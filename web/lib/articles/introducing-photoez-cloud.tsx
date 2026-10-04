@@ -13,6 +13,13 @@ export const introducingPhotoezCloud: ArticleMeta = {
   published: "2026-10-03",
   category: "PhotoEZ Cloud",
   readMinutes: 7,
+  image: {
+    src: "/articles/photoezcloud-hero.webp",
+    width: 1477,
+    height: 766,
+    alt: "The PhotoEZ Cloud home page: \"Studio software with a creative streak,\" beside a photographer with her camera and cards for a new inquiry, photos found, a gallery delivered, a client gallery, and a booking confirmed.",
+    share: "/articles/photoezcloud-hero-share.jpg",
+  },
 };
 
 const dollars = (cents: number) => `$${cents / 100}`;

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { JsonLd } from "@/components/json-ld";
@@ -25,7 +26,9 @@ export async function generateMetadata({ params }: PageProps<"/articles/[slug]">
       description: meta.description,
       url: `/articles/${meta.slug}`,
       publishedTime: meta.published,
+      ...(meta.image ? { images: [{ url: meta.image.share, width: 1200, height: 630, alt: meta.image.alt }] } : {}),
     },
+    ...(meta.image ? { twitter: { card: "summary_large_image", images: [meta.image.share] } } : {}),
   };
 }
 
@@ -51,7 +54,7 @@ export default async function ArticlePage({ params }: PageProps<"/articles/[slug
           author: { "@type": "Person", name: "Elle Jones" },
           publisher: { "@type": "Organization", name: "PhotoEZ Cloud", logo: { "@type": "ImageObject", url: `${siteUrl}/icon.svg` } },
           mainEntityOfPage: `${siteUrl}/articles/${meta.slug}`,
-          image: `${siteUrl}/opengraph-image`,
+          image: `${siteUrl}${meta.image?.share ?? "/opengraph-image"}`,
         }}
       />
       <ArticlesHeader>
@@ -64,6 +67,19 @@ export default async function ArticlePage({ params }: PageProps<"/articles/[slug
           By Elle Jones · {longDate(meta.published)} · {meta.readMinutes} min read
         </p>
       </ArticlesHeader>
+      {meta.image && (
+        <div className="mx-auto w-full max-w-5xl px-4 pt-10">
+          <Image
+            src={meta.image.src}
+            alt={meta.image.alt}
+            width={meta.image.width}
+            height={meta.image.height}
+            priority
+            sizes="(min-width: 1024px) 992px, 100vw"
+            className="w-full rounded-3xl shadow-xl"
+          />
+        </div>
+      )}
       <main className="legal mx-auto w-full max-w-3xl flex-1 px-4 py-12 leading-relaxed">
         <Body />
       </main>

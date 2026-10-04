@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Image from "next/image";
 import Link from "next/link";
 import { BlogCards } from "@/components/blog-cards";
 import { LegalFooter } from "@/components/legal-page";
@@ -35,14 +36,26 @@ export default async function ArticlesPage() {
             <li key={meta.slug}>
               <Link
                 href={`/articles/${meta.slug}`}
-                className="card group flex h-full flex-col p-6 transition hover:-translate-y-1 hover:shadow-xl"
+                className="card group flex h-full flex-col overflow-hidden transition hover:-translate-y-1 hover:shadow-xl"
               >
-                <p className="text-xs font-bold tracking-wider text-coral uppercase">
-                  {meta.category} <span className="ml-2 font-semibold text-muted normal-case">{meta.readMinutes} min read</span>
-                </p>
-                <h3 className="mt-2 font-display text-2xl font-bold group-hover:text-lime-ink">{meta.title}</h3>
-                <p className="mt-2 flex-1 text-muted">{meta.description}</p>
-                <p className="mt-4 text-sm font-bold text-lime-ink">Read the article →</p>
+                {meta.image && (
+                  <Image
+                    src={meta.image.src}
+                    alt=""
+                    width={meta.image.width}
+                    height={meta.image.height}
+                    sizes="(min-width: 640px) 50vw, 100vw"
+                    className="aspect-[16/9] w-full object-cover object-left"
+                  />
+                )}
+                <div className="flex flex-1 flex-col p-6">
+                  <p className="text-xs font-bold tracking-wider text-coral uppercase">
+                    {meta.category} <span className="ml-2 font-semibold text-muted normal-case">{meta.readMinutes} min read</span>
+                  </p>
+                  <h3 className="mt-2 font-display text-2xl font-bold group-hover:text-lime-ink">{meta.title}</h3>
+                  <p className="mt-2 flex-1 text-muted">{meta.description}</p>
+                  <p className="mt-4 text-sm font-bold text-lime-ink">Read the article →</p>
+                </div>
               </Link>
             </li>
           ))}
