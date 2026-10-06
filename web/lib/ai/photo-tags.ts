@@ -1,6 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
 import { z } from "zod";
+import { tokensFromApi, type CallUsage } from "./prices.ts";
 
 // Gallery search: Claude looks at a small copy of each photo and writes a
 // short description plus search tags, so clients can type "first dance" or
@@ -29,10 +30,15 @@ Write what someone would search for:
 
 Tags are lowercase, one to three words each, no duplicates.`;
 
-// Describes one photo (a small JPEG, base64). Returns the tags and the
-// tokens used, for the usage log.
-export async function tagPhoto(jpegBase64: string) {
-  const client = new Anthropic();
+// Describes one photo (a small JPEG, base64). Returns the tags. onUsage is
+// told the tokens as soon as the API answers, even if the answer is then cut
+// off (that call is billed too), for the cost report.
+export async function tagPhoto(
+  jpegBase64: string,
+  options: { onUsage?: (usage: CallUsage) => void | Promise<void>; client?: Anthropic } = {},
+) {
+  const client = options.client ?? new Anthropic();
+  const started = Date.now();
   const response = await client.beta.messages.parse({
     model: PHOTO_TAG_MODEL,
     max_tokens: 1024,
@@ -48,15 +54,11 @@ export async function tagPhoto(jpegBase64: string) {
     ],
     output_config: { format: betaZodOutputFormat(photoTagsSchema) },
   });
+  await options.onUsage?.({ model: response.model, tokens: tokensFromApi(response.usage), latencyMs: Date.now() - started });
   if (response.stop_reason === "max_tokens" || !response.parsed_output) {
     throw new Error("The photo description came back incomplete.");
   }
-  return {
-    tags: cleanTags(response.parsed_output),
-    model: response.model,
-    inputTokens: response.usage.input_tokens,
-    outputTokens: response.usage.output_tokens,
-  };
+  return { tags: cleanTags(response.parsed_output), model: response.model };
 }
 
 // Tidies what came back: trimmed, lowercase, unique, at most 25 short tags.

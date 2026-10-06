@@ -2,6 +2,7 @@ import { and, asc, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { bookingHours, inquiries, photographers, sessionTypes, studioFaqs } from "@/db/schema";
 import { triageInquiry, type StudioContext } from "@/lib/ai/triage";
+import { recordAiUsage } from "@/lib/ai/usage";
 import { richTextToPlain } from "@/lib/rich-text";
 import { LOCATION_LABELS, SESSION_LABELS, type SessionType, type ShootLocation } from "@/lib/session-types";
 import { siteUrl } from "@/lib/site";
@@ -72,9 +73,15 @@ export async function studioContext(photographerId: string): Promise<StudioConte
 export async function runTriage(
   inquiry: { id: string; message: string; fromName: string | null; fromEmail: string | null },
   photographer: { id: string; name: string; businessName?: string | null },
+  // Tests pass a stand-in for the Anthropic client.
+  options: { client?: Parameters<typeof triageInquiry>[0]["client"] } = {},
 ) {
   try {
     const run = await triageInquiry({
+      client: options.client,
+      // Every triage call is in the cost report; triage never counts toward a plan's limits.
+      onUsage: (usage) =>
+        recordAiUsage({ feature: "triage", photographerId: photographer.id, inquiryId: inquiry.id, ...usage, countsTowardLimit: false }),
       message: inquiry.message,
       fromName: inquiry.fromName,
       fromEmail: inquiry.fromEmail,

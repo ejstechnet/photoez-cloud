@@ -6,6 +6,7 @@ import { localDateOf, zonedToUtc } from "@/lib/booking/time";
 import { aiAssistantLimit, effectivePlan, hasFeature } from "@/lib/plans";
 import { executeTool, requestAction } from "./executor";
 import { ASSISTANT_TOOLS, needsApproval } from "./registry";
+import { recordAiUsage } from "../usage";
 import { Trace } from "./trace";
 import type { Proposal } from "./tools";
 
@@ -47,7 +48,14 @@ export async function assistantAllowance(photographerId: string) {
   const [{ used }] = await db
     .select({ used: count() })
     .from(aiUsage)
-    .where(and(eq(aiUsage.photographerId, photographerId), eq(aiUsage.feature, "assistant"), gte(aiUsage.createdAt, monthStart)));
+    .where(
+      and(
+        eq(aiUsage.photographerId, photographerId),
+        eq(aiUsage.feature, "assistant"),
+        eq(aiUsage.countsTowardLimit, true),
+        gte(aiUsage.createdAt, monthStart),
+      ),
+    );
   const plan = effectivePlan(studio.plan, studio.trialEndsAt);
   const limit = aiAssistantLimit(studio.plan, studio.trialEndsAt);
   return { enabled: hasFeature(plan, "aiSearch"), used, limit, left: Math.max(0, limit - used), timeZone: studio.timeZone };
@@ -76,6 +84,8 @@ export async function askAssistant(
   const client = options.client ?? new Anthropic();
   const proposals: Proposal[] = [];
   const trace = await Trace.start({ photographerId, feature: "assistant", question, model: ASSISTANT_MODEL });
+  const started = Date.now();
+  let answeredBy = ASSISTANT_MODEL;
   let answer = "";
 
   try {
@@ -93,6 +103,7 @@ export async function askAssistant(
           cache_control: { type: "ephemeral" },
         }),
       );
+      answeredBy = response.model ?? answeredBy;
       const text = response.content
         .filter((b): b is Anthropic.TextBlock => b.type === "text")
         .map((b) => b.text)
@@ -142,12 +153,18 @@ export async function askAssistant(
     await trace.finish("error", error);
     return { error: "The assistant couldn't answer right now. Please try again in a minute." };
   } finally {
-    // Plan limits count these rows; input includes cached tokens (the trace splits them).
+    // One row per question (plan limits count them), with every model call's
+    // tokens added up, split the same way as its trace.
     const t = trace.tokens;
-    await db
-      .insert(aiUsage)
-      .values({ photographerId, feature: "assistant", model: ASSISTANT_MODEL, inputTokens: t.input + t.cacheRead + t.cacheWrite, outputTokens: t.output })
-      .catch((e) => console.error("Couldn't log assistant usage", e));
+    await recordAiUsage({
+      feature: "assistant",
+      photographerId,
+      model: answeredBy,
+      tokens: { input: t.input, cacheWrite: t.cacheWrite, cacheRead: t.cacheRead, output: t.output },
+      latencyMs: Date.now() - started,
+      traceId: trace.id,
+      countsTowardLimit: true,
+    });
   }
   await trace.finish(proposals.length ? "awaiting_approval" : "completed");
   return { answer: answer || "Done.", proposals, traceId: trace.id };

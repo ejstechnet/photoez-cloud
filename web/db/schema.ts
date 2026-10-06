@@ -1069,23 +1069,43 @@ export const giftCards = pgTable(
   (t) => [index("gift_cards_photographer_idx").on(t.photographerId, t.createdAt)],
 );
 
-// Every AI call the app makes for a studio, with its token counts, so costs
-// can be tracked and each plan's monthly allowance enforced.
+// Every AI call the app makes, with its tokens and cost (lib/ai/usage.ts), so
+// costs can be reported (/dashboard/ai-usage) and each plan's monthly
+// allowance enforced. Plan limits count a studio's rows for one feature with
+// counts_toward_limit: one Assistant question, or one photo described.
+export const AI_FEATURES = ["triage", "assistant", "photo_tag", "eval"] as const;
+export type AiFeature = (typeof AI_FEATURES)[number];
 export const aiUsage = pgTable(
   "ai_usage",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    photographerId: uuid("photographer_id")
-      .notNull()
-      .references(() => photographers.id, { onDelete: "cascade" }),
-    // e.g. "photo_tag", "assistant".
-    feature: text("feature").notNull(),
+    // null for eval runs, which belong to no studio.
+    photographerId: uuid("photographer_id").references(() => photographers.id, { onDelete: "cascade" }),
+    feature: text("feature", { enum: AI_FEATURES }).notNull(),
+    // The model the API reported (e.g. "claude-haiku-4-5-20251001").
     model: text("model").notNull(),
+    // All input tokens: uncached + cache writes + cache reads.
     inputTokens: integer("input_tokens").notNull().default(0),
     outputTokens: integer("output_tokens").notNull().default(0),
+    // The three kinds of input, as the API reports them; null on old rows
+    // (token_split_known false), whose cost is an upper-bound estimate.
+    inputUncachedTokens: integer("input_uncached_tokens"),
+    cacheWriteTokens: integer("cache_write_tokens"),
+    cacheReadTokens: integer("cache_read_tokens"),
+    tokenSplitKnown: boolean("token_split_known").notNull().default(false),
+    // Millionths of a dollar, from the price in effect at the time (price_key,
+    // lib/ai/prices.ts); null when the model has no price.
+    costMicrodollars: integer("cost_microdollars"),
+    priceKey: text("price_key"),
+    latencyMs: integer("latency_ms"),
+    // Triage and eval rows never count against a studio's plan.
+    countsTowardLimit: boolean("counts_toward_limit").notNull().default(true),
+    inquiryId: uuid("inquiry_id").references(() => inquiries.id, { onDelete: "set null" }),
+    traceId: uuid("trace_id").references((): AnyPgColumn => aiTraces.id, { onDelete: "set null" }),
+    galleryId: uuid("gallery_id").references(() => galleries.id, { onDelete: "set null" }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [index("ai_usage_photographer_idx").on(t.photographerId, t.feature, t.createdAt)],
+  (t) => [index("ai_usage_photographer_idx").on(t.photographerId, t.feature, t.createdAt), index("ai_usage_created_idx").on(t.createdAt)],
 );
 
 // Step logs ("traces") for the Studio Assistant: one row per answer, with

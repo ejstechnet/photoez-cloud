@@ -414,6 +414,13 @@
       "when": 1791255833135,
       "tag": "0058_assistant_traces_approvals",
       "breakpoints": true
+    },
+    {
+      "idx": 59,
+      "version": "7",
+      "when": 1791265662878,
+      "tag": "0059_ai_cost_tracking",
+      "breakpoints": true
     }
   ]
 }

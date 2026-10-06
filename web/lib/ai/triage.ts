@@ -2,6 +2,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
 import { z } from "zod";
 import { cleanReplyText } from "./clean-text.ts";
+import { tokensFromApi, type CallUsage } from "./prices.ts";
 
 // Inquiry triage: one Claude call reads a client's inquiry and returns
 // structured fields (validated against the Zod schema below) plus a draft
@@ -198,8 +199,13 @@ export async function triageInquiry(input: {
   today: Date;
   // Evals can try other models; the app always uses TRIAGE_MODEL.
   model?: string;
+  // Told the tokens as soon as the API answers, even if the answer is then
+  // refused or cut off (those calls are billed too). For the cost report.
+  onUsage?: (usage: CallUsage) => void | Promise<void>;
+  // Tests pass a stand-in.
+  client?: Anthropic;
 }): Promise<TriageRun> {
-  const client = new Anthropic();
+  const client = input.client ?? new Anthropic();
 
   const details = [
     `Today's date: ${input.today.toISOString().slice(0, 10)}`,
@@ -214,6 +220,7 @@ export async function triageInquiry(input: {
     .filter(Boolean)
     .join("\n\n");
 
+  const started = Date.now();
   const response = await client.beta.messages.parse({
     model: input.model ?? TRIAGE_MODEL,
     max_tokens: 16000,
@@ -225,6 +232,7 @@ export async function triageInquiry(input: {
     messages: [{ role: "user", content: userMessage }],
     output_config: { format: betaZodOutputFormat(triageSchema) },
   });
+  await input.onUsage?.({ model: response.model, tokens: tokensFromApi(response.usage), latencyMs: Date.now() - started });
 
   if (response.stop_reason === "refusal") {
     throw new Error("The AI declined to read this inquiry. You can still reply to it yourself.");
