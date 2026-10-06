@@ -1,6 +1,7 @@
 import { and, desc, eq, inArray, lt, notInArray } from "drizzle-orm";
 import { db } from "@/db";
-import { assistantConversations, assistantProposals } from "@/db/schema";
+import { assistantConversations, assistantProposals, type PROPOSAL_STATUSES, type ProposalDelivery } from "@/db/schema";
+import { expireProposals } from "./executor";
 import type { Proposal } from "./tools";
 
 // Saved Studio Assistant conversations: the 10 most recent per photographer,
@@ -11,7 +12,7 @@ export const KEEP_DAYS = 90;
 
 export type SavedTurn = { role: "user" | "assistant"; text: string; proposalIds?: string[] };
 // A proposal as shown in a reopened conversation, with what happened to it.
-export type SavedProposal = Proposal & { status: "pending" | "done" | "dismissed"; result: string | null };
+export type SavedProposal = Proposal & { status: (typeof PROPOSAL_STATUSES)[number]; result: string | null; deliveries: ProposalDelivery[] | null };
 
 export function conversationTitle(question: string) {
   const oneLine = question.replace(/\s+/g, " ").trim();
@@ -60,6 +61,8 @@ export async function loadConversation(photographerId: string, conversationId: s
     .from(assistantConversations)
     .where(and(eq(assistantConversations.id, conversationId), eq(assistantConversations.photographerId, photographerId)));
   if (!conversation) return null;
+  // Cards past their 24 hours show as expired.
+  await expireProposals(new Date(), photographerId);
   const proposalIds = conversation.turns.flatMap((t) => t.proposalIds ?? []);
   const rows = proposalIds.length
     ? await db
@@ -77,6 +80,7 @@ export async function loadConversation(photographerId: string, conversationId: s
         details: Array.isArray(r.payload.details) ? (r.payload.details as string[]) : [],
         status: r.status,
         result: r.result,
+        deliveries: r.deliveries,
       },
     ]),
   );

@@ -2,12 +2,14 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import type { ProposalDelivery } from "@/db/schema";
+import type { CardOutcome } from "@/lib/ai/assistant/executor";
 import type { SavedProposal } from "@/lib/ai/assistant/history";
 import type { Proposal } from "@/lib/ai/assistant/tools";
-import { approveProposal, ask, dismissProposal } from "./actions";
+import { approveProposal, ask, dismissProposal, retryProposal } from "./actions";
 
 // A proposal fresh from the assistant is pending; reopened ones carry their outcome.
-type CardProposal = Proposal & Partial<Pick<SavedProposal, "status" | "result">>;
+type CardProposal = Proposal & Partial<Pick<SavedProposal, "status" | "result" | "deliveries">>;
 
 export type Entry =
   | { kind: "user"; text: string }
@@ -44,14 +46,72 @@ function Formatted({ text }: { text: string }) {
   );
 }
 
-function ProposalCard({ proposal }: { proposal: CardProposal }) {
-  const [state, setState] = useState<{ done: boolean; text: string } | null>(
-    proposal.status === "done"
-      ? { done: true, text: `✓ ${proposal.result ?? "Approved."}` }
-      : proposal.status === "dismissed"
-        ? { done: false, text: "Dismissed. Nothing was sent." }
-        : null,
+type CardView = { done: boolean; text: string; deliveries: ProposalDelivery[] | null; retry: boolean };
+
+// What a reopened card says, by its status (null: still waiting for a decision).
+function cardState(proposal: CardProposal): CardView | null {
+  const deliveries = proposal.deliveries ?? null;
+  switch (proposal.status) {
+    case "executed":
+      return { done: true, text: `✓ ${proposal.result ?? "Approved."}`, deliveries, retry: false };
+    case "failed":
+      return { done: false, text: proposal.result ?? "Something went wrong.", deliveries, retry: canRetry(deliveries) };
+    case "approved":
+    case "executing":
+      return { done: false, text: "Approved. Working on it…", deliveries, retry: false };
+    case "rejected":
+      return { done: false, text: "Dismissed. Nothing was sent.", deliveries: null, retry: false };
+    case "expired":
+      return { done: false, text: "Expired (cards last 24 hours). Nothing was sent. Ask me to prepare it again.", deliveries: null, retry: false };
+    default:
+      return null;
+  }
+}
+
+const fromOutcome = (o: CardOutcome): CardView => ({
+  done: o.ok,
+  text: o.ok ? `✓ ${o.message}` : o.message,
+  deliveries: o.deliveries ?? null,
+  retry: o.status === "failed" && canRetry(o.deliveries ?? null),
+});
+
+// Anyone left who certainly didn't get it (never the "not sure" ones).
+const canRetry = (deliveries: ProposalDelivery[] | null) => Boolean(deliveries?.some((d) => d.status === "failed" || d.status === "pending"));
+
+const DELIVERY_MARKS: Record<ProposalDelivery["status"], { mark: string; className: string; label: string }> = {
+  sent: { mark: "✓", className: "text-lime-ink", label: "Done" },
+  failed: { mark: "✗", className: "text-coral", label: "Didn't go through" },
+  unknown: { mark: "?", className: "text-brand-deep", label: "Not sure it went through" },
+  sending: { mark: "?", className: "text-brand-deep", label: "Not sure it went through" },
+  skipped: { mark: "–", className: "text-muted", label: "Skipped" },
+  pending: { mark: "…", className: "text-muted", label: "Not tried yet" },
+};
+
+// Who got it, shown once a card has run and not everything went through.
+function Deliveries({ deliveries }: { deliveries: ProposalDelivery[] }) {
+  if (deliveries.every((d) => d.status === "sent")) return null;
+  return (
+    <ul className="mt-2 space-y-1 text-sm">
+      {deliveries.map((d) => {
+        const m = DELIVERY_MARKS[d.status];
+        return (
+          <li key={d.key} className="flex gap-2 rounded-lg bg-surface/70 px-3 py-1.5">
+            <span className={`w-4 shrink-0 font-bold ${m.className}`} aria-label={m.label} title={m.label}>
+              {m.mark}
+            </span>
+            <span className="min-w-0">
+              {d.label}
+              {d.note && <span className="block text-xs text-muted">{d.note}</span>}
+            </span>
+          </li>
+        );
+      })}
+    </ul>
   );
+}
+
+function ProposalCard({ proposal }: { proposal: CardProposal }) {
+  const [state, setState] = useState<CardView | null>(cardState(proposal));
   const [pending, startTransition] = useTransition();
   return (
     <div className="mt-3 rounded-2xl border-2 border-lime/60 bg-lime/10 p-4">
@@ -65,18 +125,26 @@ function ProposalCard({ proposal }: { proposal: CardProposal }) {
         ))}
       </ul>
       {state ? (
-        <p className={`mt-3 text-sm font-semibold ${state.done ? "text-lime-ink" : "text-muted"}`}>{state.text}</p>
+        <>
+          <p className={`mt-3 text-sm font-semibold ${state.done ? "text-lime-ink" : "text-muted"}`}>{state.text}</p>
+          {state.deliveries && <Deliveries deliveries={state.deliveries} />}
+          {state.retry && (
+            <button
+              type="button"
+              disabled={pending}
+              onClick={() => startTransition(async () => setState(fromOutcome(await retryProposal(proposal.id))))}
+              className="btn-secondary mt-3 px-5 py-2 text-xs"
+            >
+              {pending ? "Working…" : "Try again for the rest"}
+            </button>
+          )}
+        </>
       ) : (
         <div className="mt-3 flex gap-2">
           <button
             type="button"
             disabled={pending}
-            onClick={() =>
-              startTransition(async () => {
-                const result = await approveProposal(proposal.id);
-                setState("result" in result ? { done: true, text: `✓ ${result.result}` } : { done: false, text: result.error });
-              })
-            }
+            onClick={() => startTransition(async () => setState(fromOutcome(await approveProposal(proposal.id))))}
             className="btn-primary px-5 py-2 text-xs"
           >
             {pending ? "Working…" : "Approve"}
@@ -87,7 +155,7 @@ function ProposalCard({ proposal }: { proposal: CardProposal }) {
             onClick={() =>
               startTransition(async () => {
                 await dismissProposal(proposal.id);
-                setState({ done: false, text: "Dismissed. Nothing was sent." });
+                setState({ done: false, text: "Dismissed. Nothing was sent.", deliveries: null, retry: false });
               })
             }
             className="rounded-full px-4 py-2 text-xs font-bold tracking-wider text-muted uppercase hover:text-foreground"
@@ -118,7 +186,11 @@ export function Chat({
   const [pending, startTransition] = useTransition();
   const endRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" }), [entries, pending]);
+  // Braces matter: newer Chrome returns a Promise from scrollIntoView, and an
+  // effect that returns anything but a cleanup function crashes React.
+  useEffect(() => {
+    endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+  }, [entries, pending]);
 
   function send(question: string) {
     const q = question.trim();

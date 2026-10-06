@@ -407,6 +407,13 @@
       "when": 1791245643460,
       "tag": "0057_swaggpress_changes",
       "breakpoints": true
+    },
+    {
+      "idx": 58,
+      "version": "7",
+      "when": 1791255833135,
+      "tag": "0058_assistant_traces_approvals",
+      "breakpoints": true
     }
   ]
 }

@@ -4,12 +4,16 @@ import { db } from "@/db";
 import { aiUsage, photographers } from "@/db/schema";
 import { localDateOf, zonedToUtc } from "@/lib/booking/time";
 import { aiAssistantLimit, effectivePlan, hasFeature } from "@/lib/plans";
-import { ASSISTANT_TOOLS, runTool, type Proposal } from "./tools";
+import { executeTool, requestAction } from "./executor";
+import { ASSISTANT_TOOLS, needsApproval } from "./registry";
+import { Trace } from "./trace";
+import type { Proposal } from "./tools";
 
 // The Studio Assistant: answers a photographer's question about their studio
-// with Claude and a small set of tools (tools.ts), in a manual tool-use loop.
-// It can look things up and PREPARE actions; it never sends or changes
-// anything itself. Every question is logged in ai_usage.
+// with Claude and a small set of tools (registry.ts), in a manual tool-use
+// loop. It can look things up and PREPARE actions; it never sends or changes
+// anything itself (executor.ts enforces that). Every question is logged in
+// ai_usage, and every step in its trace (trace.ts).
 
 // Elle chose Claude Sonnet 5 (2026-09-27): strong tool use at under half
 // Opus's price. Medium effort keeps questions to a few cents.
@@ -49,11 +53,15 @@ export async function assistantAllowance(photographerId: string) {
   return { enabled: hasFeature(plan, "aiSearch"), used, limit, left: Math.max(0, limit - used), timeZone: studio.timeZone };
 }
 
+// Tests pass a stand-in for the Anthropic client.
+type ModelClient = { messages: { create(params: Anthropic.MessageCreateParamsNonStreaming): Promise<Anthropic.Message> } };
+
 export async function askAssistant(
   photographerId: string,
   history: ChatTurn[],
   question: string,
-): Promise<{ answer: string; proposals: Proposal[] } | { error: string }> {
+  options: { client?: ModelClient } = {},
+): Promise<{ answer: string; proposals: Proposal[]; traceId: string | null } | { error: string }> {
   const allowance = await assistantAllowance(photographerId);
   if (!allowance.enabled) return { error: "The Studio Assistant isn't available on this plan." };
   if (allowance.left <= 0) return { error: "You've used this month's Studio Assistant questions." };
@@ -65,26 +73,26 @@ export async function askAssistant(
     { role: "user", content: `(Today is ${today}; studio time zone ${ctx.timeZone}.)\n\n${question}` },
   ];
 
-  const client = new Anthropic();
+  const client = options.client ?? new Anthropic();
   const proposals: Proposal[] = [];
-  const usage = { input: 0, output: 0 };
+  const trace = await Trace.start({ photographerId, feature: "assistant", question, model: ASSISTANT_MODEL });
   let answer = "";
 
   try {
     for (let round = 0; round < MAX_ROUNDS; round++) {
-      const response = await client.messages.create({
-        model: ASSISTANT_MODEL,
-        // Room for thinking plus a studio-sized answer; long reports are out of scope.
-        max_tokens: 4000,
-        system: SYSTEM_PROMPT,
-        tools: ASSISTANT_TOOLS,
-        messages,
-        output_config: { effort: "medium" },
-        // The tools and instructions are the same every time, so they're cached.
-        cache_control: { type: "ephemeral" },
-      });
-      usage.input += response.usage.input_tokens + (response.usage.cache_read_input_tokens ?? 0) + (response.usage.cache_creation_input_tokens ?? 0);
-      usage.output += response.usage.output_tokens;
+      const response = await trace.modelCall(ASSISTANT_MODEL, () =>
+        client.messages.create({
+          model: ASSISTANT_MODEL,
+          // Room for thinking plus a studio-sized answer; long reports are out of scope.
+          max_tokens: 4000,
+          system: SYSTEM_PROMPT,
+          tools: ASSISTANT_TOOLS,
+          messages,
+          output_config: { effort: "medium" },
+          // The tools and instructions are the same every time, so they're cached.
+          cache_control: { type: "ephemeral" },
+        }),
+      );
       const text = response.content
         .filter((b): b is Anthropic.TextBlock => b.type === "text")
         .map((b) => b.text)
@@ -108,8 +116,15 @@ export async function askAssistant(
       messages.push({ role: "assistant", content: response.content });
       const results: Anthropic.ToolResultBlockParam[] = [];
       for (const use of toolUses) {
+        const input = (use.input ?? {}) as Record<string, unknown>;
         try {
-          const result = await runTool(use.name, (use.input ?? {}) as Record<string, unknown>, ctx);
+          // Look-ups run; anything else only becomes an approval card.
+          const result = await trace.toolCall(use.name, input, async (): Promise<{ text: string; proposal?: Proposal }> => {
+            if (!needsApproval(use.name)) return executeTool(use.name, input, ctx);
+            const requested = await requestAction(use.name, input, { ...ctx, traceId: trace.id });
+            if (requested.proposal) await trace.step("approval_requested", { toolName: use.name, toolOutput: { proposalId: requested.proposal.id, summary: requested.proposal.summary } });
+            return requested;
+          });
           if (result.proposal) proposals.push(result.proposal);
           results.push({ type: "tool_result", tool_use_id: use.id, content: result.text });
         } catch (error) {
@@ -123,12 +138,17 @@ export async function askAssistant(
     }
   } catch (error) {
     console.error("Studio Assistant failed", error);
+    await trace.step("error", { status: "error", error: error instanceof Error ? error.message : String(error) });
+    await trace.finish("error", error);
     return { error: "The assistant couldn't answer right now. Please try again in a minute." };
   } finally {
+    // Plan limits count these rows; input includes cached tokens (the trace splits them).
+    const t = trace.tokens;
     await db
       .insert(aiUsage)
-      .values({ photographerId, feature: "assistant", model: ASSISTANT_MODEL, inputTokens: usage.input, outputTokens: usage.output })
+      .values({ photographerId, feature: "assistant", model: ASSISTANT_MODEL, inputTokens: t.input + t.cacheRead + t.cacheWrite, outputTokens: t.output })
       .catch((e) => console.error("Couldn't log assistant usage", e));
   }
-  return { answer: answer || "Done.", proposals };
+  await trace.finish(proposals.length ? "awaiting_approval" : "completed");
+  return { answer: answer || "Done.", proposals, traceId: trace.id };
 }

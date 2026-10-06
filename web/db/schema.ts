@@ -1088,9 +1088,93 @@ export const aiUsage = pgTable(
   (t) => [index("ai_usage_photographer_idx").on(t.photographerId, t.feature, t.createdAt)],
 );
 
+// Step logs ("traces") for the Studio Assistant: one row per answer, with
+// every model call and tool call it made in ai_trace_steps, so a wrong
+// answer can be explained (lib/ai/assistant/trace.ts). Only PhotoEZ Cloud's
+// owner sees them (/dashboard/ai-traces); kept AI_TRACE_KEEP_DAYS (90).
+export const AI_TRACE_OUTCOMES = ["running", "completed", "awaiting_approval", "error"] as const;
+export const aiTraces = pgTable(
+  "ai_traces",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    photographerId: uuid("photographer_id")
+      .notNull()
+      .references(() => photographers.id, { onDelete: "cascade" }),
+    // "assistant" for now.
+    feature: text("feature").notNull(),
+    // The conversation and which turn in it (its turns have no ids of their own).
+    conversationId: uuid("conversation_id").references((): AnyPgColumn => assistantConversations.id, { onDelete: "set null" }),
+    turnIndex: integer("turn_index"),
+    question: text("question").notNull(),
+    model: text("model").notNull(),
+    outcome: text("outcome", { enum: AI_TRACE_OUTCOMES }).notNull().default("running"),
+    // Input tokens split three ways, as the API reports them.
+    inputTokens: integer("input_tokens").notNull().default(0),
+    cacheReadTokens: integer("cache_read_tokens").notNull().default(0),
+    cacheWriteTokens: integer("cache_write_tokens").notNull().default(0),
+    outputTokens: integer("output_tokens").notNull().default(0),
+    error: text("error"),
+    startedAt: timestamp("started_at", { withTimezone: true }).notNull().defaultNow(),
+    endedAt: timestamp("ended_at", { withTimezone: true }),
+    latencyMs: integer("latency_ms"),
+  },
+  (t) => [index("ai_traces_photographer_idx").on(t.photographerId, t.startedAt), index("ai_traces_started_idx").on(t.startedAt)],
+);
+
+export const AI_TRACE_STEP_TYPES = ["model_call", "tool_call", "approval_requested", "approval_decided", "error"] as const;
+export const aiTraceSteps = pgTable(
+  "ai_trace_steps",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    traceId: uuid("trace_id")
+      .notNull()
+      .references(() => aiTraces.id, { onDelete: "cascade" }),
+    // Repeated from the trace so every step is scoped to its studio.
+    photographerId: uuid("photographer_id")
+      .notNull()
+      .references(() => photographers.id, { onDelete: "cascade" }),
+    stepIndex: integer("step_index").notNull(),
+    stepType: text("step_type", { enum: AI_TRACE_STEP_TYPES }).notNull(),
+    status: text("status", { enum: ["ok", "error", "refused"] }).notNull().default("ok"),
+    toolName: text("tool_name"),
+    toolInput: jsonb("tool_input").$type<unknown>(),
+    // Capped at about 10 KB; truncated says when it was cut.
+    toolOutput: jsonb("tool_output").$type<unknown>(),
+    truncated: boolean("truncated").notNull().default(false),
+    // Model calls only.
+    model: text("model"),
+    stopReason: text("stop_reason"),
+    requestId: text("request_id"),
+    inputTokens: integer("input_tokens"),
+    cacheReadTokens: integer("cache_read_tokens"),
+    cacheWriteTokens: integer("cache_write_tokens"),
+    outputTokens: integer("output_tokens"),
+    error: text("error"),
+    startedAt: timestamp("started_at", { withTimezone: true }).notNull().defaultNow(),
+    endedAt: timestamp("ended_at", { withTimezone: true }),
+    latencyMs: integer("latency_ms"),
+  },
+  (t) => [unique("ai_trace_steps_order").on(t.traceId, t.stepIndex)],
+);
+
 // Something the Studio Assistant prepared for the photographer to approve
-// (an email, reminders, booking changes). Nothing happens until they click
-// Approve; the payload is re-checked then (lib/ai/assistant/proposals.ts).
+// (an email, reminders, booking changes): its "pending action". Nothing
+// happens until the photographer clicks Approve, and then only through
+// executeTool (lib/ai/assistant/executor.ts), which runs the stored
+// payload once, checked against args_hash. Cards expire after 24 hours.
+//   pending → approved → executing → executed | failed
+//   pending → rejected (Dismiss) | expired
+export const PROPOSAL_STATUSES = ["pending", "approved", "rejected", "expired", "executing", "executed", "failed"] as const;
+// One recipient (or booking) of a card, saved as each is done, so a failed or
+// half-finished card shows who got it and a retry never repeats anyone.
+//   sending: started but not confirmed (a crash here becomes "unknown": it's
+//   never sent again automatically; check the Email log).
+export type ProposalDelivery = {
+  key: string;
+  label: string;
+  status: "pending" | "sending" | "sent" | "failed" | "skipped" | "unknown";
+  note?: string;
+};
 export const assistantProposals = pgTable(
   "assistant_proposals",
   {
@@ -1099,13 +1183,27 @@ export const assistantProposals = pgTable(
       .notNull()
       .references(() => photographers.id, { onDelete: "cascade" }),
     kind: text("kind", { enum: ["client_email", "gallery_emails", "balance_reminders", "booking_status"] }).notNull(),
+    // The Assistant tool that asked for it, e.g. "propose_client_email".
+    toolName: text("tool_name").notNull(),
     payload: jsonb("payload").$type<Record<string, unknown>>().notNull(),
+    // sha256 of the tool name and payload; null on cards made before hashing (never run).
+    argsHash: text("args_hash"),
     // What the card says, e.g. "Email 3 clients: Your gallery closes Friday".
     summary: text("summary").notNull(),
-    status: text("status", { enum: ["pending", "done", "dismissed"] }).notNull().default("pending"),
-    // What happened when it was approved, e.g. "Sent 3 of 3".
+    status: text("status", { enum: PROPOSAL_STATUSES }).notNull().default("pending"),
+    // What happened when it ran, e.g. "Sent 3 of 3", and to whom.
     result: text("result"),
+    deliveries: jsonb("deliveries").$type<ProposalDelivery[]>(),
+    error: text("error"),
+    conversationId: uuid("conversation_id").references((): AnyPgColumn => assistantConversations.id, { onDelete: "set null" }),
+    traceId: uuid("trace_id").references(() => aiTraces.id, { onDelete: "set null" }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    decidedAt: timestamp("decided_at", { withTimezone: true }),
+    decidedBy: uuid("decided_by").references(() => photographers.id, { onDelete: "set null" }),
+    // When the latest run started (a run stuck in "executing" can be retried).
+    runStartedAt: timestamp("run_started_at", { withTimezone: true }),
+    // When it finished: ran, failed, was dismissed, or expired.
     doneAt: timestamp("done_at", { withTimezone: true }),
   },
   (t) => [index("assistant_proposals_photographer_idx").on(t.photographerId, t.createdAt)],

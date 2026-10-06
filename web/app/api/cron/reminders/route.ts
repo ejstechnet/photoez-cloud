@@ -1,4 +1,6 @@
 import { timingSafeEqual } from "node:crypto";
+import { expireProposals } from "@/lib/ai/assistant/executor";
+import { pruneTraces } from "@/lib/ai/assistant/trace";
 import { runReminders } from "@/lib/email/reminders";
 
 // Called by the server's cron every 15 minutes:
@@ -15,5 +17,9 @@ export async function POST(request: Request) {
   }
 
   const sent = await runReminders();
-  return Response.json({ ok: true, sent });
+  // Studio Assistant housekeeping: cards past 24 hours expire; step logs
+  // older than AI_TRACE_KEEP_DAYS (90) are deleted.
+  const expiredCards = await expireProposals().catch((e) => (console.error("Expiring assistant cards failed", e), 0));
+  const prunedTraces = await pruneTraces().catch((e) => (console.error("Pruning AI traces failed", e), 0));
+  return Response.json({ ok: true, sent, expiredCards, prunedTraces });
 }

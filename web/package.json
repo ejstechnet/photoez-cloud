@@ -9,7 +9,7 @@
     "lint": "eslint",
     "eval:triage": "node --env-file=.env --no-warnings evals/triage/run-eval.mjs --flow .claude/hillclimb/triage --model claude-opus-5 --reps 2",
     "eval:triage:check": "node evals/triage/check-grader.mjs",
-    "test": "node --test --no-warnings \"lib/**/*.test.ts\""
+    "test": "node --test --no-warnings --import ./test/register.mjs \"lib/**/*.test.ts\""
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.128.0",
@@ -35,6 +35,7 @@
     "zod": "^4.6.5"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.8",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/nodemailer": "^8.0.2",
