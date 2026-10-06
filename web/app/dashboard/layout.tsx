@@ -71,8 +71,13 @@ export default async function DashboardLayout({ children }: LayoutProps<"/dashbo
                 { href: "/dashboard/billing#refer", label: "Refer a photographer" },
                 { href: "/dashboard/emails", label: "Email log" },
                 { href: "/dashboard/texts", label: "Text log" },
-                // PhotoEZ Cloud's owner only: tracked sign-ups from ads.
-                ...(isOwnerEmail(user.email) ? [{ href: "/dashboard/signups", label: "Sign-ups" }] : []),
+                // PhotoEZ Cloud's owner only: tracked sign-ups from ads, and AI step logs.
+                ...(isOwnerEmail(user.email)
+                  ? [
+                      { href: "/dashboard/signups", label: "Sign-ups" },
+                      { href: "/dashboard/ai-traces", label: "AI traces" },
+                    ]
+                  : []),
               ]}
             />
           </nav>
