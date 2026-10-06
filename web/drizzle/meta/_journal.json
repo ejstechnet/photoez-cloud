@@ -400,6 +400,13 @@
       "when": 1791136373261,
       "tag": "0056_storage_addon",
       "breakpoints": true
+    },
+    {
+      "idx": 57,
+      "version": "7",
+      "when": 1791245643460,
+      "tag": "0057_swaggpress_changes",
+      "breakpoints": true
     }
   ]
 }

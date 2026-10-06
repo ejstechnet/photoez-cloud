@@ -492,6 +492,13 @@ async function loadStoreOrder(orderId: string) {
 }
 
 // A store order was paid: the client's receipt, and a heads-up to the studio.
+// SwaggPress changed products the studio sells (lib/swaggpress/catalog.ts).
+export async function emailSwaggChanges(photographerId: string, changes: messages.SwaggChangeLine[]) {
+  const [studio] = await db.select({ name: photographers.name }).from(photographers).where(eq(photographers.id, photographerId));
+  if (!studio || !changes.length) return;
+  await sendToStudio(photographerId, "swaggpress_changes", messages.swaggChangesStudio({ name: studio.name, changes, storeUrl: `${siteUrl}/dashboard/store` }));
+}
+
 export async function emailStoreOrderPaid(orderId: string) {
   const loaded = await loadStoreOrder(orderId);
   if (!loaded) return;

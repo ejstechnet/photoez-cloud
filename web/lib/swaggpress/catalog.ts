@@ -1,10 +1,11 @@
 import { randomBytes } from "node:crypto";
 import { and, count, eq } from "drizzle-orm";
 import { db } from "@/db";
-import { photographers, storeProducts } from "@/db/schema";
+import { photographers, storeProducts, type SwaggChange } from "@/db/schema";
+import { emailSwaggChanges } from "@/lib/email/notify";
 import { openSecret, sealSecret } from "@/lib/secret-box";
 import { isSwaggPressKey, swaggCatalog, SwaggPressError, type SwaggCatalog } from "./client";
-import { swaggDesign, swaggFields, swaggImages, swaggMode, swaggOptions, swaggVariants, syncSwaggVariants } from "./mapping";
+import { autoSwaggVariants, sameJson, swaggDesign, swaggFields, swaggImages, swaggMode, swaggOptions, swaggVariants, syncSwaggVariants } from "./mapping";
 
 // A studio's SwaggPress connection and the products it added from the
 // SwaggPress catalog. Wholesale prices, sizes, and photos follow SwaggPress
@@ -93,7 +94,14 @@ export async function addSwaggProduct(photographerId: string, labProductId: numb
 // Brings added SwaggPress products up to date with the catalog. Pass a
 // catalog already fetched, or it's fetched here (at most every 6 hours
 // unless forced). Returns an error message when SwaggPress couldn't be read.
+//
+// Two ways: the studio's "Refresh prices" (forced, or connecting) takes
+// everything and clears the change notice. The automatic run (the scheduled
+// job) applies only wholesale increases and discontinued sizes, so a studio
+// never sells below cost, and records the rest for the dashboard banner and
+// an email ("SwaggPress lowered prices… Refresh prices").
 export async function syncSwaggProducts(photographerId: string, catalog?: SwaggCatalog, force = false): Promise<string | null> {
+  const refresh = force || Boolean(catalog);
   if (!catalog) {
     const [studio] = await db
       .select({ key: photographers.swaggpressKey, syncedAt: photographers.swaggpressSyncedAt })
@@ -118,6 +126,7 @@ export async function syncSwaggProducts(photographerId: string, catalog?: SwaggC
     .select()
     .from(storeProducts)
     .where(and(eq(storeProducts.photographerId, photographerId), eq(storeProducts.fulfillment, "swaggpress")));
+  if (!refresh) return autoSync(photographerId, catalog, mine);
   for (const product of mine) {
     const lab = catalog.products.find((p) => p.id === product.labProductId) ?? null;
     const variants = syncSwaggVariants(product.variants, lab, variantId);
@@ -139,5 +148,57 @@ export async function syncSwaggProducts(photographerId: string, catalog?: SwaggC
       })
       .where(eq(storeProducts.id, product.id));
   }
+  await db.update(photographers).set({ swaggpressChanges: null, swaggpressChangesEmailed: null }).where(eq(photographers.id, photographerId));
   return null;
+}
+
+// The automatic run: see syncSwaggProducts.
+async function autoSync(photographerId: string, catalog: SwaggCatalog, mine: (typeof storeProducts.$inferSelect)[]): Promise<null> {
+  const found: SwaggChange[] = [];
+  for (const product of mine) {
+    const lab = catalog.products.find((p) => p.id === product.labProductId) ?? null;
+    const { variants, changes } = autoSwaggVariants(product.variants, lab, variantId);
+    // Photos, print areas, options and the like: shown after Refresh.
+    if (
+      lab &&
+      !(
+        sameJson(swaggImages(lab), product.labImageUrls) &&
+        sameJson(swaggDesign(lab), product.labDesign) &&
+        sameJson(swaggOptions(lab), product.labOptions) &&
+        sameJson(swaggMode(lab), product.labMode) &&
+        sameJson(swaggFields(lab), product.labFields)
+      ) &&
+      !changes.some((c) => c.kind === "details")
+    ) {
+      changes.push({ label: "", kind: "details", fromCents: null, toCents: null, applied: false });
+    }
+    if (changes.some((c) => c.applied)) {
+      await db.update(storeProducts).set({ variants, labUnavailable: !lab }).where(eq(storeProducts.id, product.id));
+    }
+    found.push(...changes.map((c) => ({ ...c, storeProductId: product.id, product: product.name })));
+  }
+  const [studio] = await db
+    .select({ changes: photographers.swaggpressChanges, emailed: photographers.swaggpressChangesEmailed })
+    .from(photographers)
+    .where(eq(photographers.id, photographerId));
+  // Applied changes stay listed until the studio sees them; waiting ones are
+  // worked out fresh each run (they're still differences until Refresh).
+  const merged = new Map<string, SwaggChange>();
+  for (const c of [...(studio?.changes ?? []).filter((c) => c.applied), ...found]) {
+    merged.set(`${c.storeProductId}|${c.label}|${c.kind}|${c.applied}`, c);
+  }
+  const list = [...merged.values()];
+  const key = list.length ? JSON.stringify(list.map((c) => [c.storeProductId, c.label, c.kind, c.toCents, c.applied]).sort()) : null;
+  await db
+    .update(photographers)
+    .set({ swaggpressChanges: list.length ? list : null, ...(key && key !== studio?.emailed ? { swaggpressChangesEmailed: key } : {}) })
+    .where(eq(photographers.id, photographerId));
+  // Emailed once per new set of changes.
+  if (key && key !== studio?.emailed) await emailSwaggChanges(photographerId, list).catch((error) => console.error("SwaggPress change email failed", error));
+  return null;
+}
+
+// "Got it" on the banner when everything listed was already applied.
+export async function clearSwaggChanges(photographerId: string) {
+  await db.update(photographers).set({ swaggpressChanges: null }).where(eq(photographers.id, photographerId));
 }

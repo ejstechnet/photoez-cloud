@@ -1,7 +1,7 @@
 // Tests for SwaggPress catalog mapping.   npm test
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { sellable, suggestedRetailCents, swaggImages, swaggVariantLabel, swaggVariants, swaggDesign, swaggFields, swaggMode, swaggOptions, syncSwaggVariants } from "./mapping.ts";
+import { autoSwaggVariants, sameJson, sellable, suggestedRetailCents, swaggImages, swaggVariantLabel, swaggVariants, swaggDesign, swaggFields, swaggMode, swaggOptions, syncSwaggVariants } from "./mapping.ts";
 
 let n = 0;
 const makeId = () => `v${++n}`;
@@ -82,7 +82,7 @@ test("a product's design setup comes along for the gallery designer", () => {
   };
   assert.deepEqual(swaggDesign(mug), {
     canvas: { w: 600, h: 600 },
-    front: { mockup: "https://swaggpress.com/m.webp", area: { x: 97, y: 128, w: 427, h: 378 } },
+    front: { mockup: "https://swaggpress.com/m.webp", area: { x: 97, y: 128, w: 427, h: 378 }, overlay: null },
     back: null,
     fullWrap: true,
     // 0 × 0 means SwaggPress has no print size set.
@@ -94,6 +94,11 @@ test("a product's design setup comes along for the gallery designer", () => {
     view3d: null,
     backUpchargeCents: 0,
   });
+  // A hoodie's 3D model and drawstring overlay come along; unknown models don't.
+  const hoodie = { ...mug, design: { ...mug.design, full_wrap: false, view3d: "hoodie", front: { ...mug.design.front, overlay: "https://swaggpress.com/o.png" } } };
+  assert.equal(swaggDesign(hoodie)!.view3d, "hoodie");
+  assert.equal(swaggDesign(hoodie)!.front.overlay, "https://swaggpress.com/o.png");
+  assert.equal(swaggDesign({ ...mug, design: { ...mug.design, view3d: "spaceship" } })!.view3d, null);
   // All-over printing comes along with its upcharge in cents.
   const allOverTee = { ...mug, design: { ...mug.design, full_wrap: false, allover: { upcharge: 10, inches: { w: 20, h: 28 } } } };
   assert.deepEqual(swaggDesign(allOverTee)!.allOver, { upchargeCents: 1000, inches: { w: 20, h: 28 } });
@@ -148,3 +153,45 @@ test("a Custom Text & Photos product's fields come along", () => {
   assert.deepEqual(swaggFields({ ...stole, purchase_mode: "custom_design" as const }), []);
 });
 
+
+test("automatic update: increases and dropped sizes apply now, the rest waits for Refresh", () => {
+  const current = swaggVariants(tee, makeId).map((v) => ({ ...v, priceCents: 3000 }));
+  // SwaggPress: M up $12 → $13, 2XL down $14.50 → $13.50, a new 3XL.
+  const changed = {
+    ...tee,
+    variants: [
+      { ...tee.variants[0], wholesale_price: 13 },
+      { ...tee.variants[1], wholesale_price: 13.5 },
+      { id: 12, color: "White", color_hex: "#fff", size: "3XL", wholesale_price: 15, print_w_in: null, print_h_in: null, image: null },
+    ],
+  };
+  const { variants, changes } = autoSwaggVariants(current, changed, makeId);
+  assert.equal(variants.length, 2); // the new size isn't added until Refresh
+  assert.equal(variants[0].wholesaleCents, 1300); // increase applied
+  assert.equal(variants[1].wholesaleCents, 1450); // decrease waits
+  assert.equal(variants[0].priceCents, 3000); // the studio's own price stays
+  assert.deepEqual(
+    changes.map((c) => [c.label, c.kind, c.fromCents, c.toCents, c.applied]),
+    [
+      ["White · M", "up", 1200, 1300, true],
+      ["White · 2XL", "down", 1450, 1350, false],
+      ["White · 3XL", "new", null, 1500, false],
+    ],
+  );
+
+  // A size SwaggPress stopped offering is hidden right away.
+  const dropped = autoSwaggVariants(current, { ...tee, variants: [tee.variants[0]] }, makeId);
+  assert.equal(dropped.variants[1].available, false);
+  assert.deepEqual(dropped.changes.map((c) => [c.kind, c.applied]), [["gone", true]]);
+
+  // Nothing changed: nothing to report.
+  assert.deepEqual(autoSwaggVariants(current, tee, makeId).changes, []);
+  // The whole product gone.
+  assert.deepEqual(autoSwaggVariants(current, null, makeId).changes.map((c) => c.kind), ["gone"]);
+});
+
+test("sameJson ignores key order", () => {
+  assert.equal(sameJson({ a: 1, b: { c: 2, d: [1, { e: 3, f: 4 }] } }, { b: { d: [1, { f: 4, e: 3 }], c: 2 }, a: 1 }), true);
+  assert.equal(sameJson({ a: 1 }, { a: 2 }), false);
+  assert.equal(sameJson({ a: undefined, b: 1 }, { b: 1 }), true);
+});

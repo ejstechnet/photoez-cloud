@@ -1,7 +1,7 @@
 // Turning SwaggPress catalog products into the studio's store products, and
 // keeping them in step. Plain functions; tested in mapping.test.ts.
 
-import type { StoreLabDesign, StoreLabField, StoreLabOption, StoreVariant } from "../../db/schema.ts";
+import type { StoreLabDesign, StoreLabField, StoreLabOption, StoreVariant, SwaggChangeKind } from "../../db/schema.ts";
 import type { SwaggProduct, SwaggVariant } from "./client.ts";
 
 const cents = (dollars: number) => Math.round(dollars * 100);
@@ -62,11 +62,82 @@ export function syncSwaggVariants(current: StoreVariant[], p: SwaggProduct | nul
   return [...merged, ...dropped];
 }
 
+export type SwaggVariantChange = { label: string; kind: SwaggChangeKind; fromCents: number | null; toCents: number | null; applied: boolean };
+
+// The automatic update (every few hours). Only what protects the studio
+// happens on its own: a wholesale price going UP, and sizes SwaggPress
+// stopped offering. Lower prices, new sizes and other changes wait for the
+// studio's "Refresh prices" (syncSwaggVariants). Everything is reported.
+export function autoSwaggVariants(
+  current: StoreVariant[],
+  p: SwaggProduct | null,
+  makeId: () => string,
+): { variants: StoreVariant[]; changes: SwaggVariantChange[] } {
+  const changes: SwaggVariantChange[] = [];
+  if (!p) {
+    if (current.some((v) => v.available !== false)) changes.push({ label: "", kind: "gone", fromCents: null, toCents: null, applied: true });
+    return { variants: current.map((v) => ({ ...v, available: false })), changes };
+  }
+  const fresh = swaggVariants(p, makeId);
+  const freshBy = new Map(fresh.map((f) => [f.labVariantId ?? null, f]));
+  const variants = current.map((v) => {
+    const f = freshBy.get(v.labVariantId ?? null);
+    if (!f) {
+      if (v.available !== false) changes.push({ label: v.label, kind: "gone", fromCents: v.wholesaleCents ?? null, toCents: null, applied: true });
+      return { ...v, available: false };
+    }
+    // Offered again after being dropped: back on Refresh.
+    if (v.available === false) {
+      changes.push({ label: f.label, kind: "new", fromCents: null, toCents: f.wholesaleCents ?? null, applied: false });
+      return v;
+    }
+    const was = v.wholesaleCents ?? 0;
+    const now = f.wholesaleCents ?? 0;
+    if (now > was) {
+      changes.push({ label: v.label, kind: "up", fromCents: was, toCents: now, applied: true });
+      return { ...v, wholesaleCents: now };
+    }
+    if (now < was) {
+      changes.push({ label: v.label, kind: "down", fromCents: was, toCents: now, applied: false });
+    } else if (
+      f.label !== v.label ||
+      f.widthIn !== v.widthIn ||
+      f.heightIn !== v.heightIn ||
+      (f.labImage ?? null) !== (v.labImage ?? null) ||
+      (f.colorHex ?? null) !== (v.colorHex ?? null)
+    ) {
+      changes.push({ label: v.label, kind: "details", fromCents: null, toCents: null, applied: false });
+    }
+    return v;
+  });
+  const had = new Set(current.map((v) => v.labVariantId ?? null));
+  for (const f of fresh) {
+    if (!had.has(f.labVariantId ?? null)) changes.push({ label: f.label, kind: "new", fromCents: null, toCents: f.wholesaleCents ?? null, applied: false });
+  }
+  return { variants, changes };
+}
+
+// The same value, whatever order its keys are in (a JSON column gives keys
+// back in its own order).
+export function sameJson(a: unknown, b: unknown): boolean {
+  const norm = (v: unknown): unknown =>
+    Array.isArray(v)
+      ? v.map(norm)
+      : v && typeof v === "object"
+        ? Object.fromEntries(Object.keys(v as object).sort().filter((k) => (v as Record<string, unknown>)[k] !== undefined).map((k) => [k, norm((v as Record<string, unknown>)[k])]))
+        : v ?? null;
+  return JSON.stringify(norm(a)) === JSON.stringify(norm(b));
+}
+
 // Whether clients may buy a size: still offered, and priced above wholesale
 // (so a price change at SwaggPress never makes a studio sell at a loss).
 export function sellable(v: StoreVariant) {
   return v.available !== false && (v.wholesaleCents == null || v.priceCents > v.wholesaleCents);
 }
+
+// The "View in 3D" models the gallery designer ships with (its
+// swagg-designer-<name>.glb files in public/vendor).
+export const SWAGG_3D_MODELS = ["tee", "long-sleeve", "hoodie", "kids-tee", "bodysuit", "crewneck", "ornament", "pillow", "tote-bag", "fine-art", "blanket"];
 
 // The product's design setup for the gallery designer; null when SwaggPress
 // didn't send one or it has no product picture to design on.
@@ -76,14 +147,14 @@ export function swaggDesign(product: SwaggProduct): StoreLabDesign | null {
   const px = d.print_px?.w > 0 && d.print_px?.h > 0 ? d.print_px : null;
   return {
     canvas: { w: d.canvas?.w || 600, h: d.canvas?.h || 600 },
-    front: { mockup: d.front.mockup ?? product.mockup_front ?? null, area: d.front.area },
-    back: d.back ? { mockup: d.back.mockup ?? null, area: d.back.area } : null,
+    front: { mockup: d.front.mockup ?? product.mockup_front ?? null, area: d.front.area, overlay: d.front.overlay ?? null },
+    back: d.back ? { mockup: d.back.mockup ?? null, area: d.back.area, overlay: d.back.overlay ?? null } : null,
     fullWrap: Boolean(d.full_wrap),
     printPx: px ? { w: px.w, h: px.h, dpi: px.dpi || 300 } : null,
     wrapChoice: Boolean(d.wrap_optional) && !d.full_wrap,
     wrapUpchargeCents: d.wrap_optional ? cents(d.wrap_upcharge ?? 0) : 0,
     wrapInches: d.wrap_in && d.wrap_in.w > 0 && d.wrap_in.h > 0 ? { w: d.wrap_in.w, h: d.wrap_in.h } : null,
-    view3d: d.view3d === "tee" ? "tee" : null,
+    view3d: d.view3d && SWAGG_3D_MODELS.includes(d.view3d) ? d.view3d : null,
     backUpchargeCents: d.back ? cents(Number(d.back_upcharge) || 0) : 0,
     allOver: d.allover
       ? {

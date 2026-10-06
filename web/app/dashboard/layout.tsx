@@ -10,13 +10,14 @@ import { GearIcon } from "@/components/icons";
 import { NavLink } from "./nav-link";
 import { NavMenu } from "./nav-menu";
 import { SignOutButton } from "./sign-out-button";
+import { SwaggChangesBanner } from "./swagg-changes-banner";
 
 // Frame shared by every dashboard page: a PhotoEZ navy band with the logo,
 // navigation pills, and sign-out.
 export default async function DashboardLayout({ children }: LayoutProps<"/dashboard">) {
   const user = await requirePhotographer();
   const [studio] = await db
-    .select({ plan: photographers.plan, trialEndsAt: photographers.trialEndsAt })
+    .select({ plan: photographers.plan, trialEndsAt: photographers.trialEndsAt, swaggChanges: photographers.swaggpressChanges })
     .from(photographers)
     .where(eq(photographers.id, user.id));
   // Days left in the free Pro trial (0 once it's over or a plan is chosen).
@@ -86,6 +87,8 @@ export default async function DashboardLayout({ children }: LayoutProps<"/dashbo
           </Link>
         </p>
       )}
+      {/* SwaggPress changed products this studio sells: refresh for new prices. */}
+      {studio?.swaggChanges?.length ? <SwaggChangesBanner changes={studio.swaggChanges} /> : null}
       <main className="mx-auto w-full max-w-[1440px] px-4 py-10">{children}</main>
     </div>
   );

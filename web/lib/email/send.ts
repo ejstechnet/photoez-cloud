@@ -37,6 +37,7 @@ export type EmailKind =
   | "store_order"
   | "store_order_new"
   | "store_order_shipped"
+  | "swaggpress_changes"
   | "password_reset"
   | "email_verification"
   | "trial_reminder"

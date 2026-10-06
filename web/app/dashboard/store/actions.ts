@@ -8,7 +8,7 @@ import { db } from "@/db";
 import { photographers, sessionTypes, storeOrders, storeProducts, type StoreVariant } from "@/db/schema";
 import { emailStoreOrderShipped } from "@/lib/email/notify";
 import { refreshOrderShipped, submitLabOrder } from "@/lib/swaggpress/orders";
-import { addSwaggProduct, connectSwaggPress, disconnectSwaggPress, syncSwaggProducts } from "@/lib/swaggpress/catalog";
+import { addSwaggProduct, clearSwaggChanges, connectSwaggPress, disconnectSwaggPress, syncSwaggProducts } from "@/lib/swaggpress/catalog";
 import { requirePhotographer } from "@/lib/session";
 import { MAX_PRODUCT_PHOTOS, MAX_VARIANTS, STARTER_PRINTS, parsePrice } from "@/lib/store/rules";
 import { deletePrefix, signedUploadUrl, storedSize, storeProductPhotoKey } from "@/lib/storage";
@@ -324,8 +324,15 @@ export async function addSwaggToStore(labProductId: number): Promise<{ message?:
 export async function refreshSwagg(): Promise<{ message: string; ok: boolean }> {
   const photographer = await requirePhotographer();
   const error = await syncSwaggProducts(photographer.id, undefined, true);
-  revalidatePath("/dashboard/store", "layout");
+  revalidatePath("/dashboard", "layout");
   return error ? { ok: false, message: error } : { ok: true, message: "Updated from SwaggPress just now." };
+}
+
+// The SwaggPress change banner's "Got it" (everything listed was already applied).
+export async function dismissSwaggChanges(): Promise<void> {
+  const photographer = await requirePhotographer();
+  await clearSwaggChanges(photographer.id);
+  revalidatePath("/dashboard", "layout");
 }
 
 // The order page's "Send to SwaggPress again" after a failure.

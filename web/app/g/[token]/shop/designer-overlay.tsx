@@ -12,7 +12,7 @@ import type { ShopPhoto } from "./shop-dialog";
 // and the design is saved for the cart (lib/store/designs.ts).
 
 // Bump when a new designer build is copied in, so browsers load it fresh.
-const DESIGNER_URL = "/vendor/swagg-designer.js?v=2026-09-29l";
+const DESIGNER_URL = "/vendor/swagg-designer.js?v=2026-10-05";
 
 export type SavedDesign = { id: string; previewUrl: string; design: unknown; printStyle: "panel" | "wrap" | "allover"; hasBack?: boolean };
 
@@ -96,7 +96,7 @@ export function DesignerOverlay({
           product: {
             name: `${productName} · ${variant.label}`,
             canvas: setup.canvas,
-            front: { mockup: variant.labImage || setup.front.mockup, area: setup.front.area },
+            front: { mockup: variant.labImage || setup.front.mockup, area: setup.front.area, overlay: setup.front.overlay ?? null },
             back: setup.back,
             fullWrap: setup.fullWrap,
             // Wraps use SwaggPress's wrap size when it's set.
