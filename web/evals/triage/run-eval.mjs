@@ -3,7 +3,10 @@
 // case in cases.json, grades it (grader.mjs), and writes results the eval
 // report reads. Run from the web/ folder:
 //
-//   node --env-file=.env --no-warnings evals/triage/run-eval.mjs --flow .claude/hillclimb/triage --variant baseline --model claude-opus-5 --reps 2
+//   node --env-file=.env --no-warnings --import ./scripts/register.mjs evals/triage/run-eval.mjs --flow .claude/hillclimb/triage --variant baseline --model claude-opus-5 --reps 2
+//
+// Every model call (triage and judge) is also recorded in ai_usage as an
+// "eval" row for the AI cost report (../record-usage.mjs).
 //
 // Add --ids a,b,c to run only some cases (e.g. a pilot).
 //
@@ -39,6 +42,7 @@ import { fileURLToPath } from 'node:url';
 
 import { triageInquiry } from '../../lib/ai/triage.ts';
 import { gradeTriage } from './grader.mjs';
+import { recordEvalUsage } from '../record-usage.mjs';
 
 const CASES_FILE = new URL('./cases.json', import.meta.url);
 const caseFile = JSON.parse(readFileSync(CASES_FILE, 'utf8'));
@@ -62,6 +66,7 @@ async function runCase(input, ctx) {
       studio: caseFile.photographer.profile,
       today: new Date(`${caseFile.today}T12:00:00Z`),
       model: ctx.model,
+      onUsage: (u) => recordEvalUsage(u.model, { input_tokens: u.tokens.input, output_tokens: u.tokens.output, cache_read_input_tokens: u.tokens.cacheRead, cache_creation_input_tokens: u.tokens.cacheWrite }, u.latencyMs),
     });
   } catch (e) {
     // triageInquiry throws its own friendly errors for refusals and cut-offs.

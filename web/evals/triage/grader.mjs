@@ -12,6 +12,7 @@ import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { z } from "zod";
 import { hasGarbledText } from "../../lib/ai/clean-text.ts";
 import { describeStudio } from "../../lib/ai/triage.ts";
+import { recordEvalUsage } from "../record-usage.mjs";
 
 export const JUDGE_MODEL = "claude-sonnet-5";
 export const MAX_REPLY_WORDS = 180;
@@ -146,6 +147,7 @@ export async function judgeReply(message, reply, caseChecks, studioInfo) {
     output_config: { format: zodOutputFormat(judgeSchema) },
   });
 
+  await recordEvalUsage(response.model, response.usage);
   const verdict = response.parsed_output;
   const judge = { judge_model: response.model, judge_usage: response.usage };
   if (response.stop_reason !== "end_turn" || !verdict || verdict.checks.length !== all.length) {

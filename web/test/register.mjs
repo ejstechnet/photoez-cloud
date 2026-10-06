@@ -3,4 +3,4 @@
 // in-memory database (test/db.ts) wherever app code imports "@/db".
 import { register } from "node:module";
 
-register("./resolve-hooks.mjs", import.meta.url);
+register("./resolve-hooks.mjs", import.meta.url, { data: { testDb: true } });

@@ -1,8 +1,11 @@
 import { and, asc, count, eq, gte, isNull } from "drizzle-orm";
+import type Anthropic from "@anthropic-ai/sdk";
 import sharp from "sharp";
 import { db } from "@/db";
 import { aiUsage, photographers, photos } from "@/db/schema";
 import { tagPhoto } from "@/lib/ai/photo-tags";
+import type { CallUsage } from "@/lib/ai/prices";
+import { recordAiUsage } from "@/lib/ai/usage";
 import { localDateOf, zonedToUtc } from "@/lib/booking/time";
 import { aiPhotoLimit, effectivePlan, hasFeature } from "@/lib/plans";
 import { photoKey, readObject } from "@/lib/storage";
@@ -25,7 +28,14 @@ export async function photoAllowance(photographerId: string) {
   const [{ used }] = await db
     .select({ used: count() })
     .from(aiUsage)
-    .where(and(eq(aiUsage.photographerId, photographerId), eq(aiUsage.feature, "photo_tag"), gte(aiUsage.createdAt, monthStart)));
+    .where(
+      and(
+        eq(aiUsage.photographerId, photographerId),
+        eq(aiUsage.feature, "photo_tag"),
+        eq(aiUsage.countsTowardLimit, true),
+        gte(aiUsage.createdAt, monthStart),
+      ),
+    );
   const plan = effectivePlan(studio.plan, studio.trialEndsAt);
   const limit = aiPhotoLimit(studio.plan, studio.trialEndsAt);
   return { enabled: hasFeature(plan, "aiSearch"), used, limit, left: Math.max(0, limit - used) };
@@ -42,6 +52,8 @@ export async function untaggedCount(galleryId: string) {
 export async function tagNextPhotos(
   galleryId: string,
   photographerId: string,
+  // Tests pass stand-ins for the Anthropic client and photo storage.
+  options: { client?: Anthropic; readThumb?: (key: string) => Promise<Uint8Array | null> } = {},
 ): Promise<{ tagged: number; failed: number; remaining: number } | { error: string }> {
   const allowance = await photoAllowance(photographerId);
   if (!allowance.enabled) return { error: "Gallery search isn't available on this plan." };
@@ -56,21 +68,24 @@ export async function tagNextPhotos(
 
   const results = await Promise.allSettled(
     batch.map(async (photo) => {
-      const thumb = await readObject(photoKey(photo.fileKey, "thumb"));
+      const thumb = await (options.readThumb ?? readObject)(photoKey(photo.fileKey, "thumb"));
       if (!thumb) throw new Error("Photo not found in storage.");
       const small = await sharp(thumb).resize({ width: EDGE, height: EDGE, fit: "inside" }).jpeg({ quality: 80 }).toBuffer();
-      const result = await tagPhoto(small.toString("base64"));
-      await db
-        .update(photos)
-        .set({ aiDescription: result.tags.description, aiTags: result.tags.tags, aiTaggedAt: new Date() })
-        .where(eq(photos.id, photo.id));
-      await db.insert(aiUsage).values({
-        photographerId,
-        feature: "photo_tag",
-        model: result.model,
-        inputTokens: result.inputTokens,
-        outputTokens: result.outputTokens,
-      });
+      // A photo counts toward the plan once it's described, as before; a call
+      // that failed after the API answered is recorded but doesn't count.
+      let usage: CallUsage | null = null;
+      let described = false;
+      try {
+        const result = await tagPhoto(small.toString("base64"), { client: options.client, onUsage: (u) => void (usage = u) });
+        await db
+          .update(photos)
+          .set({ aiDescription: result.tags.description, aiTags: result.tags.tags, aiTaggedAt: new Date() })
+          .where(eq(photos.id, photo.id));
+        described = true;
+      } finally {
+        const u = usage as CallUsage | null;
+        if (u) await recordAiUsage({ feature: "photo_tag", photographerId, galleryId, ...u, countsTowardLimit: described });
+      }
     }),
   );
   const failed = results.filter((r) => r.status === "rejected");
