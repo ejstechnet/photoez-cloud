@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { and, asc, count, eq } from "drizzle-orm";
+import { and, asc, count, eq, inArray, sum } from "drizzle-orm";
 import { db } from "@/db";
-import { photographers, storeOrders, storeProducts } from "@/db/schema";
+import { photographers, storeOrderItems, storeOrders, storeProducts } from "@/db/schema";
 import { formatPrice } from "@/lib/booking/format";
 import { paymentAccount } from "@/lib/payments/checkout";
 import { requirePhotographer } from "@/lib/session";
@@ -11,13 +11,14 @@ import { StoreSettingsForm } from "./settings-form";
 import { SwaggCard } from "./swagg-card";
 import { sellable } from "@/lib/swaggpress/mapping";
 import { formatDate, formatTime } from "@/lib/booking/time";
+import { signedViewUrl } from "@/lib/storage";
 
 export const metadata: Metadata = { title: "Store" };
 
 // Store: open the shop, set shipping and handling, and manage products.
 export default async function StorePage() {
   const user = await requirePhotographer();
-  const [[studio], products, [toShip], account] = await Promise.all([
+  const [[studio], products, [toShip], account, soldRows] = await Promise.all([
     db
       .select({
         enabled: photographers.storeEnabled,
@@ -41,7 +42,21 @@ export default async function StorePage() {
       .from(storeOrders)
       .where(and(eq(storeOrders.photographerId, user.id), eq(storeOrders.status, "paid"))),
     paymentAccount(user.id),
+    // How many of each product clients have bought (paid or shipped orders).
+    db
+      .select({ productId: storeOrderItems.productId, n: sum(storeOrderItems.quantity) })
+      .from(storeOrderItems)
+      .innerJoin(storeOrders, eq(storeOrders.id, storeOrderItems.orderId))
+      .where(and(eq(storeOrders.photographerId, user.id), inArray(storeOrders.status, ["paid", "shipped"])))
+      .groupBy(storeOrderItems.productId),
   ]);
+  const sold = new Map(soldRows.map((r) => [r.productId, Number(r.n ?? 0)]));
+  // Each product's first picture, for its card.
+  const pictures = new Map(
+    await Promise.all(
+      products.map(async (p) => [p.id, p.fulfillment === "swaggpress" ? (p.labImageUrls[0] ?? null) : p.imageKeys[0] ? await signedViewUrl(p.imageKeys[0]) : null] as const),
+    ),
+  );
 
   return (
     <div>
@@ -99,34 +114,48 @@ export default async function StorePage() {
               </form>
             </div>
           ) : (
-            <ul className="mt-5 divide-y divide-border">
+            <ul className="mt-5 grid gap-3 sm:grid-cols-2">
               {products.map((p) => {
-                const prices = p.variants.map((v) => v.priceCents);
+                const prices = p.variants.filter((v) => v.available !== false).map((v) => v.priceCents);
+                const low = prices.length ? Math.min(...prices) : null;
+                const high = prices.length ? Math.max(...prices) : null;
                 const swagg = p.fulfillment === "swaggpress";
                 // SwaggPress sizes clients can't buy (dropped, or priced at/below wholesale).
                 const blocked = swagg ? p.variants.filter((v) => !sellable(v)).length : 0;
+                const n = sold.get(p.id) ?? 0;
+                const picture = pictures.get(p.id);
                 return (
-                  <li key={p.id} className="flex flex-wrap items-center justify-between gap-3 py-3.5">
-                    <div>
-                      <p className="font-semibold">
-                        {p.name}
-                        {!p.active && <span className="ml-2 rounded-full bg-border px-2 py-0.5 text-xs font-bold text-muted uppercase">Hidden</span>}
-                        {swagg && <span className="ml-2 rounded-full bg-coral/15 px-2 py-0.5 text-xs font-bold text-coral uppercase">SwaggPress</span>}
-                      </p>
-                      <p className="text-sm text-muted">
-                        {p.variants.map((v) => v.label).join(", ")}
-                        {prices.length > 0 && ` · ${formatPrice(Math.min(...prices))}–${formatPrice(Math.max(...prices))}`}
-                      </p>
-                      {swagg && (p.labUnavailable || blocked > 0) && (
-                        <p className="text-xs font-semibold text-danger">
-                          {p.labUnavailable
-                            ? "No longer offered by SwaggPress"
-                            : `${blocked} ${blocked === 1 ? "size is" : "sizes are"} hidden (dropped or priced at/below wholesale)`}
+                  <li key={p.id}>
+                    <Link
+                      href={`/dashboard/store/products/${p.id}`}
+                      className={`flex h-full items-center gap-4 rounded-2xl border border-border p-4 transition hover:border-brand/40 hover:shadow-sm ${p.active ? "" : "opacity-70"}`}
+                    >
+                      <div className="flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-background">
+                        {picture ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={picture} alt="" className="size-full object-contain" />
+                        ) : (
+                          <span className="text-2xl" aria-hidden="true">🖼️</span>
+                        )}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate font-semibold">{p.name}</p>
+                        <p className="font-display text-2xl font-bold text-brand">
+                          {low === null ? "No sizes on sale" : low === high ? formatPrice(low) : `From ${formatPrice(low)}`}
                         </p>
-                      )}
-                    </div>
-                    <Link href={`/dashboard/store/products/${p.id}`} className="link text-sm">
-                      Edit
+                        <p className="text-sm text-muted">{n > 0 ? `${n} sold` : "None sold yet"}</p>
+                        {(!p.active || swagg) && (
+                          <p className="mt-1 flex flex-wrap gap-1.5">
+                            {!p.active && <span className="rounded-full bg-border px-2 py-0.5 text-[11px] font-bold text-muted uppercase">Hidden</span>}
+                            {swagg && <span className="rounded-full bg-coral/15 px-2 py-0.5 text-[11px] font-bold text-coral uppercase">SwaggPress</span>}
+                          </p>
+                        )}
+                        {swagg && (p.labUnavailable || blocked > 0) && (
+                          <p className="mt-1 text-xs font-semibold text-danger">
+                            {p.labUnavailable ? "No longer offered by SwaggPress" : `${blocked} ${blocked === 1 ? "size" : "sizes"} hidden from clients`}
+                          </p>
+                        )}
+                      </div>
                     </Link>
                   </li>
                 );
