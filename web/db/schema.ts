@@ -126,6 +126,11 @@ export const photographers = pgTable("photographers", {
   swaggpressBusiness: text("swaggpress_business"),
   swaggpressCardOnFile: boolean("swaggpress_card_on_file").notNull().default(false),
   swaggpressSyncedAt: timestamp("swaggpress_synced_at", { withTimezone: true }),
+  // What changed at SwaggPress since the studio last clicked "Refresh prices"
+  // (the dashboard banner and email; lib/swaggpress/catalog.ts). Null = nothing.
+  swaggpressChanges: jsonb("swaggpress_changes").$type<SwaggChange[]>(),
+  // The change list last emailed, so each new set of changes is emailed once.
+  swaggpressChangesEmailed: text("swaggpress_changes_emailed"),
   // Price per photo a client selects beyond a gallery's included number
   // (PhotoEZ's "global extra price"; galleries can override it).
   extraPhotoPriceCents: integer("extra_photo_price_cents").notNull().default(1000),
@@ -1172,6 +1177,22 @@ export type StoreVariant = {
   colorHex?: string | null;
 };
 
+// Something SwaggPress changed on a product the studio sells. Wholesale
+// increases and discontinued sizes are applied right away (applied: true) so
+// a studio never sells below cost; lower prices, new sizes and product
+// updates wait for "Refresh prices".
+export type SwaggChangeKind = "up" | "down" | "new" | "gone" | "details";
+export type SwaggChange = {
+  storeProductId: string;
+  product: string;
+  // The size/color, or "" for the whole product.
+  label: string;
+  kind: SwaggChangeKind;
+  fromCents: number | null;
+  toCents: number | null;
+  applied: boolean;
+};
+
 // A SwaggPress product's options besides size and color (e.g. Trim: Without
 // trim / With trim +$5), as its partner catalog sends them. The price change
 // passes through to the client at the same amount.
@@ -1206,8 +1227,9 @@ export type StoreLabField = {
 export type StoreLabArea = { x: number; y: number; w: number; h: number };
 export type StoreLabDesign = {
   canvas: { w: number; h: number };
-  front: { mockup: string | null; area: StoreLabArea };
-  back: { mockup: string | null; area: StoreLabArea } | null;
+  // overlay: parts drawn over the design (a hoodie's drawstrings), never printed.
+  front: { mockup: string | null; area: StoreLabArea; overlay?: string | null };
+  back: { mockup: string | null; area: StoreLabArea; overlay?: string | null } | null;
   fullWrap: boolean;
   printPx: { w: number; h: number; dpi: number } | null;
   // The client picks panels or a full wrap; wrap costs wrapUpchargeCents more.
@@ -1219,7 +1241,7 @@ export type StoreLabDesign = {
   // inches = the print size per side (null = not set in SwaggPress).
   allOver?: { upchargeCents: number; inches: { w: number; h: number } | null } | null;
   // "View in 3D" model in the designer ("tee"); round products always get one.
-  view3d?: "tee" | null;
+  view3d?: string | null;
   // Two-sided products: what a back design costs (charged only when used).
   backUpchargeCents?: number;
 };

@@ -53,8 +53,9 @@ export type SwaggProduct = {
 type SwaggArea = { x: number; y: number; w: number; h: number };
 export type SwaggDesign = {
   canvas: { w: number; h: number };
-  front: { mockup: string | null; area: SwaggArea };
-  back: { mockup: string | null; area: SwaggArea } | null;
+  // overlay: parts that sit on top of the print (a hoodie's drawstrings).
+  front: { mockup: string | null; area: SwaggArea; overlay?: string | null };
+  back: { mockup: string | null; area: SwaggArea; overlay?: string | null } | null;
   print_mask: string | null;
   full_wrap: boolean;
   print_px: { w: number; h: number; dpi: number };
@@ -67,7 +68,7 @@ export type SwaggDesign = {
   allover?: { upcharge: number; inches: { w: number; h: number } | null } | null;
   // Two-sided products: what a back design costs (dollars; 0 = free).
   back_upcharge?: number;
-  // "View in 3D" model in the designer ("tee" or null).
+  // "View in 3D" model in the designer (SWAGG_3D_MODELS, or null).
   view3d?: string | null;
 };
 

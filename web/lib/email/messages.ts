@@ -425,6 +425,44 @@ export function trialEndingStudio(o: {
   };
 }
 
+// SwaggPress changed products the studio sells (lib/swaggpress/catalog.ts).
+export type SwaggChangeLine = { product: string; label: string; kind: "up" | "down" | "new" | "gone" | "details"; fromCents: number | null; toCents: number | null; applied: boolean };
+
+export function swaggChangeText(c: SwaggChangeLine): string {
+  const price = (n: number | null) => (n == null ? "" : formatPrice(n));
+  switch (c.kind) {
+    case "down":
+      return `Wholesale lowered ${price(c.fromCents)} → ${price(c.toCents)}`;
+    case "up":
+      return `Wholesale raised ${price(c.fromCents)} → ${price(c.toCents)} (already updated)`;
+    case "new":
+      return c.toCents == null ? "Now offered" : `Now offered, ${price(c.toCents)} wholesale`;
+    case "gone":
+      return "No longer offered (already hidden from clients)";
+    default:
+      return "Photos or details updated";
+  }
+}
+
+export function swaggChangesStudio(o: { name: string; changes: SwaggChangeLine[]; storeUrl: string }): EmailContent {
+  const waiting = o.changes.some((c) => !c.applied);
+  const lower = o.changes.filter((c) => c.kind === "down").length;
+  const shown = o.changes.slice(0, 15);
+  return {
+    subject: lower ? "SwaggPress lowered prices on products you sell" : "SwaggPress updated products you sell",
+    heading: "SwaggPress made changes",
+    intro: [
+      `Hi ${firstName(o.name)}, SwaggPress changed some of the products in your store.`,
+      waiting
+        ? "Price drops and new sizes are waiting for you: click Refresh prices in your dashboard to load them. Your own prices to clients don't change unless you change them."
+        : "These are already updated in your store. Your own prices to clients don't change unless you change them.",
+    ],
+    details: shown.map((c) => [c.label ? `${c.product} · ${c.label}` : c.product, swaggChangeText(c)] as [string, string]),
+    button: { label: waiting ? "Refresh prices" : "Review my prices", url: o.storeUrl },
+    outro: o.changes.length > shown.length ? [`And ${o.changes.length - shown.length} more in your dashboard.`] : [],
+  };
+}
+
 export function testEmail(studioName: string): EmailContent {
   return {
     subject: `Test email from ${studioName}`,
