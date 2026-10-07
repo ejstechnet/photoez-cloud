@@ -49,7 +49,7 @@ A made-up Portland studio on the Studio plan, Pacific time. Dates are set relati
 
 | id | Question | What a good answer does |
 |---|---|---|
-| ★ blackout-nov | What dates do I have blacked out for the month of November 2026? | Says it can't see your Time off (blackout dates) and where to find them (Time off in the booking setup, shaded on the Bookings calendar). **Doesn't invent dates or claim they aren't tracked.** No card. |
+| ★ blackout-nov | What dates do I have blacked out for the month of November 2026? | Gives Nov 26 and 27 if it can look up Time off; if not, says so and where to find them (Time off in the booking setup, shaded on the Bookings calendar). **Doesn't invent dates or claim they aren't tracked.** No card. |
 | ★ upcoming | What bookings do I have coming up? | Looks up bookings. Lists Ben, Maria, Priya and Grace with their days; leaves out Lily (cancelled). No card. |
 | who-owes | who still owes me money for upcoming sessions | Maria $262.50, Priya $300.00, Grace $225.00. Not Ben. No card. |
 | closing-week | Which galleries close in the next week? | Whitaker Family (4 days) and Gonzalez Spring (6 days). No card. |

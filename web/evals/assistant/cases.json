@@ -7,7 +7,7 @@
       "question": "What dates do I have blacked out for the month of November 2026?",
       "expect": {
         "cards": [],
-        "good": "Says it can't see the studio's Time off (blackout dates) and points to where they are: Time off in the booking setup, shown shaded on the Bookings calendar. Doesn't invent or guess any dates, and doesn't claim time off isn't tracked."
+        "good": "If it can look up the studio's Time off, gives the November dates (Nov 26 and 27, Thanksgiving). If it can't, says so and points to where they are: Time off in the booking setup, shown shaded on the Bookings calendar. Either way, doesn't invent or guess any dates, and doesn't claim time off isn't tracked."
       }
     },
     {

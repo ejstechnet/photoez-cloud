@@ -24,10 +24,10 @@ const HISTORY_TURNS = 12;
 
 export const SYSTEM_PROMPT = `You are the Studio Assistant inside PhotoEZ Cloud, helping a professional photographer run their studio: sessions (bookings), client galleries, clients, inquiries, reviews, and payments.
 
-You help with anything a photography business needs, not only what's in the system: writing emails and messages, social media captions, replies to reviews or inquiries, pricing and package ideas, FAQ answers, client prep guides, planning, and general questions. You're also an experienced photographer: help with camera settings, lighting setups (strobes, speedlights, natural light), posing, composition, gear, and editing. Give specific, practical starting points (settings, placement, ratios) and say what to adjust. Be genuinely useful.
+You help with anything a photography business needs, not only what's in the system: writing emails and messages, social media captions, replies to reviews or inquiries, pricing and package ideas, FAQ answers, client prep guides, planning, and general questions. You're also an experienced photographer: help with camera settings, lighting setups (strobes, speedlights, natural light), posing, composition, gear, and editing. Give specific, practical starting points (settings, placement, ratios) and say what to adjust. Stay on the question and be accurate: a few correct, specific points beat a long list, and if you're unsure of a technical detail, say so. Be genuinely useful.
 
 How to work:
-- For facts about this studio (clients, sessions, galleries, money), look them up with the tools; don't guess names, dates, amounts, or ids. The first line of each question gives today's date and the studio's time zone.
+- For facts about this studio (clients, sessions, galleries, money, time off), look them up with the tools; don't guess names, dates, amounts, or ids. The first line of each question gives today's date, the studio's time zone, and the studio's name; sign emails and drafts with the studio's name.
 - To do something (email someone, send gallery links, closing-soon reminders, review requests, balance reminders, mark sessions completed or cancelled), use a propose_ tool. Proposals are NOT sent: the photographer sees a card and approves it. Never say something was sent or changed; say it's ready for their approval.
 - To email someone who isn't a client yet, use propose_client_email with their name and email address in new_recipients (they're added as a client when approved). If you don't have their email address, still write the draft in your answer and ask for the address; don't refuse.
 - Only prepare what was asked. If the request is unclear or would affect many clients unexpectedly, ask a short question first.
@@ -41,7 +41,13 @@ export type ChatTurn = { role: "user" | "assistant"; text: string };
 // Questions asked this month (studio's calendar), and what the plan allows.
 export async function assistantAllowance(photographerId: string) {
   const [studio] = await db
-    .select({ plan: photographers.plan, trialEndsAt: photographers.trialEndsAt, timeZone: photographers.timeZone })
+    .select({
+      plan: photographers.plan,
+      trialEndsAt: photographers.trialEndsAt,
+      timeZone: photographers.timeZone,
+      name: photographers.name,
+      businessName: photographers.businessName,
+    })
     .from(photographers)
     .where(eq(photographers.id, photographerId));
   const monthStart = zonedToUtc(`${localDateOf(new Date(), studio.timeZone).slice(0, 7)}-01`, "00:00", studio.timeZone);
@@ -58,7 +64,14 @@ export async function assistantAllowance(photographerId: string) {
     );
   const plan = effectivePlan(studio.plan, studio.trialEndsAt);
   const limit = aiAssistantLimit(studio.plan, studio.trialEndsAt);
-  return { enabled: hasFeature(plan, "aiSearch"), used, limit, left: Math.max(0, limit - used), timeZone: studio.timeZone };
+  return {
+    enabled: hasFeature(plan, "aiSearch"),
+    used,
+    limit,
+    left: Math.max(0, limit - used),
+    timeZone: studio.timeZone,
+    studioName: studio.businessName || studio.name,
+  };
 }
 
 // Tests pass a stand-in for the Anthropic client.
@@ -79,7 +92,7 @@ export async function askAssistant(
   const today = localDateOf(new Date(), ctx.timeZone);
   const messages: Anthropic.MessageParam[] = [
     ...history.slice(-HISTORY_TURNS).map((t) => ({ role: t.role, content: t.text }) as Anthropic.MessageParam),
-    { role: "user", content: `(Today is ${today}; studio time zone ${ctx.timeZone}.)\n\n${question}` },
+    { role: "user", content: `(Today is ${today}; studio time zone ${ctx.timeZone}; studio name ${allowance.studioName}.)\n\n${question}` },
   ];
 
   const client = options.client ?? new Anthropic();

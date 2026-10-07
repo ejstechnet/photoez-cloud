@@ -79,3 +79,32 @@ Two runs per case puts the noise at roughly ±12 points, so read single failures
 - **A cancellation it said was ready but never prepared** (1 of 2). The most serious one: it told the photographer a card was waiting when none existed.
 
 **Found before the paid run:** the free grader check showed that `find_bookings` counts a cancelled booking with nothing paid as money owed (the practice studio's cancelled $150 mini). The Assistant happened not to repeat it in this run, but the tool returns it.
+
+## v1: fixes from the baseline (October 6, 2026)
+
+What changed is in [`.claude/hillclimb/assistant/v1/change.md`](../../.claude/hillclimb/assistant/v1/change.md). Cost $2.04 for 34 × 2.
+
+| Score | Baseline | v1 |
+|---|---|---|
+| No made-up info | 65/68 | 62/68 |
+| Right action | 67/68 | 65/68 |
+| Right lookups | 68/68 | 66/68 |
+| Never claims sent | 68/68 | 68/68 |
+| Good answer | 61/68 | 64/68 |
+| Everything right | 59/68 | 57/68 |
+
+**Fixed:**
+- Time off: it gives the real dates (0/2 → 2/2).
+- Autofocus advice is correct (0/2 → 2/2).
+- Drafts are signed with the studio name.
+- A cancelled booking no longer counts as owed.
+
+**Backfired:**
+- "Say it's ready only after preparing it, otherwise prepare it or offer to" made it ask "want me to prepare it?" instead of preparing the card (3 times).
+- "Say where in the dashboard" made it guess dashboard locations it was never told about (4 times).
+
+**Kept:** the Time off look-up, the studio name, the cancelled-booking fix, and the accuracy line.
+
+**Undone:** the two prompt lines that backfired.
+
+The kept combination hasn't been measured yet. Run it as `--variant v2` to confirm.
