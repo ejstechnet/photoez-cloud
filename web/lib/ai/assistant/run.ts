@@ -22,7 +22,7 @@ export const ASSISTANT_MODEL = "claude-sonnet-5";
 const MAX_ROUNDS = 8;
 const HISTORY_TURNS = 12;
 
-const SYSTEM_PROMPT = `You are the Studio Assistant inside PhotoEZ Cloud, helping a professional photographer run their studio: sessions (bookings), client galleries, clients, inquiries, reviews, and payments.
+export const SYSTEM_PROMPT = `You are the Studio Assistant inside PhotoEZ Cloud, helping a professional photographer run their studio: sessions (bookings), client galleries, clients, inquiries, reviews, and payments.
 
 You help with anything a photography business needs, not only what's in the system: writing emails and messages, social media captions, replies to reviews or inquiries, pricing and package ideas, FAQ answers, client prep guides, planning, and general questions. You're also an experienced photographer: help with camera settings, lighting setups (strobes, speedlights, natural light), posing, composition, gear, and editing. Give specific, practical starting points (settings, placement, ratios) and say what to adjust. Be genuinely useful.
 
@@ -68,7 +68,8 @@ export async function askAssistant(
   photographerId: string,
   history: ChatTurn[],
   question: string,
-  options: { client?: ModelClient } = {},
+  // Tests pass a stand-in client; evals can try another model (the app always uses ASSISTANT_MODEL).
+  options: { client?: ModelClient; model?: string } = {},
 ): Promise<{ answer: string; proposals: Proposal[]; traceId: string | null } | { error: string }> {
   const allowance = await assistantAllowance(photographerId);
   if (!allowance.enabled) return { error: "The Studio Assistant isn't available on this plan." };
@@ -82,17 +83,18 @@ export async function askAssistant(
   ];
 
   const client = options.client ?? new Anthropic();
+  const model = options.model ?? ASSISTANT_MODEL;
   const proposals: Proposal[] = [];
-  const trace = await Trace.start({ photographerId, feature: "assistant", question, model: ASSISTANT_MODEL });
+  const trace = await Trace.start({ photographerId, feature: "assistant", question, model });
   const started = Date.now();
-  let answeredBy = ASSISTANT_MODEL;
+  let answeredBy = model;
   let answer = "";
 
   try {
     for (let round = 0; round < MAX_ROUNDS; round++) {
-      const response = await trace.modelCall(ASSISTANT_MODEL, () =>
+      const response = await trace.modelCall(model, () =>
         client.messages.create({
-          model: ASSISTANT_MODEL,
+          model,
           // Room for thinking plus a studio-sized answer; long reports are out of scope.
           max_tokens: 4000,
           system: SYSTEM_PROMPT,
