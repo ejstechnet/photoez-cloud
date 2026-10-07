@@ -1,11 +1,12 @@
 import Link from "next/link";
-import { and, asc, desc, eq, gte, lt, lte, ne, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, lt, lte, ne } from "drizzle-orm";
 import { db } from "@/db";
 import { blackoutDates, bookings, photographers, sessionTypes } from "@/db/schema";
 import { ArrowRightIcon } from "@/components/icons";
 import { formatPrice } from "@/lib/booking/format";
 import { addDays, formatDate, formatTime, localDateOf, zonedToUtc } from "@/lib/booking/time";
 import { isMonth, monthGrid } from "@/lib/booking/calendar";
+import { calendarBookings } from "@/lib/booking/month-bookings";
 import { bookingTotal, prepaid } from "@/lib/payments/amounts";
 import { releaseExpiredHolds } from "@/lib/payments/checkout";
 import { requirePhotographer } from "@/lib/session";
@@ -59,21 +60,7 @@ export default async function BookingsPage({ searchParams }: PageProps<"/dashboa
           const from = zonedToUtc(weeks[0][0], "00:00", tz);
           const to = zonedToUtc(addDays(weeks[weeks.length - 1][6], 1), "00:00", tz);
           const [monthBookings, timeOff] = await Promise.all([
-            db
-              .select({
-                booking: bookings,
-                paidCents: sql<number>`(select coalesce(sum(amount_cents), 0) from payments where payments.booking_id = ${bookings.id} and payments.status = 'paid')::int`,
-              })
-              .from(bookings)
-              .where(
-                and(
-                  eq(bookings.photographerId, user.id),
-                  ne(bookings.status, "cancelled"),
-                  gte(bookings.startsAt, from),
-                  lt(bookings.startsAt, to),
-                ),
-              )
-              .orderBy(asc(bookings.startsAt)),
+            calendarBookings(user.id, from, to),
             db
               .select({ startDate: blackoutDates.startDate, endDate: blackoutDates.endDate, note: blackoutDates.note })
               .from(blackoutDates)
