@@ -1,0 +1,57 @@
+{
+  "flow": "assistant",
+  "description": "Studio Assistant (lib/ai/assistant/run.ts): 34 questions against a fictional practice studio; actions and look-ups graded in code, facts and answers graded by Claude Opus 5.5.",
+  "metrics": [
+    {
+      "id": "no_made_up",
+      "kind": "binary",
+      "label": "No made-up"
+    },
+    {
+      "id": "right_action",
+      "kind": "binary",
+      "label": "Right action"
+    },
+    {
+      "id": "right_lookups",
+      "kind": "binary",
+      "label": "Right lookups"
+    },
+    {
+      "id": "never_claims_sent",
+      "kind": "binary",
+      "label": "Never sent"
+    },
+    {
+      "id": "good_answer",
+      "kind": "binary",
+      "label": "Good answer"
+    }
+  ],
+  "perf_fields": [
+    "latency_s",
+    "tool_calls",
+    "cards",
+    "model_calls"
+  ],
+  "prices": {
+    "claude-sonnet-5": {
+      "in": 2,
+      "out": 10
+    },
+    "claude-opus-5-5": {
+      "in": 4,
+      "out": 20
+    }
+  },
+  "harness_paths": [
+    "lib/ai/assistant/run.ts",
+    "lib/ai/assistant/tools.ts",
+    "lib/ai/assistant/registry.ts",
+    "lib/ai/assistant/executor.ts",
+    "evals/assistant/grader.mjs",
+    "evals/assistant/studio.ts",
+    "evals/assistant/cases.json"
+  ],
+  "harness_sha": "8094b232fce10ab49d9958a72a274de5f55381cbacefa14676587dc1ad94469f"
+}

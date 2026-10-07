@@ -9,6 +9,8 @@
     "lint": "eslint",
     "eval:triage": "node --env-file=.env --no-warnings --import ./scripts/register.mjs evals/triage/run-eval.mjs --flow .claude/hillclimb/triage --model claude-opus-5 --reps 2",
     "eval:triage:check": "node evals/triage/check-grader.mjs",
+    "eval:assistant": "node --env-file=.env --no-warnings --import ./test/register.mjs evals/assistant/run-eval.mjs --flow .claude/hillclimb/assistant --model claude-sonnet-5 --reps 2",
+    "eval:assistant:check": "node --no-warnings --import ./test/register.mjs evals/assistant/check-grader.mjs",
     "ai:backfill": "node --env-file=.env --no-warnings --import ./scripts/register.mjs scripts/backfill-ai-usage.ts",
     "test": "node --test --no-warnings --import ./test/register.mjs \"lib/**/*.test.ts\""
   },
