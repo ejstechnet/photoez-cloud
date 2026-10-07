@@ -73,6 +73,12 @@ export const TOOL_REGISTRY: AssistantToolSpec[] = [
     },
   },
   {
+    name: "find_time_off",
+    effect: "read",
+    description: "Days the studio isn't taking bookings: the photographer's Time off (set in the booking setup, shown shaded on the Bookings calendar). Between two dates; defaults to the next 12 months.",
+    input_schema: { type: "object", properties: { from: DATE, to: DATE }, additionalProperties: false },
+  },
+  {
     name: "revenue",
     effect: "read",
     description: "Money collected online between two dates (inclusive), split into bookings, gallery extras, and gift cards.",

@@ -41,6 +41,9 @@ const overview = await read(s, 'studio_overview', {});
 assert.equal(overview.reviews_to_approve, 1);
 assert.equal(overview.new_inquiries, 3);
 assert.equal((await read(s, 'find_clients', { search: 'Rebecca' })).count, 0);
+const timeOff = await read(s, 'find_time_off', { from: '2026-11-01', to: '2026-11-30' });
+assert.equal(timeOff.count, 1);
+assert.equal(timeOff.time_off[0].note, 'Thanksgiving');
 console.log('1. gold answers match the practice studio: ok');
 
 // 2 and 3. Oracle and null through the code checks.

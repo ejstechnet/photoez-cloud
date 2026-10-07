@@ -1,6 +1,6 @@
 import { and, asc, desc, eq, gte, ilike, inArray, isNotNull, lt, lte, or, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { bookings, clients, galleries, giftCards, inquiries, invoices, payments, reviews, storeOrders } from "@/db/schema";
+import { blackoutDates, bookings, clients, galleries, giftCards, inquiries, invoices, payments, reviews, storeOrders } from "@/db/schema";
 import { formatPrice } from "@/lib/booking/format";
 import { addDays, formatDate, formatTime, localDateOf, zonedToUtc } from "@/lib/booking/time";
 import { signedContractFor } from "@/lib/contracts/for-booking";
@@ -112,7 +112,8 @@ export async function readTool(name: string, input: Input, ctx: ToolContext): Pr
         .limit(50);
       const list = await Promise.all(
         rows.map(async ({ booking: b, paidCents }) => {
-          const due = Math.max(0, bookingTotal(b) - paidCents - prepaid(b));
+          // A cancelled booking owes nothing.
+          const due = b.status === "cancelled" ? 0 : Math.max(0, bookingTotal(b) - paidCents - prepaid(b));
           return {
             id: b.id,
             client: b.clientName,
@@ -226,6 +227,25 @@ export async function readTool(name: string, input: Input, ctx: ToolContext): Pr
             // The AI summary is of public text too, so it's marked the same way.
             untrusted_client_text: `<untrusted_client_content>${q.triage?.summary ?? q.message.slice(0, 200)}</untrusted_client_content>`,
           })),
+        }),
+      };
+    }
+
+    case "find_time_off": {
+      const from = isDate(input.from) ? input.from : today;
+      const to = isDate(input.to) ? input.to : addDays(today, 365);
+      const rows = await db
+        .select({ start: blackoutDates.startDate, end: blackoutDates.endDate, note: blackoutDates.note })
+        .from(blackoutDates)
+        .where(and(eq(blackoutDates.photographerId, ctx.photographerId), lte(blackoutDates.startDate, to), gte(blackoutDates.endDate, from)))
+        .orderBy(asc(blackoutDates.startDate));
+      const show = (d: string) => day(zonedToUtc(d, "12:00", tz));
+      return {
+        text: JSON.stringify({
+          from,
+          to,
+          count: rows.length,
+          time_off: rows.map((r) => ({ from: show(r.start), to: show(r.end), note: r.note })),
         }),
       };
     }

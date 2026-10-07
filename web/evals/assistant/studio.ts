@@ -244,7 +244,7 @@ New inquiries (3): Hannah Brooks, wedding next August in Hood River, wants a quo
 
 Money collected: last month (${lastMonth}) ${money(64500)} in total: ${money(45000)} newborn balance (Daniel Okafor), ${money(10000)} gift card, ${money(9500)} Whitaker gallery extras. This month so far ${money(76250)} (deposits and paid-in-full sessions).
 
-Time off (blackout dates): Nov 26 and 27, 2026 (Thanksgiving). The app tracks these as "Time off" in the booking setup, shown shaded on the Bookings calendar. The Assistant has NO tool that can read time off, booking hours or availability.
+Time off (blackout dates): Nov 26 and 27, 2026 (Thanksgiving). The app tracks these as "Time off" in the booking setup, shown shaded on the Bookings calendar. Any time off the Assistant reports must match these dates; it cannot read booking hours or open availability.
 
 The Assistant can only look up and email this studio's own clients. It cannot see or email other photographers, PhotoEZ Cloud's own customers, or anyone outside the client list (except new people the photographer names with an email address).`;
 
