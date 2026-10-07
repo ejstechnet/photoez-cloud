@@ -70,11 +70,13 @@ export async function dashboardStats(photographerId: string, timeZone: string, p
         .where(and(eq(reviews.photographerId, photographerId), eq(reviews.status, "submitted"))),
       db.select({ clientCount: count() }).from(clients).where(eq(clients.photographerId, photographerId)),
       // Confirmed bookings not yet finished, with what's been paid, for
-      // balances owed and the upcoming list.
+      // balances owed and the upcoming list. The outer column is written out:
+      // in a one-table select Drizzle renders ${bookings.id} as a bare "id",
+      // which Postgres reads as payments.id.
       db
         .select({
           booking: bookings,
-          paidCents: sql<number>`(select coalesce(sum(amount_cents), 0) from payments where payments.booking_id = ${bookings.id} and payments.status = 'paid')::int`,
+          paidCents: sql<number>`(select coalesce(sum(amount_cents), 0) from payments where payments.booking_id = bookings.id and payments.status = 'paid')::int`,
         })
         .from(bookings)
         .where(and(eq(bookings.photographerId, photographerId), eq(bookings.status, "confirmed")))
@@ -82,7 +84,7 @@ export async function dashboardStats(photographerId: string, timeZone: string, p
       // Extra photos recorded as owed (studio without Stripe at the time).
       db
         .select({
-          owed: sql<number>`coalesce(sum(greatest(${galleries.extrasCents} - (select coalesce(sum(amount_cents), 0) from payments where payments.gallery_id = ${galleries.id} and payments.status = 'paid'), 0)), 0)::int`,
+          owed: sql<number>`coalesce(sum(greatest(${galleries.extrasCents} - (select coalesce(sum(amount_cents), 0) from payments where payments.gallery_id = galleries.id and payments.status = 'paid'), 0)), 0)::int`,
         })
         .from(galleries)
         .where(and(eq(galleries.photographerId, photographerId), gt(galleries.extrasCents, 0))),
