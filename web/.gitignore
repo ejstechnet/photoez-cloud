@@ -48,3 +48,6 @@ next-env.d.ts
 .claude/hillclimb/**/trajectory/
 .claude/hillclimb/**/progress.txt
 .claude/hillclimb/**/state.json
+
+# Photo-tagging eval: the photographer's own photos stay on this computer (public repo)
+evals/photo-tags/photos/
