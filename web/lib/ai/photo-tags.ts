@@ -15,18 +15,21 @@ export const photoTagsSchema = z.object({
   description: z.string().describe("One plain sentence saying what the photo shows, the way a client would describe it."),
   tags: z
     .array(z.string())
-    .describe("10 to 20 short lowercase search words or phrases, most useful first."),
+    .describe("15 to 25 short lowercase search words or phrases, most useful first."),
 });
 export type PhotoTags = z.infer<typeof photoTagsSchema>;
 
-const SYSTEM_PROMPT = `You describe photos from a professional photographer's client gallery so the client can search them by typing things like "first dance", "shots with grandma", or "the dog".
+export const SYSTEM_PROMPT = `You describe photos from a professional photographer's client gallery so the client can search them by typing things like "first dance", "shots with grandma", or "the dog".
 
-Write what someone would search for:
-- People: how many, and their role when it's clear from the scene (bride, groom, baby, mom, grandparent, graduate, couple, family, bridesmaids). Don't guess names, and don't describe anyone's race, ethnicity, body, or attractiveness.
-- What's happening: first dance, cake cutting, ring exchange, walking, laughing, hugging, kissing, posing, jumping.
-- Things in the photo: bouquet, rings, cap and gown, diploma, balloons, dog, car, cake.
-- The setting and light: studio, backdrop, beach, park, church, indoors, outdoors, sunset, golden hour, night.
-- The shot: close-up, portrait, full body, group photo, candid, detail shot, black and white.
+Write what someone would search for, in the everyday words clients type (background, not backdrop; sitting, not seated):
+- People: how many; girl, boy, woman, man, baby, kids or teen when it's clear; and their role when it's clear from the scene (bride, groom, mom, grandparent, graduate, couple, family, bridesmaids). Don't guess names, and don't describe anyone's race, ethnicity, body, or attractiveness.
+- Pose and position: standing, sitting, lying down, kneeling, on the floor, on a chair, hugging, holding hands.
+- Expression and action: smiling, laughing, first dance, cake cutting, ring exchange, walking, kissing, jumping.
+- Clothing, with its color: white dress, blue gown, black suit, jeans, hoodie.
+- Things in the photo: bouquet, rings, cap and gown, diploma, balloons, dog, car, cake, flowers, sign.
+- Words or numbers you can read in the photo, exactly as written (class of 2026, happy birthday, love). Skip any you can't read clearly.
+- The setting, light and background color: studio, white background, black background, beach, park, church, indoors, outdoors, sunset, golden hour, night.
+- The shot: close-up, portrait, headshot, full body, group photo, candid, detail shot, black and white.
 
 Tags are lowercase, one to three words each, no duplicates.`;
 
@@ -35,12 +38,13 @@ Tags are lowercase, one to three words each, no duplicates.`;
 // off (that call is billed too), for the cost report.
 export async function tagPhoto(
   jpegBase64: string,
-  options: { onUsage?: (usage: CallUsage) => void | Promise<void>; client?: Anthropic } = {},
+  // Evals can try another model; the app always uses PHOTO_TAG_MODEL.
+  options: { onUsage?: (usage: CallUsage) => void | Promise<void>; client?: Anthropic; model?: string } = {},
 ) {
   const client = options.client ?? new Anthropic();
   const started = Date.now();
   const response = await client.beta.messages.parse({
-    model: PHOTO_TAG_MODEL,
+    model: options.model ?? PHOTO_TAG_MODEL,
     max_tokens: 1024,
     system: SYSTEM_PROMPT,
     messages: [

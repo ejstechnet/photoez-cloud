@@ -1,0 +1,96 @@
+diff --git a/web/lib/ai/photo-tags.ts b/web/lib/ai/photo-tags.ts
+index 1e5d019..499b78b 100644
+--- a/web/lib/ai/photo-tags.ts
++++ b/web/lib/ai/photo-tags.ts
+@@ -15,18 +15,21 @@ export const photoTagsSchema = z.object({
+   description: z.string().describe("One plain sentence saying what the photo shows, the way a client would describe it."),
+   tags: z
+     .array(z.string())
+-    .describe("10 to 20 short lowercase search words or phrases, most useful first."),
++    .describe("15 to 25 short lowercase search words or phrases, most useful first."),
+ });
+ export type PhotoTags = z.infer<typeof photoTagsSchema>;
+ 
+-const SYSTEM_PROMPT = `You describe photos from a professional photographer's client gallery so the client can search them by typing things like "first dance", "shots with grandma", or "the dog".
++export const SYSTEM_PROMPT = `You describe photos from a professional photographer's client gallery so the client can search them by typing things like "first dance", "shots with grandma", or "the dog".
+ 
+-Write what someone would search for:
+-- People: how many, and their role when it's clear from the scene (bride, groom, baby, mom, grandparent, graduate, couple, family, bridesmaids). Don't guess names, and don't describe anyone's race, ethnicity, body, or attractiveness.
+-- What's happening: first dance, cake cutting, ring exchange, walking, laughing, hugging, kissing, posing, jumping.
+-- Things in the photo: bouquet, rings, cap and gown, diploma, balloons, dog, car, cake.
+-- The setting and light: studio, backdrop, beach, park, church, indoors, outdoors, sunset, golden hour, night.
+-- The shot: close-up, portrait, full body, group photo, candid, detail shot, black and white.
++Write what someone would search for, in the everyday words clients type (background, not backdrop; sitting, not seated):
++- People: how many; girl, boy, woman, man, baby, kids or teen when it's clear; and their role when it's clear from the scene (bride, groom, mom, grandparent, graduate, couple, family, bridesmaids). Don't guess names, and don't describe anyone's race, ethnicity, body, or attractiveness.
++- Pose and position: standing, sitting, lying down, kneeling, on the floor, on a chair, hugging, holding hands.
++- Expression and action: smiling, laughing, first dance, cake cutting, ring exchange, walking, kissing, jumping.
++- Clothing, with its color: white dress, blue gown, black suit, jeans, hoodie.
++- Things in the photo: bouquet, rings, cap and gown, diploma, balloons, dog, car, cake, flowers, sign.
++- Words or numbers you can read in the photo, exactly as written (class of 2026, happy birthday, love). Skip any you can't read clearly.
++- The setting, light and background color: studio, white background, black background, beach, park, church, indoors, outdoors, sunset, golden hour, night.
++- The shot: close-up, portrait, headshot, full body, group photo, candid, detail shot, black and white.
+ 
+ Tags are lowercase, one to three words each, no duplicates.`;
+ 
+@@ -35,12 +38,13 @@ Tags are lowercase, one to three words each, no duplicates.`;
+ // off (that call is billed too), for the cost report.
+ export async function tagPhoto(
+   jpegBase64: string,
+-  options: { onUsage?: (usage: CallUsage) => void | Promise<void>; client?: Anthropic } = {},
++  // Evals can try another model; the app always uses PHOTO_TAG_MODEL.
++  options: { onUsage?: (usage: CallUsage) => void | Promise<void>; client?: Anthropic; model?: string } = {},
+ ) {
+   const client = options.client ?? new Anthropic();
+   const started = Date.now();
+   const response = await client.beta.messages.parse({
+-    model: PHOTO_TAG_MODEL,
++    model: options.model ?? PHOTO_TAG_MODEL,
+     max_tokens: 1024,
+     system: SYSTEM_PROMPT,
+     messages: [
+diff --git a/web/lib/photo-search.ts b/web/lib/photo-search.ts
+index 3432261..f7d78ba 100644
+--- a/web/lib/photo-search.ts
++++ b/web/lib/photo-search.ts
+@@ -2,9 +2,12 @@ import { and, eq, inArray, isNotNull, sql } from "drizzle-orm";
+ import { db } from "@/db";
+ import { photos } from "@/db/schema";
+ 
+-// Searching a gallery's photos by what the AI saw in them. Postgres's word
+-// search handles plurals and word forms ("dancing" finds "dance"), and a
+-// plain text match catches anything it misses.
++// Searching a gallery's photos by what the AI saw in them. A search matches
++// whole words, kept together as a phrase, within one tag or the description:
++// "man" never finds "woman", and "white background" needs those words side by
++// side (not "white bodysuit" plus "beige background"). Postgres's word search
++// handles plurals and word forms ("dancing" finds "dance"). Measured by the
++// photo-tagging eval (evals/photo-tags).
+ 
+ // What someone typed, tidied (and kept short).
+ export function cleanQuery(input: string) {
+@@ -14,7 +17,10 @@ export function cleanQuery(input: string) {
+ export async function searchGalleryPhotos(galleryId: string, input: string, kinds: ("proof" | "final")[] = ["proof", "final"]) {
+   const q = cleanQuery(input);
+   if (!q) return [];
+-  const text = sql`coalesce(${photos.aiDescription}, '') || ' ' || coalesce((select string_agg(t, ' ') from jsonb_array_elements_text(${photos.aiTags}) as t), '')`;
++  const phrase = sql`phraseto_tsquery('english', ${q})`;
++  // The whole phrase as typed, at word boundaries: catches what the word search
++  // drops, like text made only of common words ("I did it").
++  const exact = `\\m${q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\M`;
+   const rows = await db
+     .select({ id: photos.id })
+     .from(photos)
+@@ -23,7 +29,12 @@ export async function searchGalleryPhotos(galleryId: string, input: string, kind
+         eq(photos.galleryId, galleryId),
+         inArray(photos.kind, kinds),
+         isNotNull(photos.aiTaggedAt),
+-        sql`(to_tsvector('english', ${text}) @@ websearch_to_tsquery('english', ${q}) or ${text} ilike ${`%${q}%`})`,
++        sql`(
++          to_tsvector('english', coalesce(${photos.aiDescription}, '')) @@ ${phrase}
++          or exists (select 1 from jsonb_array_elements_text(${photos.aiTags}) as tag(t) where to_tsvector('english', tag.t) @@ ${phrase})
++          or coalesce(${photos.aiDescription}, '') ~* ${exact}
++          or exists (select 1 from jsonb_array_elements_text(${photos.aiTags}) as tag(t) where tag.t ~* ${exact})
++        )`,
+       ),
+     );
+   return rows.map((r) => r.id);

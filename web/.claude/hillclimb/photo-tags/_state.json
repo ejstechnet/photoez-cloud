@@ -1,0 +1,43 @@
+{
+  "flow": "photo-tags",
+  "description": "Photo tagging for gallery search (lib/ai/photo-tags.ts, Claude Haiku 4.5): the photographer's own photos, graded by running the app's real gallery search for the phrases she wrote (should find / should not find).",
+  "metrics": [
+    {
+      "id": "no_wrong_match",
+      "kind": "binary",
+      "label": "No wrong match"
+    },
+    {
+      "id": "all_found",
+      "kind": "binary",
+      "label": "All found"
+    },
+    {
+      "id": "find_rate",
+      "kind": "float",
+      "label": "Find rate"
+    },
+    {
+      "id": "wrong_rate",
+      "kind": "float",
+      "label": "Wrong rate"
+    }
+  ],
+  "perf_fields": [
+    "latency_s",
+    "tag_count"
+  ],
+  "prices": {
+    "claude-haiku-4-5": {
+      "in": 1,
+      "out": 5
+    }
+  },
+  "harness_paths": [
+    "lib/ai/photo-tags.ts",
+    "lib/photo-search.ts",
+    "evals/photo-tags/grader.mjs",
+    "evals/photo-tags/searches.csv"
+  ],
+  "harness_sha": "5fc879588c974fa1007d4712bca696f0f352b7246e3933a74b6ede17ea1cba7f"
+}
