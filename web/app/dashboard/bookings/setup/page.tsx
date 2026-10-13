@@ -149,7 +149,7 @@ export default async function BookingSetupPage() {
           left, the rules around it on the right. One column on phones. */}
       <div className="mt-8 grid items-start gap-8 lg:grid-cols-2">
         <div className="space-y-8">
-          <section className="card p-6 sm:p-8">
+          <section id="sessions" className="card scroll-mt-8 p-6 sm:p-8">
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div>
                 <h2 className="font-display text-2xl font-bold">Sessions</h2>
@@ -359,7 +359,7 @@ export default async function BookingSetupPage() {
           </section>
         </div>
         <div className="space-y-8">
-          <section className="card p-6 sm:p-8">
+          <section id="hours" className="card scroll-mt-8 p-6 sm:p-8">
             <h2 className="font-display text-2xl font-bold">Hours</h2>
             <p className="mt-1 text-sm text-muted">
               Times are offered from opening, one session plus buffer apart,
