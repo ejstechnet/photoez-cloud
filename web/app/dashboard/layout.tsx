@@ -6,6 +6,7 @@ import { Logo } from "@/components/brand";
 import { trialDaysLeft } from "@/lib/plans";
 import { requirePhotographer } from "@/lib/session";
 import { isOwnerEmail } from "@/lib/owner";
+import { storeOpenFor } from "@/lib/store/launch";
 import { GearIcon } from "@/components/icons";
 import { NavLink } from "./nav-link";
 import { NavMenu } from "./nav-menu";
@@ -50,13 +51,20 @@ export default async function DashboardLayout({ children }: LayoutProps<"/dashbo
               ]}
             />
             <NavLink href="/dashboard/galleries">Galleries</NavLink>
-            <NavMenu
-              label="Store"
-              items={[
-                { href: "/dashboard/store/orders", label: "Orders" },
-                { href: "/dashboard/store", label: "Products & settings", exact: true },
-              ]}
-            />
+            {storeOpenFor(user.email) ? (
+              <NavMenu
+                label="Store"
+                items={[
+                  { href: "/dashboard/store/orders", label: "Orders" },
+                  { href: "/dashboard/store", label: "Products & settings", exact: true },
+                ]}
+              />
+            ) : (
+              // Coming soon (lib/store/launch.ts): one link to the coming-soon page.
+              <NavLink href="/dashboard/store">
+                Store <span className="rounded-full bg-white/15 px-1.5 py-0.5 text-[10px] tracking-normal normal-case">Soon</span>
+              </NavLink>
+            )}
             <NavLink href="/dashboard/assistant">Assistant</NavLink>
             <NavMenu
               label={

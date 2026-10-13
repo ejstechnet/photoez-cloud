@@ -35,11 +35,11 @@ import { siteUrl } from "@/lib/site";
 export const metadata: Metadata = {
   title: "PhotoEZ Cloud: Studio Software for Photographers | Booking, Galleries, Invoices",
   description:
-    "Run your photography business in one place: online booking, contracts, client proofing galleries, invoices and payment plans, a print store, text reminders, and AI that sorts inquiries and culls photos. Free plan; Pro trial with no card.",
+    "Run your photography business in one place: online booking, contracts, client proofing galleries, invoices and payment plans, text reminders, and AI that sorts inquiries and culls photos. Free plan; Pro trial with no card.",
   alternates: { canonical: "/" },
   openGraph: {
     title: "PhotoEZ Cloud: studio software for photographers",
-    description: "Booking, contracts, galleries, invoices, payments, a print store, and AI in one place. 0% commission.",
+    description: "Booking, contracts, galleries, invoices, payments, and AI in one place. 0% commission.",
     url: "/",
   },
 };
@@ -64,7 +64,7 @@ const structuredData = [
     applicationCategory: "BusinessApplication",
     operatingSystem: "Web",
     description:
-      "All-in-one studio software for photographers: online booking, contracts, client proofing and delivery galleries, invoices with payment plans, a print and product store, text reminders, and AI inquiry triage, gallery search, and culling.",
+      "All-in-one studio software for photographers: online booking, contracts, client proofing and delivery galleries, invoices with payment plans, text reminders, and AI inquiry triage, gallery search, and culling.",
     offers: [
       { "@type": "Offer", name: "Free", price: "0", priceCurrency: "USD" },
       { "@type": "Offer", name: "Pro", price: (PLAN_PRICES.pro.month / 100).toFixed(2), priceCurrency: "USD" },
@@ -111,7 +111,7 @@ const cloudFeatures = [
   { title: "Reviews", body: "Asked for after delivery, approved by you, shown on your page." },
   { title: "Emails & reminders", body: "Confirmations, reminders, and gallery emails sent for you." },
   { title: "Page Designer", body: "Your colors, fonts, banner, and gallery style." },
-  { title: "Online store", body: "Clients order prints and products of their photos right from their gallery." },
+  { title: "Online store (coming soon)", body: "Clients will order prints and products of their photos right from their gallery." },
   { title: "Photographer directory", body: "People searching nearby find your studio page. Free on every plan." },
   { title: "Referrals", body: "Clients share a link; their friends save, and they earn session credit." },
 ];
@@ -122,11 +122,11 @@ const SWAGGPRESS_URL = "https://swaggpress.com";
 // "Grow your business": the features that bring in money and new clients.
 const growth = [
   {
-    title: "Sell prints and products",
-    body: "Your clients order prints, canvases, and more of their own photos from their gallery, framed exactly how they like. You set the prices, and the money goes straight to your Stripe.",
+    title: "Sell prints and products: coming soon",
+    body: "Soon your clients will order prints, canvases, and more of their own photos from their gallery, framed exactly how they like. You'll set the prices, and the money will go straight to your Stripe.",
     icon: <BagIcon size={24} />,
     tile: "bg-coral",
-    link: { href: "/pricing", label: "Included on every plan" },
+    link: null,
   },
   {
     title: "Get found nearby",
@@ -265,7 +265,7 @@ export default async function Home() {
               .
             </h1>
             <p className="mt-6 max-w-lg text-lg text-white/80">
-              Booking, galleries, delivery, and a print store, with AI that reads your inquiries, finds your shots, and
+              Booking, galleries, delivery, and payments, with AI that reads your inquiries, finds your shots, and
               handles the busywork so you can get back behind the camera.
             </p>
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
@@ -368,11 +368,11 @@ export default async function Home() {
               />
             </a>
             <div>
-              <p className="text-sm font-bold tracking-wider text-coral uppercase">Print &amp; merch partner</p>
+              <p className="text-sm font-bold tracking-wider text-coral uppercase">Print &amp; merch partner &middot; coming soon</p>
               <p className="mt-2 text-lg leading-relaxed text-foreground/80">
-                <strong className="text-foreground">SwaggPress Creations</strong> prints your clients&rsquo; photos on
-                wide-format printers and presses them onto tees, hoodies, hats, tumblers, and graduate swag, then ships
-                straight to their door. You set the prices.
+                <strong className="text-foreground">SwaggPress Creations</strong> will print your clients&rsquo; photos on
+                wide-format printers and press them onto tees, hoodies, hats, tumblers, and graduate swag, then ship
+                straight to their door. You&rsquo;ll set the prices.
               </p>
               <a
                 href={SWAGGPRESS_URL}
