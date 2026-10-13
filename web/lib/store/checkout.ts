@@ -24,6 +24,7 @@ import { swaggRates } from "@/lib/swaggpress/client";
 import { sellable } from "@/lib/swaggpress/mapping";
 import { galleryDesign } from "./designs";
 import { fieldUploadsExist, isFieldUpload } from "./field-uploads";
+import { storeOpenFor } from "./launch";
 import { MAX_CART_LINES, MAX_QUANTITY, cartTotals, checkFields, cropFits, itemUnitCents, optionsCents, orderNumber, variantRatio } from "./rules";
 
 // The Online Store's checkout (decided with Elle 2026-09-28): clients order
@@ -57,6 +58,7 @@ export async function storefrontFor(photographerId: string, sessionTypeId: strin
   const [studio] = await db
     .select({
       enabled: photographers.storeEnabled,
+      email: photographers.email,
       shippingCents: photographers.storeShippingCents,
       handlingCents: photographers.storeHandlingCents,
       swaggConnected: photographers.swaggpressKey,
@@ -64,7 +66,8 @@ export async function storefrontFor(photographerId: string, sessionTypeId: strin
     })
     .from(photographers)
     .where(eq(photographers.id, photographerId));
-  if (!studio?.enabled || !(await paymentAccount(photographerId))) return null;
+  // While the store is coming soon (lib/store/launch.ts), no shop and no checkout.
+  if (!studio?.enabled || !storeOpenFor(studio.email) || !(await paymentAccount(photographerId))) return null;
   const swaggReady = Boolean(studio.swaggConnected) && studio.swaggCard;
   const products = await db
     .select({

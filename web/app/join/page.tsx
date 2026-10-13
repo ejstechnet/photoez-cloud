@@ -22,7 +22,7 @@ import { LegalFooter } from "@/components/legal-page";
 
 export const metadata: Metadata = {
   title: "One app for your whole photography business",
-  description: `Booking, contracts, galleries, payments, a print store, and AI in one place. Try PhotoEZ Cloud Pro free for ${TRIAL_DAYS} days, no card needed, 0% commission.`,
+  description: `Booking, contracts, galleries, payments, and AI in one place. Try PhotoEZ Cloud Pro free for ${TRIAL_DAYS} days, no card needed, 0% commission.`,
   openGraph: {
     title: "One app for your whole photography business",
     description: `Retire the pile of apps. Booking to delivery in one place. ${TRIAL_DAYS}-day free trial, no card needed.`,
@@ -39,7 +39,7 @@ const PILE = [
   { old: "E-signature tool", icon: <ContractIcon size={22} />, tile: "bg-coral", now: "Contracts signed online, filled in from each booking for you." },
   { old: "Gallery host", icon: <ImagesIcon size={22} />, tile: "bg-violet", now: "Watermarked proofs, client favorites, paid extras, clean downloads." },
   { old: "Invoicing app", icon: <BagIcon size={22} />, tile: "bg-lime", now: "Deposits, balances, and extras paid straight to your own Stripe." },
-  { old: "Print lab site", icon: <GiftIcon size={22} />, tile: "bg-sun", now: "Clients order prints, tees, mugs, and more right from their gallery." },
+  { old: "Gift card seller", icon: <GiftIcon size={22} />, tile: "bg-sun", now: "Gift cards sold on your own page, delivered on the day the buyer picks." },
   { old: "Email reminders", icon: <InboxIcon size={22} />, tile: "bg-coral", now: "Confirmations, reminders, and gallery emails sent for you." },
   { old: "Website builder", icon: <MapPinIcon size={22} />, tile: "bg-sky", now: "Your own studio page, plus a directory where nearby clients find you." },
   { old: "Review requests", icon: <StarIcon size={22} />, tile: "bg-violet", now: "Reviews asked for after delivery, approved by you, shown on your page." },
@@ -120,7 +120,7 @@ export default async function JoinPage({ searchParams }: PageProps<"/join">) {
               photography business.
             </h1>
             <p className="mx-auto mt-5 max-w-xl text-lg text-white/80 lg:mx-0">
-              Stop juggling a booking app, a contract app, a gallery app, and a print lab. PhotoEZ Cloud runs it all, from the
+              Stop juggling a booking app, a contract app, a gallery app, and an invoicing app. PhotoEZ Cloud runs it all, from the
               first inquiry to the final delivery, with AI that handles the busywork.
             </p>
             <div className="mt-8">{cta()}</div>
@@ -194,12 +194,12 @@ export default async function JoinPage({ searchParams }: PageProps<"/join">) {
       <section className="mx-auto w-full max-w-7xl px-4 py-16 sm:py-20">
         <div className="flex flex-col items-center gap-8 rounded-3xl bg-surface p-6 sm:p-10 lg:flex-row">
           <div className="flex-1 text-center lg:text-left">
-            <p className="text-sm font-bold tracking-wider text-coral uppercase">Earn more from every gallery</p>
+            <p className="text-sm font-bold tracking-wider text-coral uppercase">Coming soon</p>
             <h2 className="mt-2 font-display text-3xl font-bold tracking-tight sm:text-4xl">A print and merch store, built in.</h2>
             <p className="mt-4 text-lg leading-relaxed text-foreground/80">
-              Clients order prints, canvases, tees, hoodies, mugs, and graduate swag of their own photos, and can design
-              them right in their gallery. Our partner <strong>SwaggPress Creations</strong> makes them and ships to their
-              door. You set the prices.
+              Soon your clients will order prints, canvases, tees, hoodies, mugs, and graduate swag of their own photos,
+              and design them right in their gallery. Our partner <strong>SwaggPress Creations</strong> will make them and
+              ship to their door. You&rsquo;ll set the prices.
             </p>
           </div>
           <Image src="/home/swaggpress-logo.webp" alt="SwaggPress Creations" width={720} height={239} style={{ width: 260, height: "auto" }} />
