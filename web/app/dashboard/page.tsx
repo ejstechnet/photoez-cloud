@@ -9,6 +9,7 @@ import { PERIODS, PERIOD_LABELS, parsePeriod } from "@/lib/dashboard-periods";
 import { dashboardStats } from "@/lib/dashboard-stats";
 import { PHOTOEZ_LINKS } from "@/lib/photoez-links";
 import { requirePhotographer } from "@/lib/session";
+import { SetupChecklist } from "./setup-checklist";
 
 // The studio at a glance, like PhotoEZ for WordPress's dashboard: revenue,
 // galleries by stage, bookings, what needs attention, and the next sessions.
@@ -42,6 +43,9 @@ export default async function DashboardPage({ searchParams }: PageProps<"/dashbo
       <h1 className="mt-1 font-display text-4xl font-bold tracking-tight sm:text-5xl">
         Hello, <span className="italic">{user.name.split(" ")[0]}</span>
       </h1>
+
+      {/* New studios: what to set up first (goes away once it's all done). */}
+      <SetupChecklist photographerId={user.id} />
 
       {/* Revenue, with the period to show. */}
       <section className="relative mt-8 overflow-hidden rounded-3xl bg-brand-deep p-6 text-white shadow-xl sm:p-8">

@@ -70,6 +70,10 @@ export const photographers = pgTable("photographers", {
   // go straight to it; chargesEnabled is Stripe's "ready to take payments".
   stripeAccountId: text("stripe_account_id"),
   stripeChargesEnabled: boolean("stripe_charges_enabled").notNull().default(false),
+  // Dashboard welcome checklist (lib/setup-checklist.ts): when the studio link
+  // was copied from it, and when the photographer hid it.
+  setupLinkCopiedAt: timestamp("setup_link_copied_at", { withTimezone: true }),
+  setupDismissedAt: timestamp("setup_dismissed_at", { withTimezone: true }),
   // Subscription tier (lib/plans.ts): set from the Stripe subscription
   // (lib/billing.ts), or by hand for complimentary accounts.
   plan: text("plan", { enum: PLANS }).notNull().default("free"),
