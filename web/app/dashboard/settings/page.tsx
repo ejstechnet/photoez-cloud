@@ -37,7 +37,7 @@ import { settingsWithDefaults } from "@/lib/sms/messages";
 import { formatPhone } from "@/lib/sms/phone";
 import { calendarUrl } from "@/lib/calendar-link";
 
-export default async function SettingsPage() {
+export default async function SettingsPage({ searchParams }: PageProps<"/dashboard/settings">) {
   const user = await requirePhotographer();
   const [settings] = await db
     .select({
@@ -190,7 +190,12 @@ export default async function SettingsPage() {
           </section>
         </div>
         <div className="space-y-8">
-          <PaymentsCard configured={stripeConfigured()} accountId={settings.stripeAccountId} ready={stripeReady} />
+          <PaymentsCard
+            configured={stripeConfigured()}
+            accountId={settings.stripeAccountId}
+            ready={stripeReady}
+            failed={(await searchParams).stripe === "failed"}
+          />
           <EmailCard
             accountEmail={settings.email}
             notifyEmail={settings.notifyEmail}
