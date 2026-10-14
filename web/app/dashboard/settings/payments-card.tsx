@@ -5,10 +5,13 @@ export function PaymentsCard({
   configured,
   accountId,
   ready,
+  failed = false,
 }: {
   configured: boolean;
   accountId: string | null;
   ready: boolean;
+  // Connect Stripe just failed (stripe-actions.ts sends ?stripe=failed).
+  failed?: boolean;
 }) {
   return (
     <section id="payments" className="card scroll-mt-8 p-6 sm:p-8">
@@ -30,6 +33,12 @@ export function PaymentsCard({
         </div>
       ) : (
         <div className="mt-4 space-y-3">
+          {failed && (
+            <p className="rounded-xl bg-coral/15 px-4 py-3 text-sm font-medium" role="alert">
+              Stripe couldn&apos;t start the sign-up just now. Please try again in a few minutes. If it keeps happening,
+              contact PhotoEZ Cloud support.
+            </p>
+          )}
           {accountId && (
             <p className="rounded-xl bg-sun/30 px-4 py-3 text-sm font-medium">
               Stripe needs a few more details before you can take payments.

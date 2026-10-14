@@ -17,7 +17,8 @@ const PLANS = {
 const key = process.env.STRIPE_SECRET_KEY;
 if (!key) throw new Error("STRIPE_SECRET_KEY is missing from .env");
 const stripe = new Stripe(key);
-console.log(`Stripe ${key.startsWith("sk_live_") ? "LIVE" : "test"} mode`);
+// Live keys: sk_live_ (standard) or rk_live_ (restricted).
+console.log(`Stripe ${/^(sk|rk)_live_/.test(key) ? "LIVE" : "test"} mode`);
 
 const portalProducts = [];
 for (const [plan, info] of Object.entries(PLANS)) {
