@@ -27,6 +27,13 @@ export const photoezCloudVsPixieset: ArticleMeta = {
   published: "2026-10-20",
   category: "Comparisons",
   readMinutes: 8,
+  image: {
+    src: "/articles/photoez-cloud-vs-pixieset.webp",
+    width: 1774,
+    height: 887,
+    alt: "Two laptops on a photographer's desk with \"vs.\" between them: on the left, the PhotoEZ Cloud logo above a laptop showing a PhotoEZ Cloud gallery; on the right, the Pixieset name above a laptop with a blurred gallery.",
+    share: "/articles/photoez-cloud-vs-pixieset-share.jpg",
+  },
 };
 
 const dollars = (cents: number) => `$${(cents / 100).toLocaleString("en-US", { maximumFractionDigits: 2 })}`;
