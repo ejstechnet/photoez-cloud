@@ -87,9 +87,16 @@ test("a gallery is flagged: blurry, dark, bright, closed eyes, duplicates", () =
     { id: "g", cull: metrics({ hash: "5555aaaa5555aaaa", brightness: 0.105, darkClip: 0.14, p1: 0, p10: 0.035, p90: 0.188, p99: 0.7 }) },
     // High-key portrait: white background, dark clothing. Not "too bright".
     { id: "h", cull: metrics({ hash: "3c3c3c3cc3c3c3c3", brightness: 0.88, brightClip: 0.6, p1: 0.05, p10: 0.2, p90: 1, p99: 1 }) },
+    // Flash didn't fire: dim all over AND soft (little detail shows). Labeled
+    // for the cause, not "blurry" (Elle's first client gallery, 2026-10-20).
+    { id: "m", cull: metrics({ hash: "9999666699996666", sharpness: 40, brightness: 0.08, darkClip: 0.6, p1: 0, p10: 0.01, p90: 0.22, p99: 0.45 }) },
+    // A misfire dark enough to also be "too dark" still gets one label.
+    { id: "n", cull: metrics({ hash: "77778888ffff0000", sharpness: 30, brightness: 0.05, darkClip: 0.8, p1: 0, p10: 0, p90: 0.1, p99: 0.2 }) },
     { id: "f", cull: null },
   ]);
   assert.deepEqual(result.flags.get("c"), ["blurry"]);
+  assert.deepEqual(result.flags.get("m"), ["flash"]);
+  assert.deepEqual(result.flags.get("n"), ["flash"]);
   assert.deepEqual(result.flags.get("d"), ["dark"]);
   assert.deepEqual(result.flags.get("e"), ["bright", "eyes"]);
   assert.deepEqual(result.duplicateSets, [["a", "b"]]); // sharpest first

@@ -35,12 +35,13 @@ export type CullMetrics = {
   eyesClosed: number | null;
 };
 
-export const CULL_FLAGS = ["blurry", "dark", "bright", "eyes", "duplicate"] as const;
+export const CULL_FLAGS = ["blurry", "dark", "flash", "bright", "eyes", "duplicate"] as const;
 export type CullFlag = (typeof CULL_FLAGS)[number];
 
 export const CULL_LABELS: Record<CullFlag, string> = {
   blurry: "Blurry",
   dark: "Too dark",
+  flash: "Too dark (flash didn't fire?)",
   bright: "Too bright",
   eyes: "Closed eyes",
   duplicate: "Near-duplicate",
@@ -152,6 +153,14 @@ const DUPLICATE_BITS = 8;
 // ≈ 2,000; a 2px Gaussian blur at full size 116–409; 4px 13–63; 8px 1.5–8.
 const BLUR_SHARE = 0.2;
 const BLUR_FLOOR = 60;
+// A frame where the flash didn't fire is dim all over: so little shows that
+// the blur check trips before the darkness check does (Elle's first client
+// gallery, 2026-10-20: strobe misfires came up "Blurry"). A soft photo this
+// dim is labeled for the real cause instead. Looser than "too dark" on
+// purpose; it only relabels photos already flagged blurry, so sharp low-key
+// portraits (which have real highlights) are never touched.
+const DIM_P99 = 0.55;
+const DIM_P90 = 0.3;
 
 export type CullInput = { id: string; cull: CullMetrics | null };
 export type CullResult = {
@@ -170,10 +179,15 @@ export function cullGallery(photos: CullInput[]): CullResult {
   const sorted = checked.map((p) => p.cull.sharpness).sort((a, b) => a - b);
   const median = sorted.length ? sorted[Math.floor(sorted.length / 2)] : 0;
   for (const { id, cull } of checked) {
-    if (cull.sharpness < BLUR_FLOOR || (checked.length >= 4 && cull.sharpness < median * BLUR_SHARE)) add(id, "blurry");
+    const blurry = cull.sharpness < BLUR_FLOOR || (checked.length >= 4 && cull.sharpness < median * BLUR_SHARE);
     // Too dark: no real highlights anywhere, so dark backdrops and deeper
     // skin tones never count against a photo. Too bright: no real shadows.
-    if (cull.p99 < 0.4 && cull.p90 < 0.25) add(id, "dark");
+    const dark = cull.p99 < 0.4 && cull.p90 < 0.25;
+    if (blurry && cull.p99 < DIM_P99 && cull.p90 < DIM_P90) add(id, "flash");
+    else {
+      if (blurry) add(id, "blurry");
+      if (dark) add(id, "dark");
+    }
     if (cull.p1 > 0.6 && cull.p10 > 0.8) add(id, "bright");
     if (cull.eyesClosed !== null && cull.eyesClosed > 0) add(id, "eyes");
   }
