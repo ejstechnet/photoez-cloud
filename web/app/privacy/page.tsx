@@ -102,6 +102,10 @@ export default function PrivacyPage() {
         </li>
         <li><strong>Cloudflare</strong> (R2 storage): photos and files, stored privately.</li>
         <li>
+          <strong>YouTube</strong>: our home page has a short video. Nothing loads from YouTube until you press play; then
+          it plays from YouTube&rsquo;s privacy-enhanced player (youtube-nocookie.com), under Google&rsquo;s privacy policy.
+        </li>
+        <li>
           <strong>Anthropic</strong>: the AI features described above. A phone number reaches it only if it&rsquo;s written
           inside an inquiry or a studio looks up a client with the Studio Assistant, and only to produce that answer.
         </li>

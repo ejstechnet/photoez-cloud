@@ -7,6 +7,7 @@ import { NavMenu } from "@/app/dashboard/nav-menu";
 import { SignOutButton } from "@/app/dashboard/sign-out-button";
 import Link from "next/link";
 import Image from "next/image";
+import { VideoFacade } from "@/components/video-facade";
 import { Logo, WorkflowPills } from "@/components/brand";
 import {
   ArrowRightIcon,
@@ -115,6 +116,9 @@ const cloudFeatures = [
   { title: "Photographer directory", body: "People searching nearby find your studio page. Free on every plan." },
   { title: "Referrals", body: "Clients share a link; their friends save, and they earn session credit." },
 ];
+
+// Elle's one-minute promo on the PhotoEZ YouTube channel.
+const PROMO_VIDEO_ID = "rpyQDovtVJc";
 
 // Elle's print and merch company, the store's first print partner.
 const SWAGGPRESS_URL = "https://swaggpress.com";
@@ -313,6 +317,17 @@ export default async function Home() {
             <p className="text-sm text-white/70">Every client, from first hello to final delivery.</p>
             <WorkflowPills />
           </div>
+        </div>
+      </section>
+
+      {/* Elle's one-minute promo (YouTube), loaded only when played. */}
+      <section className="mx-auto w-full max-w-4xl px-4 pt-20 text-center">
+        <p className="text-sm font-bold tracking-wider text-coral uppercase">See it in a minute</p>
+        <h2 className="mt-2 font-display text-4xl font-bold tracking-tight">
+          Your whole studio, <span className="italic text-link">one place.</span>
+        </h2>
+        <div className="mt-8">
+          <VideoFacade videoId={PROMO_VIDEO_ID} title="PhotoEZ Cloud: Run Your Whole Photography Business in One App" poster="/home/promo-video.webp" />
         </div>
       </section>
 
