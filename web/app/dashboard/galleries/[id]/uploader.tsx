@@ -2,13 +2,16 @@
 
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { MAX_PHOTO_BYTES, MAX_PHOTOS_PER_BATCH, PHOTO_TYPES, type PhotoKind } from "@/lib/photo-limits";
+import { MAX_PHOTO_BYTES, MAX_PHOTOS_PER_UPLOAD, PHOTO_TYPES, UPLOAD_CHUNK, type PhotoKind } from "@/lib/photo-limits";
 import { loadWatermark, makeProof, renderJpeg, type WatermarkSettings } from "@/lib/proof-maker";
 import { ImagesIcon } from "@/components/icons";
 import { confirmUpload, prepareUploads } from "../actions";
 
 type Status = "waiting" | "uploading" | "done" | "error";
 type Item = { key: string; name: string; status: Status; progress: number; error?: string };
+// One photo's signed upload links, from prepareUploads.
+type PreparedUpload = Extract<Awaited<ReturnType<typeof prepareUploads>>, { uploads: unknown }>["uploads"][number];
+type QueuedPhoto = { file: File; key: string; upload: PreparedUpload };
 
 const PARALLEL_UPLOADS = 3;
 
@@ -49,6 +52,11 @@ export function Uploader({
   async function upload(fileList: FileList | File[]) {
     setNotice(null);
     const all = Array.from(fileList);
+    if (all.length === 0) {
+      // Dragged from another app (Lightroom, Photos, a zip) that hands over no actual files.
+      setNotice("Those photos couldn't be read. Use “Choose photos” and pick them from a folder instead.");
+      return;
+    }
     const files = all.filter(
       (file) => (PHOTO_TYPES as readonly string[]).includes(file.type) && file.size <= MAX_PHOTO_BYTES,
     );
@@ -57,8 +65,8 @@ export function Uploader({
       setNotice(`${skipped} file${skipped === 1 ? " was" : "s were"} skipped. Use JPEG, PNG, or WebP photos up to 50 MB.`);
     }
     if (files.length === 0) return;
-    if (files.length > MAX_PHOTOS_PER_BATCH) {
-      setNotice(`Upload up to ${MAX_PHOTOS_PER_BATCH} photos at a time.`);
+    if (files.length > MAX_PHOTOS_PER_UPLOAD) {
+      setNotice(`Upload up to ${MAX_PHOTOS_PER_UPLOAD.toLocaleString()} photos at a time.`);
       return;
     }
 
@@ -68,15 +76,6 @@ export function Uploader({
       ...batch.map(({ file, key }) => ({ key, name: file.name, status: "waiting" as const, progress: 0 })),
     ]);
 
-    const prepared = await prepareUploads(
-      galleryId,
-      files.map((file) => ({ name: file.name, type: file.type, size: file.size })),
-    );
-    if ("error" in prepared) {
-      batch.forEach(({ key }) => update(key, { status: "error", error: prepared.error }));
-      return;
-    }
-
     let stamp: Awaited<ReturnType<typeof loadWatermark>> = null;
     try {
       // Finals are delivered clean, so only proofs get the watermark.
@@ -85,8 +84,35 @@ export function Uploader({
       setNotice("Your watermark couldn't be loaded, so these proofs were saved without it. Use “Update proofs” later.");
     }
 
-    const queue = batch.map((entry, i) => ({ ...entry, upload: prepared.uploads[i] }));
-    async function worker() {
+    // Upload links are asked for a few photos at a time, just before they're
+    // used, so even a slow 1,000-photo upload never hits an expired link.
+    for (let start = 0; start < batch.length; start += UPLOAD_CHUNK) {
+      const chunk = batch.slice(start, start + UPLOAD_CHUNK);
+      let prepared: Awaited<ReturnType<typeof prepareUploads>>;
+      try {
+        prepared = await prepareUploads(
+          galleryId,
+          chunk.map(({ file }) => ({ name: file.name, type: file.type, size: file.size })),
+        );
+      } catch {
+        prepared = { error: "Couldn't reach PhotoEZ Cloud. Check your connection and try these again." };
+      }
+      if ("error" in prepared) {
+        // Usually "storage is full": the rest won't fit either, so stop here.
+        const { error } = prepared;
+        batch.slice(start).forEach(({ key }) => update(key, { status: "error", error }));
+        break;
+      }
+      const uploads = prepared.uploads;
+      await uploadChunk(chunk.map((entry, i) => ({ ...entry, upload: uploads[i] })));
+    }
+    router.refresh();
+
+    async function uploadChunk(queue: QueuedPhoto[]) {
+      await Promise.all(Array.from({ length: PARALLEL_UPLOADS }, () => worker(queue)));
+    }
+
+    async function worker(queue: QueuedPhoto[]) {
       for (let next = queue.shift(); next; next = queue.shift()) {
         const { file, key, upload } = next;
         update(key, { status: "uploading" });
@@ -120,8 +146,6 @@ export function Uploader({
         }
       }
     }
-    await Promise.all(Array.from({ length: PARALLEL_UPLOADS }, worker));
-    router.refresh();
   }
 
   const doneCount = items.filter((item) => item.status === "done").length;
