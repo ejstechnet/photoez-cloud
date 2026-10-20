@@ -1,5 +1,6 @@
 import type { ComponentType } from "react";
 import { IntroducingPhotoezCloud, introducingPhotoezCloud } from "./introducing-photoez-cloud";
+import { PhotoezCloudVsPixieset, photoezCloudVsPixieset } from "./photoez-cloud-vs-pixieset";
 
 // Articles published on photoezcloud.com itself (at /articles/<slug>). Each
 // is a React component with its details; newest first. Articles on the EJS
@@ -19,7 +20,10 @@ export type ArticleMeta = {
   image?: { src: string; width: number; height: number; alt: string; share: string };
 };
 
-export const ARTICLES: { meta: ArticleMeta; Body: ComponentType }[] = [{ meta: introducingPhotoezCloud, Body: IntroducingPhotoezCloud }];
+export const ARTICLES: { meta: ArticleMeta; Body: ComponentType }[] = [
+  { meta: photoezCloudVsPixieset, Body: PhotoezCloudVsPixieset },
+  { meta: introducingPhotoezCloud, Body: IntroducingPhotoezCloud },
+];
 
 export function findArticle(slug: string) {
   return ARTICLES.find((a) => a.meta.slug === slug) ?? null;
