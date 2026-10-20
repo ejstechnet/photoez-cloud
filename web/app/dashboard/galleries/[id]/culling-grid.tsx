@@ -12,13 +12,14 @@ type CullPhoto = GridPhoto & { cull: CullMetrics | null };
 const FLAG_STYLES: Record<CullFlag, string> = {
   blurry: "bg-coral text-white",
   dark: "bg-brand-deep text-white",
+  flash: "bg-brand-deep text-white",
   bright: "bg-sun text-brand-deep",
   eyes: "bg-violet text-white",
   duplicate: "bg-sky text-white",
 };
 
 // The proofs grid with culling help on top: check photos in the browser,
-// see which look blurry, too dark or bright, have closed eyes, or are
+// see which look blurry, too dark (or a missed flash) or bright, have closed eyes, or are
 // near-duplicates, and clear them out before the client sees them.
 export function CullingGrid({ galleryId, photos }: { galleryId: string; photos: CullPhoto[] }) {
   const router = useRouter();
