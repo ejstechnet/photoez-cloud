@@ -37,14 +37,18 @@ export function VideoFacade({
           aria-label={`Play video: ${title}`}
         >
           <Image src={poster} alt="" fill sizes="(min-width: 1024px) 896px, 100vw" className="object-cover" />
-          <span className="absolute inset-0 bg-gradient-to-t from-brand-deep/70 via-brand-deep/10 to-transparent" />
-          <span className="absolute top-1/2 left-1/2 grid size-20 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full bg-lime text-brand-deep shadow-xl transition group-hover:scale-110 sm:size-24">
-            <svg viewBox="0 0 24 24" className="ml-1 size-9 sm:size-11" fill="currentColor" aria-hidden="true">
-              <path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.5-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5Z" />
-            </svg>
-          </span>
-          <span className="absolute bottom-4 left-5 text-left text-sm font-bold tracking-wider text-white uppercase sm:bottom-6 sm:left-7">
-            Watch · 1 minute
+          <span className="absolute inset-0 bg-gradient-to-t from-brand-deep/50 via-transparent to-transparent" />
+          {/* Bottom-left, so the play button never covers words in the poster
+              (Elle's thumbnail has its headline in the middle). */}
+          <span className="absolute bottom-4 left-4 flex items-center gap-3 sm:bottom-6 sm:left-6">
+            <span className="grid size-14 place-items-center rounded-full bg-lime text-brand-deep shadow-xl transition group-hover:scale-110 sm:size-16">
+              <svg viewBox="0 0 24 24" className="ml-0.5 size-7 sm:size-8" fill="currentColor" aria-hidden="true">
+                <path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.5-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5Z" />
+              </svg>
+            </span>
+            <span className="rounded-full bg-brand-deep/70 px-3 py-1.5 text-sm font-bold tracking-wider text-white uppercase backdrop-blur">
+              Watch · 1 minute
+            </span>
           </span>
         </button>
       )}
