@@ -64,7 +64,7 @@ export function syncSwaggVariants(current: StoreVariant[], p: SwaggProduct | nul
 
 export type SwaggVariantChange = { label: string; kind: SwaggChangeKind; fromCents: number | null; toCents: number | null; applied: boolean };
 
-// The automatic update (every few hours). Only what protects the studio
+// The automatic update (every 15 minutes). Only what protects the studio
 // happens on its own: a wholesale price going UP, and sizes SwaggPress
 // stopped offering. Lower prices, new sizes and other changes wait for the
 // studio's "Refresh prices" (syncSwaggVariants). Everything is reported.

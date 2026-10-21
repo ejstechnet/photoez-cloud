@@ -25,6 +25,8 @@ export const photoezCloudVsPixieset: ArticleMeta = {
   description:
     "Looking for a Pixieset alternative? How PhotoEZ Cloud and Pixieset compare on price, booking, contracts, galleries, storage, AI, and selling, including where Pixieset is ahead.",
   published: "2026-10-20",
+  // PhotoEZ Cloud's store opened (prints, mugs and water bottles).
+  updated: "2026-10-21",
   category: "Comparisons",
   readMinutes: 8,
   image: {
@@ -78,7 +80,7 @@ export function PhotoezCloudVsPixieset() {
       <ul>
         <li>
           <strong>Choose Pixieset</strong> if you want a full website builder, a branded mobile gallery app, video
-          delivery, RAW uploads, email marketing campaigns, or a print store with automatic lab fulfillment today.
+          delivery, RAW uploads, email marketing campaigns, or a store with many labs and products today.
         </li>
         <li>
           <strong>Choose PhotoEZ Cloud</strong> if you want booking, contracts, proofing galleries, invoices with payment
@@ -225,8 +227,9 @@ export function PhotoezCloudVsPixieset() {
       </p>
       <p>
         PhotoEZ Cloud never takes a commission on any plan. Client payments go straight to your own Stripe account (you
-        pay only Stripe&rsquo;s standard processing fee). Today you can sell extra photos, sessions, and gift cards. A
-        print and merch store with our partner SwaggPress Creations is coming soon.
+        pay only Stripe&rsquo;s standard processing fee). You can sell extra photos, sessions, gift cards, and products:
+        clients order prints, mugs, and water bottles from their gallery, and our partner SwaggPress Creations makes and
+        ships them, or you sell prints and products you make yourself. The store starts small, with that one partner.
       </p>
 
       <h2>Where Pixieset is ahead</h2>
@@ -236,7 +239,7 @@ export function PhotoezCloudVsPixieset() {
         <li>A branded mobile gallery app for clients</li>
         <li>Video delivery and RAW file uploads</li>
         <li>Email marketing campaigns to your client list</li>
-        <li>A print store with automatic lab fulfillment today</li>
+        <li>A store with many labs and products (PhotoEZ Cloud&rsquo;s starts with prints, mugs, and water bottles from one partner)</li>
         <li>A long track record: Pixieset has been around for years, and PhotoEZ Cloud is new</li>
       </ul>
 

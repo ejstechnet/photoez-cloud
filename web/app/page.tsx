@@ -112,7 +112,7 @@ const cloudFeatures = [
   { title: "Reviews", body: "Asked for after delivery, approved by you, shown on your page." },
   { title: "Emails & reminders", body: "Confirmations, reminders, and gallery emails sent for you." },
   { title: "Page Designer", body: "Your colors, fonts, banner, and gallery style." },
-  { title: "Online store (coming soon)", body: "Clients will order prints and products of their photos right from their gallery." },
+  { title: "Online store", body: "Clients order prints, mugs, and water bottles of their photos right from their gallery." },
   { title: "Photographer directory", body: "People searching nearby find your studio page. Free on every plan." },
   { title: "Referrals", body: "Clients share a link; their friends save, and they earn session credit." },
 ];
@@ -126,8 +126,8 @@ const SWAGGPRESS_URL = "https://swaggpress.com";
 // "Grow your business": the features that bring in money and new clients.
 const growth = [
   {
-    title: "Sell prints and products: coming soon",
-    body: "Soon your clients will order prints, canvases, and more of their own photos from their gallery, framed exactly how they like. You'll set the prices, and the money will go straight to your Stripe.",
+    title: "Sell prints and gifts from every gallery",
+    body: "Clients order prints, mugs, and water bottles of their own photos from their gallery. SwaggPress Creations makes and ships them for you, or sell prints and products you make yourself. You set the prices, and the money goes straight to your Stripe.",
     icon: <BagIcon size={24} />,
     tile: "bg-coral",
     link: null,
@@ -371,7 +371,7 @@ export default async function Home() {
             ))}
           </div>
 
-          {/* The print and merch partner (Elle's own company). */}
+          {/* The print partner (Elle's own company): prints, mugs and water bottles for now. */}
           <div className="mt-6 flex flex-col gap-6 rounded-3xl bg-surface p-6 text-foreground sm:flex-row sm:items-center sm:p-8">
             <a href={SWAGGPRESS_URL} target="_blank" rel="noopener" className="shrink-0 transition hover:opacity-80">
               <Image
@@ -383,11 +383,11 @@ export default async function Home() {
               />
             </a>
             <div>
-              <p className="text-sm font-bold tracking-wider text-coral uppercase">Print &amp; merch partner &middot; coming soon</p>
+              <p className="text-sm font-bold tracking-wider text-coral uppercase">Print &amp; gift partner</p>
               <p className="mt-2 text-lg leading-relaxed text-foreground/80">
-                <strong className="text-foreground">SwaggPress Creations</strong> will print your clients&rsquo; photos on
-                wide-format printers and press them onto tees, hoodies, hats, tumblers, and graduate swag, then ship
-                straight to their door. You&rsquo;ll set the prices.
+                <strong className="text-foreground">SwaggPress Creations</strong> prints your clients&rsquo; photos on a
+                wide-format printer and onto mugs and water bottles, then ships straight to their door. You set the
+                prices. More products are on the way.
               </p>
               <a
                 href={SWAGGPRESS_URL}

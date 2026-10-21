@@ -22,7 +22,7 @@ export const FEATURES = [
   { id: "booking", label: "Online booking", detail: "Clients pick a real open time and pay the deposit, with text and email reminders." },
   { id: "paperwork", label: "Contracts and invoices", detail: "Contracts signed online, quotes and invoices, paid straight to your own Stripe." },
   { id: "galleries", label: "Proofing galleries", detail: "Clients favorite and select, you deliver finals in a click, and AI search finds any shot." },
-  { id: "store", label: "A print and merch store", detail: "A store in every gallery, with a design studio and 3D preview." },
+  { id: "store", label: "A print and gift store", detail: "Clients order prints, mugs, and water bottles from every gallery; you set the prices." },
   { id: "marketing", label: "Help getting found", detail: "A free directory listing, reviews, client referrals, and gift cards." },
 ] as const;
 type FeatureId = (typeof FEATURES)[number]["id"];
@@ -67,7 +67,7 @@ export const HEADACHES = [
   {
     id: "selling",
     label: "Selling prints and products",
-    answer: "Every gallery has a print and merch store, with a design studio and 3D preview; you set the prices.",
+    answer: "Every gallery has a store for prints, mugs, and water bottles: SwaggPress Creations makes and ships them, or you sell what you make. You set the prices.",
   },
   {
     id: "marketing",

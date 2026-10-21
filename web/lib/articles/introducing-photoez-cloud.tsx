@@ -11,8 +11,8 @@ export const introducingPhotoezCloud: ArticleMeta = {
   description:
     "PhotoEZ Cloud puts booking, contracts, proofing galleries, invoices with payment plans, text reminders, and AI help in one app for photographers, with no commission on your sales.",
   published: "2026-10-03",
-  // The print store moved to "coming soon" for launch (lib/store/launch.ts).
-  updated: "2026-10-20",
+  // The store opened 2026-10-21 with prints, mugs and water bottles (lib/store/launch.ts).
+  updated: "2026-10-21",
   category: "PhotoEZ Cloud",
   readMinutes: 7,
   image: {
@@ -92,12 +92,12 @@ export function IntroducingPhotoezCloud() {
         </li>
       </ul>
 
-      <h2>Coming soon: a print and product store in every gallery</h2>
+      <h2>A print and gift store in every gallery</h2>
       <p>
-        Soon, delivered galleries will be able to include a shop. Clients will order prints and products of their own
-        photos and design them in a built-in designer. You&rsquo;ll fulfill orders yourself or send them to a print
-        partner: SwaggPress Creations is the first, and its orders will go straight to production with tracking sent
-        back to the client.
+        Delivered galleries can include a shop. Clients order prints, mugs, and water bottles of their own photos and
+        pay you through Stripe. Sell prints and products you make and ship yourself, or let our partner SwaggPress
+        Creations do it: its orders go straight to production, with tracking sent back to the client. The store starts
+        with those three, and more SwaggPress products will follow.
       </p>
 
       <h2>Quotes and invoices with payment plans</h2>

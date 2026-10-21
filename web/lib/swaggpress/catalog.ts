@@ -12,7 +12,9 @@ import { autoSwaggVariants, sameJson, swaggDesign, swaggFields, swaggImages, swa
 // (syncSwaggProducts); the studio's own retail prices stay theirs.
 
 const variantId = () => randomBytes(5).toString("hex");
-const SYNC_EVERY_MS = 6 * 60 * 60 * 1000;
+// Every run of the 15-minute job, so a product Elle hides at SwaggPress
+// leaves clients' galleries within minutes (decided with Elle 2026-10-21).
+const SYNC_EVERY_MS = 10 * 60 * 1000;
 
 export async function swaggKeyFor(photographerId: string) {
   const [studio] = await db
@@ -92,7 +94,7 @@ export async function addSwaggProduct(photographerId: string, labProductId: numb
 }
 
 // Brings added SwaggPress products up to date with the catalog. Pass a
-// catalog already fetched, or it's fetched here (at most every 6 hours
+// catalog already fetched, or it's fetched here (at most every SYNC_EVERY_MS
 // unless forced). Returns an error message when SwaggPress couldn't be read.
 //
 // Two ways: the studio's "Refresh prices" (forced, or connecting) takes
