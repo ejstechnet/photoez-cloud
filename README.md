@@ -30,7 +30,7 @@ Every AI call is recorded with its token cost, so each studio's AI use is tracke
 - **Business:** contracts signed online, quotes and invoices, gift cards, coupons, session credits, review requests, and text reminders
 - **Studio page:** each photographer's own page and booking form, styled with a page designer, plus a directory where nearby clients find them
 - **Moving in:** a migration tool that moves a studio between PhotoEZ for WordPress and PhotoEZ Cloud
-- **Coming soon:** a print and merch store with SwaggPress Creations
+- **Store:** clients order prints, mugs and water bottles from their gallery, made and shipped by SwaggPress Creations or by the studio itself
 
 ## Stack
 

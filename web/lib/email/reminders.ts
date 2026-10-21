@@ -112,7 +112,7 @@ export async function runReminders(now = new Date()) {
     });
 
   // SwaggPress: send paid orders, pick up tracking, and keep added products
-  // in step with the SwaggPress catalog (each studio at most every 6 hours).
+  // in step with the SwaggPress catalog (each studio every run).
   sent.labShipped = await runLabOrders(now).catch((error) => {
     console.error("SwaggPress orders job failed", error);
     return 0;
