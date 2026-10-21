@@ -16,8 +16,10 @@ import { signedViewUrl } from "@/lib/storage";
 export const metadata: Metadata = { title: "Store" };
 
 // Store: open the shop, set shipping and handling, and manage products.
-export default async function StorePage() {
+// Products SwaggPress no longer sells are tucked away unless ?gone=1.
+export default async function StorePage({ searchParams }: PageProps<"/dashboard/store">) {
   const user = await requirePhotographer();
+  const showGone = (await searchParams).gone === "1";
   const [[studio], products, [toShip], account, soldRows] = await Promise.all([
     db
       .select({
@@ -51,6 +53,9 @@ export default async function StorePage() {
       .groupBy(storeOrderItems.productId),
   ]);
   const sold = new Map(soldRows.map((r) => [r.productId, Number(r.n ?? 0)]));
+  // SwaggPress products it stopped offering: hidden from clients already, and from this list unless asked.
+  const gone = products.filter((p) => p.fulfillment === "swaggpress" && p.labUnavailable).length;
+  const listed = showGone ? products : products.filter((p) => !(p.fulfillment === "swaggpress" && p.labUnavailable));
   // Each product's first picture, for its card.
   const pictures = new Map(
     await Promise.all(
@@ -70,6 +75,11 @@ export default async function StorePage() {
       <p className="mt-2 max-w-3xl text-muted">
         Clients order prints and products of their photos right from their delivered gallery and pay you through Stripe.
         Make and ship items yourself, or let SwaggPress Creations print and ship them for you.
+      </p>
+      {/* The store opened 2026-10-21 with a few SwaggPress products; Elle adds more over time. */}
+      <p className="mt-6 rounded-2xl border-2 border-lime/60 bg-lime/10 px-5 py-4 text-sm font-semibold">
+        <span aria-hidden="true">🛍️</span> More products are coming soon! New SwaggPress products show up in the SwaggPress
+        catalog as they&rsquo;re added.
       </p>
       {!account && (
         <p className="mt-6 rounded-2xl bg-sun/30 px-5 py-4 text-sm font-semibold">
@@ -104,7 +114,11 @@ export default async function StorePage() {
               + Add product
             </Link>
           </div>
-          {products.length === 0 ? (
+          {products.length > 0 && listed.length === 0 ? (
+            <p className="mt-5 rounded-2xl border-2 border-dashed border-border px-5 py-8 text-center text-muted">
+              None of your products are sold right now.
+            </p>
+          ) : products.length === 0 ? (
             <div className="mt-5 rounded-2xl border-2 border-dashed border-border px-5 py-8 text-center">
               <p className="text-muted">No products yet. Start with the usual print sizes and change the prices to yours.</p>
               <form action={addStarterPrints} className="mt-4">
@@ -115,7 +129,7 @@ export default async function StorePage() {
             </div>
           ) : (
             <ul className="mt-5 grid gap-3 sm:grid-cols-2">
-              {products.map((p) => {
+              {listed.map((p) => {
                 const prices = p.variants.filter((v) => v.available !== false).map((v) => v.priceCents);
                 const low = prices.length ? Math.min(...prices) : null;
                 const high = prices.length ? Math.max(...prices) : null;
@@ -161,6 +175,13 @@ export default async function StorePage() {
                 );
               })}
             </ul>
+          )}
+          {gone > 0 && (
+            <p className="mt-4 text-sm">
+              <Link href={showGone ? "/dashboard/store" : "/dashboard/store?gone=1"} scroll={false} className="link">
+                {showGone ? "Hide products no longer sold" : `Show ${gone} ${gone === 1 ? "product" : "products"} no longer sold`}
+              </Link>
+            </p>
           )}
         </section>
       </div>
