@@ -112,7 +112,7 @@ const cloudFeatures = [
   { title: "Reviews", body: "Asked for after delivery, approved by you, shown on your page." },
   { title: "Emails & reminders", body: "Confirmations, reminders, and gallery emails sent for you." },
   { title: "Page Designer", body: "Your colors, fonts, banner, and gallery style." },
-  { title: "Online store", body: "Clients order prints, mugs, and water bottles of their photos right from their gallery." },
+  { title: "Online store", body: "Clients order photo prints and gifts of their photos right from their gallery." },
   { title: "Photographer directory", body: "People searching nearby find your studio page. Free on every plan." },
   { title: "Referrals", body: "Clients share a link; their friends save, and they earn session credit." },
 ];
@@ -127,7 +127,7 @@ const SWAGGPRESS_URL = "https://swaggpress.com";
 const growth = [
   {
     title: "Sell prints and gifts from every gallery",
-    body: "Clients order prints, mugs, and water bottles of their own photos from their gallery. SwaggPress Creations makes and ships them for you, or sell prints and products you make yourself. You set the prices, and the money goes straight to your Stripe.",
+    body: "Clients order photo prints and gifts of their own photos from their gallery. SwaggPress Creations makes and ships them for you, or sell prints and products you make yourself. You set the prices, and the money goes straight to your Stripe.",
     icon: <BagIcon size={24} />,
     tile: "bg-coral",
     link: null,
@@ -371,7 +371,7 @@ export default async function Home() {
             ))}
           </div>
 
-          {/* The print partner (Elle's own company): prints, mugs and water bottles for now. */}
+          {/* The print and gift partner (Elle's own company). Products stay unnamed so this never goes stale. */}
           <div className="mt-6 flex flex-col gap-6 rounded-3xl bg-surface p-6 text-foreground sm:flex-row sm:items-center sm:p-8">
             <a href={SWAGGPRESS_URL} target="_blank" rel="noopener" className="shrink-0 transition hover:opacity-80">
               <Image
@@ -385,9 +385,8 @@ export default async function Home() {
             <div>
               <p className="text-sm font-bold tracking-wider text-coral uppercase">Print &amp; gift partner</p>
               <p className="mt-2 text-lg leading-relaxed text-foreground/80">
-                <strong className="text-foreground">SwaggPress Creations</strong> prints your clients&rsquo; photos on a
-                wide-format printer and onto mugs and water bottles, then ships straight to their door. You set the
-                prices. More products are on the way.
+                <strong className="text-foreground">SwaggPress Creations</strong> turns your clients&rsquo; photos into
+                photo prints and gifts, then ships straight to their door. You set the prices.
               </p>
               <a
                 href={SWAGGPRESS_URL}

@@ -25,7 +25,7 @@ export const photoezCloudVsPixieset: ArticleMeta = {
   description:
     "Looking for a Pixieset alternative? How PhotoEZ Cloud and Pixieset compare on price, booking, contracts, galleries, storage, AI, and selling, including where Pixieset is ahead.",
   published: "2026-10-20",
-  // PhotoEZ Cloud's store opened (prints, mugs and water bottles).
+  // PhotoEZ Cloud's store opened.
   updated: "2026-10-21",
   category: "Comparisons",
   readMinutes: 8,
@@ -228,7 +228,7 @@ export function PhotoezCloudVsPixieset() {
       <p>
         PhotoEZ Cloud never takes a commission on any plan. Client payments go straight to your own Stripe account (you
         pay only Stripe&rsquo;s standard processing fee). You can sell extra photos, sessions, gift cards, and products:
-        clients order prints, mugs, and water bottles from their gallery, and our partner SwaggPress Creations makes and
+        clients order photo prints and gifts from their gallery, and our partner SwaggPress Creations makes and
         ships them, or you sell prints and products you make yourself. The store starts small, with that one partner.
       </p>
 
@@ -239,7 +239,7 @@ export function PhotoezCloudVsPixieset() {
         <li>A branded mobile gallery app for clients</li>
         <li>Video delivery and RAW file uploads</li>
         <li>Email marketing campaigns to your client list</li>
-        <li>A store with many labs and products (PhotoEZ Cloud&rsquo;s starts with prints, mugs, and water bottles from one partner)</li>
+        <li>A store with many labs and products (PhotoEZ Cloud&rsquo;s starts small, with one partner)</li>
         <li>A long track record: Pixieset has been around for years, and PhotoEZ Cloud is new</li>
       </ul>
 
