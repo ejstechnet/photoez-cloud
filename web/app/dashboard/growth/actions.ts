@@ -1,9 +1,14 @@
 "use server";
 
+import { and, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { after } from "next/server";
 import { z } from "zod";
+import { db } from "@/db";
+import { growthOpportunities, growthOutreach } from "@/db/schema";
 import { GROWTH_KINDS, GROWTH_STATUSES } from "@/lib/growth/constants";
+import { analyzeOpportunity } from "@/lib/growth/qualify";
 import {
   addNote,
   changeStatus,
@@ -83,6 +88,9 @@ export async function addPost(prev: PostFormState, formData: FormData): Promise<
   if ("error" in result) return retry({ errors: { url: result.error } });
   if (result.duplicate) return retry({ message: "This post is already saved.", duplicateId: result.id });
 
+  // Scored by AI right after the page answers (when Growth AI is on), so
+  // saving never waits on it.
+  after(() => analyzeOpportunity(result.id));
   revalidatePath("/dashboard/growth");
   if (formData.get("mode") === "capture") return { savedId: result.id };
   redirect(`/dashboard/growth/${result.id}`);
@@ -135,6 +143,59 @@ export async function scheduleNextAction(id: string, day: string): Promise<Actio
   if (!idSchema.safeParse(id).success) return { error: "Something's off with that date." };
   if (day && Number.isNaN(Date.parse(day))) return { error: "Enter a date." };
   await setNextAction(id, day ? new Date(`${day}T12:00:00Z`) : null);
+  revalidatePath(`/dashboard/growth/${id}`);
+  revalidatePath("/dashboard/growth");
+  return {};
+}
+
+// "Score with AI" on a post's page: waits for the answer (about 10–20 s).
+export async function scorePost(id: string): Promise<ActionResult> {
+  await requireOwner();
+  if (!idSchema.safeParse(id).success) return { error: "Something's off with that post." };
+  const out = await analyzeOpportunity(id);
+  revalidatePath(`/dashboard/growth/${id}`);
+  revalidatePath("/dashboard/growth");
+  if (out.status === "paused") {
+    return { error: out.why === "off" ? "Growth AI is off (no monthly cap is set)." : "This month's Growth AI budget is used up. Score it yourself for now." };
+  }
+  if (out.status === "no_text") return { error: "There's no text to score. Add what they wrote first." };
+  if (out.status === "failed") return { error: out.error };
+  return {};
+}
+
+// Keeps Elle's edits to a draft (done on "Copy & open post").
+export async function saveDraft(id: string, outreachId: string, text: string): Promise<ActionResult> {
+  await requireOwner();
+  if (!idSchema.safeParse(id).success || !idSchema.safeParse(outreachId).success) return { error: "Something's off with that reply." };
+  const draft = text.trim().slice(0, 5000);
+  if (!draft) return { error: "The reply is empty." };
+  await db
+    .update(growthOutreach)
+    .set({ draft, state: "approved", approvedAt: new Date(), updatedAt: new Date() })
+    .where(and(eq(growthOutreach.id, outreachId), eq(growthOutreach.opportunityId, id)));
+  return {};
+}
+
+// "I posted it": records exactly what went out, and moves the post to
+// "Replied" (a real event, done by Elle).
+export async function markPosted(id: string, outreachId: string | null, text: string): Promise<ActionResult> {
+  await requireOwner();
+  if (!idSchema.safeParse(id).success || (outreachId && !idSchema.safeParse(outreachId).success)) return { error: "Something's off with that reply." };
+  const posted = text.trim().slice(0, 5000);
+  if (!posted) return { error: "Paste or write the reply you posted first." };
+  const now = new Date();
+  if (outreachId) {
+    await db
+      .update(growthOutreach)
+      .set({ state: "posted", postedText: posted, postedAt: now, approvedAt: now, updatedAt: now })
+      .where(and(eq(growthOutreach.id, outreachId), eq(growthOutreach.opportunityId, id)));
+  } else {
+    await db.insert(growthOutreach).values({ opportunityId: id, draft: posted, state: "posted", postedText: posted, postedAt: now, approvedAt: now });
+  }
+  // Only posts not yet replied to move to "Replied"; one that's further along
+  // (they responded, say) keeps its status.
+  const [post] = await db.select({ status: growthOpportunities.status }).from(growthOpportunities).where(eq(growthOpportunities.id, id));
+  if (post && ["new", "reviewed", "approved"].includes(post.status)) await changeStatus(id, "engaged", "Posted a reply");
   revalidatePath(`/dashboard/growth/${id}`);
   revalidatePath("/dashboard/growth");
   return {};
