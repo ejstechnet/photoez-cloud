@@ -428,6 +428,13 @@
       "when": 1791915202850,
       "tag": "0060_setup_checklist",
       "breakpoints": true
+    },
+    {
+      "idx": 61,
+      "version": "7",
+      "when": 1792635070531,
+      "tag": "0061_growth_tables",
+      "breakpoints": true
     }
   ]
 }

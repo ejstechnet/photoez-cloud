@@ -61,6 +61,8 @@ test("totals by feature, model, day and studio", () => {
       ["assistant", 7_200 + 15_200 + 11_000, 4],
       ["photo_tag", 4_000, 3],
       ["eval", 40_000, 1],
+      ["growth_prefilter", 0, 0],
+      ["growth_analysis", 0, 0],
     ],
   );
   // Dated ids are grouped with their model.
