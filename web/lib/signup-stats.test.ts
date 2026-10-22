@@ -1,7 +1,7 @@
 // Tests for the Sign-ups page's counting and the owner check.   npm test
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { bySource, csvCell, isOwnerEmail, signupStatus } from "./signup-stats.ts";
+import { NO_TAG, bySource, csvCell, isOwnerEmail, signupStatus, signupTotals } from "./signup-stats.ts";
 
 test("sign-ups are counted per tag, with how many now pay", () => {
   const tags = bySource([
@@ -12,7 +12,19 @@ test("sign-ups are counted per tag, with how many now pay", () => {
   ]);
   assert.deepEqual(tags[0], { source: "facebook", signups: 2, paying: 1 });
   assert.equal(tags.find((t) => t.source === "fb-grads")?.paying, 1);
-  assert.equal(tags.find((t) => t.source === "(none)")?.signups, 1);
+  assert.equal(tags.find((t) => t.source === NO_TAG)?.signups, 1);
+});
+
+test("totals count studios only, with confirmed emails, trials and paying", () => {
+  const totals = signupTotals([
+    { hasAccount: true, emailVerified: true, status: "Pro trial" },
+    { hasAccount: true, emailVerified: false, status: "Pro trial" },
+    { hasAccount: true, emailVerified: true, status: "Studio" },
+    { hasAccount: true, emailVerified: true, status: "Free" },
+    // An address left on the old landing page, with no account.
+    { hasAccount: false, emailVerified: false, status: "No account" },
+  ]);
+  assert.deepEqual(totals, { studios: 4, confirmed: 3, onTrial: 2, paying: 1 });
 });
 
 test("a sign-up's status: trial, plan, or no account", () => {
