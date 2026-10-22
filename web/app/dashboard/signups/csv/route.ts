@@ -1,16 +1,25 @@
 import { requireOwner } from "@/lib/owner";
-import { csvCell } from "@/lib/signup-stats";
-import { trackedSignups } from "@/lib/signups";
+import { NO_TAG, csvCell } from "@/lib/signup-stats";
+import { allSignups } from "@/lib/signups";
 import { describeAnswers } from "@/lib/quiz";
 
 // Sign-ups as a spreadsheet (the owner only).
 export async function GET() {
   await requireOwner();
-  const rows = await trackedSignups();
+  const rows = await allSignups();
   const lines = [
-    ["Signed up", "Email", "Name", "Business", "Tag", "Now", "Quiz answers"].join(","),
+    ["Signed up", "Email", "Name", "Business", "Tag", "Email confirmed", "Now", "Quiz answers"].join(","),
     ...rows.map((r) =>
-      [r.createdAt.toISOString().slice(0, 10), r.email, r.name ?? "", r.businessName ?? "", r.source ?? "", r.status, r.quiz ? describeAnswers(r.quiz) : ""]
+      [
+        r.createdAt.toISOString().slice(0, 10),
+        r.email,
+        r.name ?? "",
+        r.businessName ?? "",
+        r.source ?? NO_TAG,
+        r.hasAccount ? (r.emailVerified ? "Yes" : "No") : "",
+        r.status,
+        r.quiz ? describeAnswers(r.quiz) : "",
+      ]
         .map(csvCell)
         .join(","),
     ),
