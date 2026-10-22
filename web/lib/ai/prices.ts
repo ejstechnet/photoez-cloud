@@ -25,6 +25,12 @@ export const MODEL_PRICES: ModelPrice[] = [
   { model: "claude-sonnet-5", effectiveFrom: "2025-01-01", input: 2, cacheWrite: 2.5, cacheRead: 0.2, output: 10 },
   // Photo tagging.
   { model: "claude-haiku-4-5", effectiveFrom: "2025-01-01", input: 1, cacheWrite: 1.25, cacheRead: 0.1, output: 5 },
+  // Growth (GrowthPilot): the quick "is this about business software?" check,
+  // then lead scoring with a drafted reply. Input/output and Opus 5.5's cache
+  // read from Anthropic's model table (2026-10-06); the cache writes are the
+  // usual 1.25× of input, and Haiku 5.5's cache read the usual 0.1×.
+  { model: "claude-haiku-5-5", effectiveFrom: "2026-10-01", input: 0.1, cacheWrite: 0.125, cacheRead: 0.01, output: 0.5 },
+  { model: "claude-opus-5-5", effectiveFrom: "2026-10-01", input: 4, cacheWrite: 5, cacheRead: 0.2, output: 20 },
 ];
 
 // Tokens by kind. `input` is uncached input only.

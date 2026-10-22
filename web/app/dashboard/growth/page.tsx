@@ -4,6 +4,7 @@ import { inputClass } from "@/components/form";
 import { GROWTH_STATUSES, GROWTH_TIERS, type GrowthStatus, type GrowthTier } from "@/lib/growth/constants";
 import { QUEUE_SORTS, ensureGrowthSeeded, listOpportunities, listSources, type QueueFilters } from "@/lib/growth/opportunities";
 import { STATUS_LABELS } from "@/lib/growth/pipeline";
+import { growthBudget } from "@/lib/growth/budget";
 import { bookmarkletCode } from "@/lib/growth/capture";
 import { requireOwner } from "@/lib/owner";
 import { siteUrl } from "@/lib/site";
@@ -35,7 +36,8 @@ export default async function GrowthPage({ searchParams }: { searchParams: Promi
   await requireOwner();
   await ensureGrowthSeeded();
   const filters = filtersFrom(await searchParams);
-  const [rows, sources] = await Promise.all([listOpportunities(filters), listSources()]);
+  const [rows, sources, budget] = await Promise.all([listOpportunities(filters), listSources(), growthBudget()]);
+  const dollars = (micro: number) => `$${(micro / 1_000_000).toFixed(2)}`;
   const day = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" });
   const filtered = Boolean(filters.q || filters.tier || filters.sourceId || filters.status !== "active");
 
@@ -50,6 +52,11 @@ export default async function GrowthPage({ searchParams }: { searchParams: Promi
           <p className="mt-2 max-w-2xl text-muted">
             Posts where photographers ask about studio software. Review them, reply by hand, and track what happens. Only
             you see this.
+          </p>
+          <p className="mt-1 text-sm text-muted">
+            {budget.on
+              ? `AI this month: ${dollars(budget.spent)} of ${dollars(budget.cap)}${budget.canSpend ? "" : " (used up: scoring paused)"}`
+              : "AI scoring is off (no monthly cap set)."}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">

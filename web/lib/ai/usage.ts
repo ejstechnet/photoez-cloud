@@ -23,12 +23,14 @@ export type UsageRecord = {
   at?: Date;
 };
 
-export async function recordAiUsage(r: UsageRecord): Promise<void> {
+// Returns the new row's id (Growth links its analyses to it), or null when
+// the write failed.
+export async function recordAiUsage(r: UsageRecord): Promise<string | null> {
   try {
     const at = r.at ?? new Date();
     const price = priceFor(r.model, at);
     if (!price) console.warn(`No price for model ${r.model}; its cost is left empty.`);
-    await db.insert(aiUsage).values({
+    const [row] = await db.insert(aiUsage).values({
       photographerId: r.photographerId,
       feature: r.feature,
       model: r.model,
@@ -46,8 +48,10 @@ export async function recordAiUsage(r: UsageRecord): Promise<void> {
       traceId: r.traceId ?? null,
       galleryId: r.galleryId ?? null,
       createdAt: at,
-    });
+    }).returning({ id: aiUsage.id });
+    return row?.id ?? null;
   } catch (error) {
     console.error("Couldn't record AI usage", r.feature, error);
+    return null;
   }
 }

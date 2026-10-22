@@ -80,8 +80,9 @@ export async function runTriage(
     const run = await triageInquiry({
       client: options.client,
       // Every triage call is in the cost report; triage never counts toward a plan's limits.
-      onUsage: (usage) =>
-        recordAiUsage({ feature: "triage", photographerId: photographer.id, inquiryId: inquiry.id, ...usage, countsTowardLimit: false }),
+      onUsage: async (usage) => {
+        await recordAiUsage({ feature: "triage", photographerId: photographer.id, inquiryId: inquiry.id, ...usage, countsTowardLimit: false });
+      },
       message: inquiry.message,
       fromName: inquiry.fromName,
       fromEmail: inquiry.fromEmail,

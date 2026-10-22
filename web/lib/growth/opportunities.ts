@@ -1,6 +1,6 @@
 import { and, asc, desc, eq, ilike, notInArray, or, sql, type SQL } from "drizzle-orm";
 import { db } from "@/db";
-import { growthAudit, growthNotes, growthOpportunities, growthSources, growthStatusEvents } from "@/db/schema";
+import { growthAudit, growthFeatures, growthNotes, growthOpportunities, growthOutreach, growthSources, growthStatusEvents } from "@/db/schema";
 import type { GROWTH_KINDS, GrowthStatus, GrowthTier } from "./constants";
 import { CLOSED_STATUSES, effectiveScore, statusChangeProblem, tierFor } from "./pipeline";
 import { growthSeeded, seedGrowth } from "./seed";
@@ -82,7 +82,8 @@ export async function listOpportunities(filters: QueueFilters = {}) {
     .limit(500);
 }
 
-// One post with its source, history (oldest first) and notes (newest first).
+// One post with its source, history (oldest first), notes and replies
+// (newest first).
 export async function getOpportunity(id: string) {
   const [post] = await db
     .select({ post: growthOpportunities, source: growthSources })
@@ -90,11 +91,18 @@ export async function getOpportunity(id: string) {
     .leftJoin(growthSources, eq(growthSources.id, growthOpportunities.sourceId))
     .where(eq(growthOpportunities.id, id));
   if (!post) return null;
-  const [events, notes] = await Promise.all([
+  const [events, notes, outreach] = await Promise.all([
     db.select().from(growthStatusEvents).where(eq(growthStatusEvents.opportunityId, id)).orderBy(asc(growthStatusEvents.createdAt)),
     db.select().from(growthNotes).where(eq(growthNotes.opportunityId, id)).orderBy(desc(growthNotes.createdAt)),
+    db.select().from(growthOutreach).where(eq(growthOutreach.opportunityId, id)).orderBy(desc(growthOutreach.createdAt)),
   ]);
-  return { ...post.post, source: post.source, events, notes };
+  return { ...post.post, source: post.source, events, notes, outreach };
+}
+
+// Feature names by key, for showing which ones the AI matched.
+export async function featureNames(): Promise<Record<string, string>> {
+  const rows = await db.select({ key: growthFeatures.key, name: growthFeatures.name }).from(growthFeatures);
+  return Object.fromEntries(rows.map((r) => [r.key, r.name]));
 }
 
 export async function listSources() {
