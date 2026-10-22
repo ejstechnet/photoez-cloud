@@ -30,7 +30,14 @@ test("the first visit loads the starting data once", async () => {
   await ensureGrowthSeeded();
   await ensureGrowthSeeded();
   const sources = await db.select().from(growthSources);
-  assert.equal(sources.length, 2);
+  // The two starting sources, plus Elle's Facebook search (migration 0062).
+  assert.deepEqual(sources.map((s) => s.name).sort(), [
+    "Facebook search: how do you deliver photos to clients",
+    "Manual capture",
+    "My main photography Facebook group",
+  ]);
+  const search = sources.find((s) => s.name.startsWith("Facebook search"));
+  assert.match(search?.config.searchUrl ?? "", /^https:\/\/www\.facebook\.com\/search\/top\?q=how%20do%20you%20deliver%20photos%20to%20clients/);
 });
 
 test("a post is saved once, however its link is written", async () => {

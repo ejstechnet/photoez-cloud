@@ -6,6 +6,7 @@ import { QUEUE_SORTS, ensureGrowthSeeded, listOpportunities, listSources, type Q
 import { STATUS_LABELS } from "@/lib/growth/pipeline";
 import { growthBudget } from "@/lib/growth/budget";
 import { bookmarkletCode } from "@/lib/growth/capture";
+import { savedSearches } from "@/lib/growth/sources";
 import { requireOwner } from "@/lib/owner";
 import { siteUrl } from "@/lib/site";
 import { BookmarkInstaller } from "./bookmark-installer";
@@ -23,7 +24,10 @@ function filtersFrom(params: Record<string, string | string[] | undefined>): Que
   const sort = one("sort");
   return {
     q: one("q").slice(0, 200),
-    status: (GROWTH_STATUSES as readonly string[]).includes(status) || status === "all" ? (status as GrowthStatus | "all") : "active",
+    status:
+      (GROWTH_STATUSES as readonly string[]).includes(status) || status === "all" || status === "screened"
+        ? (status as GrowthStatus | "all" | "screened")
+        : "active",
     tier: (GROWTH_TIERS as readonly string[]).includes(tier) || tier === "unscored" ? (tier as GrowthTier | "unscored") : undefined,
     sourceId: /^[0-9a-f-]{36}$/i.test(one("source")) ? one("source") : undefined,
     sort: (QUEUE_SORTS as readonly string[]).includes(sort) ? (sort as QueueFilters["sort"]) : "newest",
@@ -36,7 +40,7 @@ export default async function GrowthPage({ searchParams }: { searchParams: Promi
   await requireOwner();
   await ensureGrowthSeeded();
   const filters = filtersFrom(await searchParams);
-  const [rows, sources, budget] = await Promise.all([listOpportunities(filters), listSources(), growthBudget()]);
+  const [rows, sources, budget, searches] = await Promise.all([listOpportunities(filters), listSources(), growthBudget(), savedSearches()]);
   const dollars = (micro: number) => `$${(micro / 1_000_000).toFixed(2)}`;
   const day = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" });
   const filtered = Boolean(filters.q || filters.tier || filters.sourceId || filters.status !== "active");
@@ -60,6 +64,9 @@ export default async function GrowthPage({ searchParams }: { searchParams: Promi
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
+          <Link href="/dashboard/growth/sources" className="btn-secondary">
+            Sources &amp; phrases
+          </Link>
           <Link href="/dashboard/growth/csv" className="btn-secondary" prefetch={false}>
             <DownloadIcon size={18} /> Spreadsheet
           </Link>
@@ -68,6 +75,18 @@ export default async function GrowthPage({ searchParams }: { searchParams: Promi
           </Link>
         </div>
       </div>
+
+      {searches.length > 0 && (
+        <div className="card mt-6 flex flex-wrap items-center gap-2 p-4">
+          <span className="mr-1 text-sm font-semibold">Your searches:</span>
+          {searches.map((s) => (
+            <a key={s.id} href={s.url} target="_blank" rel="noopener noreferrer" className="btn-secondary">
+              {s.name.replace(/^Facebook search:\s*/i, "")} ↗
+            </a>
+          ))}
+          <span className="text-xs text-muted">Opens the search; save good posts with the bookmark.</span>
+        </div>
+      )}
 
       <BookmarkInstaller code={bookmarkletCode(siteUrl)} />
 
@@ -79,6 +98,7 @@ export default async function GrowthPage({ searchParams }: { searchParams: Promi
         <select name="status" defaultValue={filters.status} aria-label="Status" className={inputClass}>
           <option value="active">Open posts</option>
           <option value="all">All posts</option>
+          <option value="screened">Filtered out by AI</option>
           {GROWTH_STATUSES.map((s) => (
             <option key={s} value={s}>
               {STATUS_LABELS[s]}
@@ -154,7 +174,12 @@ export default async function GrowthPage({ searchParams }: { searchParams: Promi
                   <p className="truncate font-semibold">{r.title || r.excerpt || r.url}</p>
                   {r.title && r.excerpt && <p className="line-clamp-2 text-sm text-foreground/80">{r.excerpt}</p>}
                   <p className="mt-1 truncate text-xs text-muted">
-                    {[PLATFORM_LABELS[r.platform], r.sourceName, r.authorLabel, `saved ${day.format(r.discoveredAt)}`]
+                    {[
+                      PLATFORM_LABELS[r.platform],
+                      r.sourceName,
+                      r.authorLabel,
+                      `${r.sourceKind && r.sourceKind !== "manual" ? "found" : "saved"} ${day.format(r.discoveredAt)}`,
+                    ]
                       .filter(Boolean)
                       .join(" · ")}
                     {r.nextActionAt && ` · follow up ${day.format(r.nextActionAt)}`}
