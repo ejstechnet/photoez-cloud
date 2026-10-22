@@ -1,28 +1,46 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { FormError, inputClass } from "@/components/form";
 import { GROWTH_STATUSES, type GrowthStatus } from "@/lib/growth/constants";
 import { NEEDS_EVIDENCE, STATUS_LABELS } from "@/lib/growth/pipeline";
 import { movePost, notePost, overrideScore, removePost, scheduleNextAction, type ActionResult } from "../actions";
 
-// The small forms on a saved post's page. Each one calls a server action and
-// shows its problem, if any, right underneath.
+// The small forms on a saved post's page. Each one calls a server action,
+// shows its problem (if any) right underneath, and its button says "Saved ✓"
+// for a moment afterwards so it's clear the change went through.
 
 function useAction() {
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [saved, setSaved] = useState(false);
+  const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  useEffect(() => () => clearTimeout(timer.current), []);
+
   const run = (action: () => Promise<ActionResult>, after?: () => void) =>
     startTransition(async () => {
       const result = await action();
       setError(result.error ?? null);
-      if (!result.error) after?.();
+      if (result.error) return;
+      after?.();
+      setSaved(true);
+      clearTimeout(timer.current);
+      timer.current = setTimeout(() => setSaved(false), 2500);
     });
-  return { pending, error, run };
+  return { pending, error, saved, run };
+}
+
+// A form's main button: "Saving…" while it works, then "Saved ✓".
+function SaveButton({ pending, saved, disabled, children }: { pending: boolean; saved: boolean; disabled?: boolean; children: React.ReactNode }) {
+  return (
+    <button type="submit" disabled={pending || disabled} className="btn-primary" aria-live="polite">
+      {pending ? "Saving…" : saved ? "Saved ✓" : children}
+    </button>
+  );
 }
 
 export function StatusForm({ id, status }: { id: string; status: GrowthStatus }) {
-  const { pending, error, run } = useAction();
+  const { pending, error, saved, run } = useAction();
   const [to, setTo] = useState<GrowthStatus>(status);
   const [evidence, setEvidence] = useState("");
   const needsEvidence = NEEDS_EVIDENCE.includes(to);
@@ -53,15 +71,15 @@ export function StatusForm({ id, status }: { id: string; status: GrowthStatus })
         />
       </div>
       <FormError message={error} />
-      <button type="submit" disabled={pending || to === status} className="btn-primary">
-        {pending ? "Saving…" : "Save change"}
-      </button>
+      <SaveButton pending={pending} saved={saved} disabled={to === status}>
+        Save change
+      </SaveButton>
     </form>
   );
 }
 
 export function ScoreForm({ id, override, reason }: { id: string; override: number | null; reason: string | null }) {
-  const { pending, error, run } = useAction();
+  const { pending, error, saved, run } = useAction();
   const [score, setScore] = useState(override === null ? "" : String(override));
   const [why, setWhy] = useState(reason ?? "");
 
@@ -86,9 +104,9 @@ export function ScoreForm({ id, override, reason }: { id: string; override: numb
       </div>
       <FormError message={error} />
       <div className="flex flex-wrap gap-2">
-        <button type="submit" disabled={pending} className="btn-secondary">
-          {pending ? "Saving…" : "Save score"}
-        </button>
+        <SaveButton pending={pending} saved={saved} disabled={score.trim() === ""}>
+          Save score
+        </SaveButton>
         {override !== null && (
           <button
             type="button"
@@ -105,7 +123,7 @@ export function ScoreForm({ id, override, reason }: { id: string; override: numb
 }
 
 export function NextActionForm({ id, day }: { id: string; day: string }) {
-  const { pending, error, run } = useAction();
+  const { pending, error, saved, run } = useAction();
   const [value, setValue] = useState(day);
 
   return (
@@ -118,15 +136,15 @@ export function NextActionForm({ id, day }: { id: string; day: string }) {
     >
       <input type="date" value={value} onChange={(e) => setValue(e.target.value)} aria-label="Follow up on" className={inputClass} />
       <FormError message={error} />
-      <button type="submit" disabled={pending || value === day} className="btn-secondary">
-        {pending ? "Saving…" : value ? "Set reminder" : "Clear reminder"}
-      </button>
+      <SaveButton pending={pending} saved={saved} disabled={value === day}>
+        {value || !day ? "Set reminder" : "Clear reminder"}
+      </SaveButton>
     </form>
   );
 }
 
 export function NoteForm({ id }: { id: string }) {
-  const { pending, error, run } = useAction();
+  const { pending, error, saved, run } = useAction();
   const [body, setBody] = useState("");
 
   return (
@@ -147,9 +165,9 @@ export function NoteForm({ id }: { id: string }) {
         className={inputClass}
       />
       <FormError message={error} />
-      <button type="submit" disabled={pending || !body.trim()} className="btn-secondary">
-        {pending ? "Saving…" : "Add note"}
-      </button>
+      <SaveButton pending={pending} saved={saved} disabled={!body.trim()}>
+        Add note
+      </SaveButton>
     </form>
   );
 }

@@ -4,7 +4,10 @@ import { inputClass } from "@/components/form";
 import { GROWTH_STATUSES, GROWTH_TIERS, type GrowthStatus, type GrowthTier } from "@/lib/growth/constants";
 import { QUEUE_SORTS, ensureGrowthSeeded, listOpportunities, listSources, type QueueFilters } from "@/lib/growth/opportunities";
 import { STATUS_LABELS } from "@/lib/growth/pipeline";
+import { bookmarkletCode } from "@/lib/growth/capture";
 import { requireOwner } from "@/lib/owner";
+import { siteUrl } from "@/lib/site";
+import { BookmarkInstaller } from "./bookmark-installer";
 import { PLATFORM_LABELS, STATUS_STYLES, TIER_LABELS, TIER_STYLES, badge } from "./labels";
 
 export const metadata = { title: "Growth · PhotoEZ Cloud" };
@@ -59,7 +62,9 @@ export default async function GrowthPage({ searchParams }: { searchParams: Promi
         </div>
       </div>
 
-      <form className="card mt-8 grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-[2fr_1fr_1fr_1fr_1fr_auto]" role="search">
+      <BookmarkInstaller code={bookmarkletCode(siteUrl)} />
+
+      <form className="card mt-6 grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-[2fr_1fr_1fr_1fr_1fr_auto]" role="search">
         <label className="block">
           <span className="sr-only">Search</span>
           <input name="q" defaultValue={filters.q} placeholder="Search text, link or name" className={inputClass} />

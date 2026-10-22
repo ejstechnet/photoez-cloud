@@ -6,15 +6,49 @@ import { Field, FormError, SelectField, SubmitButton, TextAreaField } from "@/co
 import { addPost, type PostFormState } from "../actions";
 import { KIND_LABELS } from "../labels";
 
-// Saving a post by hand. (Step 1.3 adds a one-click bookmark that fills this in.)
-export function PostForm({ sources }: { sources: { id: string; name: string }[] }) {
+export type PostPrefill = { url?: string; title?: string; excerpt?: string; sourceId?: string };
+
+// Saving a post: typed in by hand on "Add a post", or filled in by the
+// "Save to PhotoEZ Growth" bookmark on the capture page (mode "capture",
+// which stays in its small window and says it's saved).
+export function PostForm({
+  sources,
+  prefill,
+  prefillKey = 0,
+  mode,
+}: {
+  sources: { id: string; name: string }[];
+  prefill?: PostPrefill;
+  // Changes when the bookmark sends new text, so the fields refill.
+  prefillKey?: number;
+  mode?: "capture";
+}) {
   const [state, formAction, pending] = useActionState<PostFormState, FormData>(addPost, {});
   const errors = state.errors ?? {};
-  const v = state.values;
+  // What was typed wins after an attempt; otherwise what the bookmark sent.
+  const v = state.values ?? prefill;
+
+  if (state.savedId) {
+    return (
+      <div className="space-y-4 text-center">
+        <p className="font-display text-3xl font-bold">Saved ✓</p>
+        <p className="text-muted">It&apos;s in your Growth queue.</p>
+        <div className="flex flex-wrap justify-center gap-2">
+          <a href={`/dashboard/growth/${state.savedId}`} target="_blank" rel="noopener" className="btn-secondary">
+            Open it
+          </a>
+          <button type="button" onClick={() => window.close()} className="btn-primary">
+            Close this window
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    // A new key after each attempt re-fills the fields with what was typed.
-    <form key={state.attempt ?? 0} action={formAction} className="space-y-4" noValidate>
+    // A new key after each attempt (or new bookmark text) re-fills the fields.
+    <form key={`${prefillKey}-${state.attempt ?? 0}`} action={formAction} className="space-y-4" noValidate>
+      {mode && <input type="hidden" name="mode" value={mode} />}
       <Field
         label="Link to the post"
         name="url"
@@ -23,6 +57,7 @@ export function PostForm({ sources }: { sources: { id: string; name: string }[] 
         placeholder="https://www.facebook.com/groups/…/posts/…"
         defaultValue={v?.url}
         error={errors.url}
+        hint={mode ? "For a Facebook group post, open the post itself (click its date) so this is the post's own link." : undefined}
         required
       />
       <TextAreaField
@@ -43,7 +78,12 @@ export function PostForm({ sources }: { sources: { id: string; name: string }[] 
             </option>
           ))}
         </SelectField>
-        <SelectField label="This is" name="kind" defaultValue={v?.kind ?? "sales_opportunity"} error={errors.kind}>
+        <SelectField
+          label="This is"
+          name="kind"
+          defaultValue={state.values?.kind ?? "sales_opportunity"}
+          error={errors.kind}
+        >
           {Object.entries(KIND_LABELS).map(([value, label]) => (
             <option key={value} value={value}>
               {label}
@@ -62,7 +102,7 @@ export function PostForm({ sources }: { sources: { id: string; name: string }[] 
         <Field
           label="Their name as shown"
           name="authorLabel"
-          defaultValue={v?.authorLabel}
+          defaultValue={state.values?.authorLabel}
           error={errors.authorLabel}
           hint="Optional. Only the name on the post, nothing more."
         />
@@ -71,7 +111,7 @@ export function PostForm({ sources }: { sources: { id: string; name: string }[] 
         label="Posted on"
         name="publishedAt"
         type="date"
-        defaultValue={v?.publishedAt}
+        defaultValue={state.values?.publishedAt}
         error={errors.publishedAt}
         hint="Optional, but it counts toward the score."
       />
@@ -79,18 +119,24 @@ export function PostForm({ sources }: { sources: { id: string; name: string }[] 
       <FormError message={state.message} />
       {state.duplicateId && (
         <p>
-          <Link href={`/dashboard/growth/${state.duplicateId}`} className="link font-semibold">
+          <a href={`/dashboard/growth/${state.duplicateId}`} target={mode ? "_blank" : undefined} rel="noopener" className="link font-semibold">
             Open the saved post →
-          </Link>
+          </a>
         </p>
       )}
       <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center">
         <SubmitButton pending={pending} fullWidth={false}>
           Save post
         </SubmitButton>
-        <Link href="/dashboard/growth" className="btn-secondary">
-          Cancel
-        </Link>
+        {mode ? (
+          <button type="button" onClick={() => window.close()} className="btn-secondary">
+            Cancel
+          </button>
+        ) : (
+          <Link href="/dashboard/growth" className="btn-secondary">
+            Cancel
+          </Link>
+        )}
       </div>
     </form>
   );

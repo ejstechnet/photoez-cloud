@@ -55,6 +55,8 @@ export type PostFormState = {
   // (React clears a form after each submit). `attempt` re-fills it.
   values?: Record<PostField, string>;
   attempt?: number;
+  // From the bookmark's small window: stay there and say it's saved.
+  savedId?: string;
 };
 
 export async function addPost(prev: PostFormState, formData: FormData): Promise<PostFormState> {
@@ -82,6 +84,7 @@ export async function addPost(prev: PostFormState, formData: FormData): Promise<
   if (result.duplicate) return retry({ message: "This post is already saved.", duplicateId: result.id });
 
   revalidatePath("/dashboard/growth");
+  if (formData.get("mode") === "capture") return { savedId: result.id };
   redirect(`/dashboard/growth/${result.id}`);
 }
 
