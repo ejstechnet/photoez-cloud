@@ -6,6 +6,8 @@ export const FEATURE_LABELS: Record<AiFeature, string> = {
   assistant: "Studio Assistant",
   photo_tag: "Photo tagging",
   eval: "Evals",
+  growth_prefilter: "Growth: post check",
+  growth_analysis: "Growth: lead scoring",
 };
 
 // What one unit of each feature is.

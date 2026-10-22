@@ -20,6 +20,20 @@ import { GALLERY_STATUSES } from "../lib/gallery-status";
 import { PHOTO_KINDS } from "../lib/photo-limits";
 import { WATERMARK_POSITIONS } from "../lib/watermark";
 import { INVOICE_KINDS, INVOICE_STATUSES, type LineItem, type PaymentPlan, type ScheduledPayment } from "../lib/invoices/math";
+import {
+  DEFAULT_DISCLOSURE,
+  GROWTH_ANALYSIS_STAGES,
+  GROWTH_FEATURE_AREAS,
+  GROWTH_FEATURE_STATUSES,
+  GROWTH_KEYWORD_GROUPS,
+  GROWTH_KINDS,
+  GROWTH_OUTREACH_STATES,
+  GROWTH_PLATFORMS,
+  GROWTH_SOURCE_KINDS,
+  GROWTH_STATUSES,
+  GROWTH_TIERS,
+  type GrowthCriteria,
+} from "../lib/growth/constants";
 
 // A photographer's account. Better Auth uses this as its user table
 // (see lib/auth.ts), so name, email, emailVerified, image, createdAt and
@@ -1077,7 +1091,9 @@ export const giftCards = pgTable(
 // costs can be reported (/dashboard/ai-usage) and each plan's monthly
 // allowance enforced. Plan limits count a studio's rows for one feature with
 // counts_toward_limit: one Assistant question, or one photo described.
-export const AI_FEATURES = ["triage", "assistant", "photo_tag", "eval"] as const;
+// growth_*: the owner-only Growth section's lead checks (no studio, never
+// counted against a plan; see lib/growth).
+export const AI_FEATURES = ["triage", "assistant", "photo_tag", "eval", "growth_prefilter", "growth_analysis"] as const;
 export type AiFeature = (typeof AI_FEATURES)[number];
 export const aiUsage = pgTable(
   "ai_usage",
@@ -1552,3 +1568,204 @@ export const leads = pgTable("leads", {
   quiz: jsonb("quiz").$type<import("../lib/quiz").QuizAnswers>(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+// ---- Growth (GrowthPilot) --------------------------------------------------
+// The owner-only Growth section: public posts where photographers ask about
+// studio software, scored for buying intent, with honest replies Elle approves
+// and posts herself. Nothing here belongs to a studio, and nothing writes to
+// studio tables. Kept together (growth_* tables, lib/growth,
+// app/dashboard/growth) so it could be lifted into its own app later.
+
+// What PhotoEZ Cloud really does today: the only claims a drafted reply may
+// make (lib/growth/seed-data.ts holds the starting list).
+export const growthFeatures = pgTable("growth_features", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  key: text("key").notNull().unique(),
+  name: text("name").notNull(),
+  area: text("area", { enum: GROWTH_FEATURE_AREAS }).notNull(),
+  status: text("status", { enum: GROWTH_FEATURE_STATUSES }).notNull(),
+  // Which plans include it, as shown on /pricing ("All", "Pro, Studio").
+  plans: text("plans").notNull().default("All"),
+  // What a reply must say alongside it, e.g. "needs their own Twilio account".
+  replyNote: text("reply_note"),
+  evidenceUrl: text("evidence_url"),
+  verifiedAt: date("verified_at").notNull(),
+  sortOrder: integer("sort_order").notNull().default(0),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+// Where posts come from, with that community's rules, which every drafted
+// reply follows (Elle's main Facebook group blocks links, for one).
+export const growthSources = pgTable("growth_sources", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  name: text("name").notNull().unique(),
+  platform: text("platform", { enum: GROWTH_PLATFORMS }).notNull(),
+  kind: text("kind", { enum: GROWTH_SOURCE_KINDS }).notNull().default("manual"),
+  // Feed URL or search query for automatic sources. Never secrets.
+  config: jsonb("config").$type<Record<string, string>>().notNull().default({}),
+  enabled: boolean("enabled").notNull().default(true),
+  linksAllowed: boolean("links_allowed").notNull().default(false),
+  selfPromoAllowed: boolean("self_promo_allowed").notNull().default(false),
+  disclosure: text("disclosure").notNull().default(DEFAULT_DISCLOSURE),
+  rulesNote: text("rules_note"),
+  rulesCheckedAt: date("rules_checked_at"),
+  lastRunAt: timestamp("last_run_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+// Search phrases, grouped as in the spec.
+export const growthKeywords = pgTable("growth_keywords", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  group: text("group", { enum: GROWTH_KEYWORD_GROUPS }).notNull(),
+  phrase: text("phrase").notNull().unique(),
+  enabled: boolean("enabled").notNull().default(true),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+// One public post. The canonical URL (tracking bits, fragments and mobile
+// hosts stripped) is what stops the same post being saved twice.
+export const growthOpportunities = pgTable(
+  "growth_opportunities",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    sourceId: uuid("source_id").references(() => growthSources.id, { onDelete: "set null" }),
+    url: text("url").notNull(),
+    canonicalUrl: text("canonical_url").notNull().unique(),
+    // The post's id at its source (search results), when there is one.
+    externalId: text("external_id"),
+    platform: text("platform", { enum: GROWTH_PLATFORMS }).notNull(),
+    title: text("title"),
+    // Only the public text Elle captured (or a search snippet). Cleared by
+    // the retention rules once a post is no longer useful.
+    excerpt: text("excerpt"),
+    contentHash: text("content_hash"),
+    // The public display name as shown on the post, if Elle wants it. Never
+    // looked up or added to.
+    authorLabel: text("author_label"),
+    publishedAt: timestamp("published_at", { withTimezone: true }),
+    discoveredAt: timestamp("discovered_at", { withTimezone: true }).notNull().defaultNow(),
+    kind: text("kind", { enum: GROWTH_KINDS }).notNull().default("sales_opportunity"),
+    // The latest growth_status_events.to_status, kept here for filters.
+    status: text("status", { enum: GROWTH_STATUSES }).notNull().default("new"),
+    score: integer("score"),
+    tier: text("tier", { enum: GROWTH_TIERS }),
+    // Elle's own score, when she disagrees with the AI's (with why).
+    scoreOverride: integer("score_override"),
+    overrideReason: text("override_reason"),
+    nextActionAt: timestamp("next_action_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    // Nulls never clash, so posts with no external id are fine.
+    unique("growth_opportunities_source_external").on(t.sourceId, t.externalId),
+    index("growth_opportunities_queue_idx").on(t.status, t.tier),
+    index("growth_opportunities_discovered_idx").on(t.discoveredAt),
+    index("growth_opportunities_next_action_idx").on(t.nextActionAt),
+  ],
+);
+
+// One AI pass over a post: the cheap "is this about business software?"
+// check, or the full scoring with a drafted reply. Same text + prompt +
+// model = same input_hash, so a re-score reuses the saved answer for free.
+export const growthAnalyses = pgTable(
+  "growth_analyses",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    opportunityId: uuid("opportunity_id")
+      .notNull()
+      .references(() => growthOpportunities.id, { onDelete: "cascade" }),
+    stage: text("stage", { enum: GROWTH_ANALYSIS_STAGES }).notNull(),
+    model: text("model").notNull(),
+    promptVersion: text("prompt_version").notNull(),
+    inputHash: text("input_hash").notNull(),
+    result: jsonb("result").$type<Record<string, unknown>>().notNull(),
+    // Full stage only: each criterion's points, out of how many, and the quote.
+    criteria: jsonb("criteria").$type<GrowthCriteria>(),
+    total: integer("total"),
+    confidence: doublePrecision("confidence"),
+    aiUsageId: uuid("ai_usage_id").references(() => aiUsage.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    unique("growth_analyses_cache").on(t.inputHash, t.stage),
+    index("growth_analyses_opportunity_idx").on(t.opportunityId, t.createdAt),
+  ],
+);
+
+// Every pipeline move, with the evidence behind it. Only Elle (or, later,
+// a matched sign-up) writes these; the AI never does.
+export const growthStatusEvents = pgTable(
+  "growth_status_events",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    opportunityId: uuid("opportunity_id")
+      .notNull()
+      .references(() => growthOpportunities.id, { onDelete: "cascade" }),
+    fromStatus: text("from_status", { enum: GROWTH_STATUSES }),
+    toStatus: text("to_status", { enum: GROWTH_STATUSES }).notNull(),
+    evidence: text("evidence"),
+    // "owner", or "system:…" for an automatic match.
+    actor: text("actor").notNull().default("owner"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("growth_status_events_opportunity_idx").on(t.opportunityId, t.createdAt)],
+);
+
+export const growthNotes = pgTable(
+  "growth_notes",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    opportunityId: uuid("opportunity_id")
+      .notNull()
+      .references(() => growthOpportunities.id, { onDelete: "cascade" }),
+    body: text("body").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("growth_notes_opportunity_idx").on(t.opportunityId, t.createdAt)],
+);
+
+// A reply: the draft, Elle's approval, and what she actually posted by hand.
+export const growthOutreach = pgTable(
+  "growth_outreach",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    opportunityId: uuid("opportunity_id")
+      .notNull()
+      .references(() => growthOpportunities.id, { onDelete: "cascade" }),
+    // The analysis it was drafted from; null for a reply Elle wrote herself.
+    analysisId: uuid("analysis_id").references(() => growthAnalyses.id, { onDelete: "set null" }),
+    draft: text("draft").notNull(),
+    state: text("state", { enum: GROWTH_OUTREACH_STATES }).notNull().default("draft"),
+    approvedAt: timestamp("approved_at", { withTimezone: true }),
+    // What really went out (Elle may edit before posting), and where.
+    postedText: text("posted_text"),
+    postedUrl: text("posted_url"),
+    postedAt: timestamp("posted_at", { withTimezone: true }),
+    replySeenAt: timestamp("reply_seen_at", { withTimezone: true }),
+    followUpAt: timestamp("follow_up_at", { withTimezone: true }),
+    outcome: text("outcome"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index("growth_outreach_opportunity_idx").on(t.opportunityId, t.createdAt),
+    index("growth_outreach_follow_up_idx").on(t.followUpAt),
+  ],
+);
+
+// Growth actions worth a record: exports, deletions, "forget this person",
+// setting changes. Never holds secrets.
+export const growthAudit = pgTable(
+  "growth_audit",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    action: text("action").notNull(),
+    entityId: text("entity_id"),
+    details: jsonb("details").$type<Record<string, unknown>>().notNull().default({}),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("growth_audit_created_idx").on(t.createdAt)],
+);
