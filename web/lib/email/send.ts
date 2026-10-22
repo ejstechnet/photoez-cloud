@@ -47,6 +47,8 @@ export type EmailKind =
   | "quote_reminder"
   | "invoice_payment"
   | "invoice_update"
+  // The owner's daily Growth summary (lib/growth/digest.ts).
+  | "growth_digest"
   | "test";
 
 let transport: Transporter | null | undefined;

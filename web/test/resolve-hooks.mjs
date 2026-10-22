@@ -31,5 +31,8 @@ export async function resolve(specifier, context, next) {
     const found = withExtension(new URL(specifier, context.parentURL).href);
     if (found) return { url: found, shortCircuit: true };
   }
+  // Next's entry points ("next/server", "next/cache") are plain .js files
+  // without a package exports map, so Node wants the extension spelled out.
+  if (/^next\/[a-z-]+$/.test(specifier)) return next(`${specifier}.js`, context);
   return next(specifier, context);
 }

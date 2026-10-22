@@ -31,8 +31,10 @@ export function PostForm({
   if (state.savedId) {
     return (
       <div className="space-y-4 text-center">
-        <p className="font-display text-3xl font-bold">Saved ✓</p>
-        <p className="text-muted">It&apos;s in your Growth queue.</p>
+        <p className="font-display text-3xl font-bold">{state.updated ? "Updated ✓" : "Saved ✓"}</p>
+        <p className="text-muted">
+          {state.updated ? "It was already in your queue; it now has the full text and is being scored again." : "It's in your Growth queue."}
+        </p>
         <div className="flex flex-wrap justify-center gap-2">
           <a href={`/dashboard/growth/${state.savedId}`} target="_blank" rel="noopener" className="btn-secondary">
             Open it

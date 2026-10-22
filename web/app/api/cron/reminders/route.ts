@@ -1,7 +1,9 @@
 import { timingSafeEqual } from "node:crypto";
+import { after } from "next/server";
 import { expireProposals } from "@/lib/ai/assistant/executor";
 import { pruneTraces } from "@/lib/ai/assistant/trace";
 import { runReminders } from "@/lib/email/reminders";
+import { runGrowthTick } from "@/lib/growth/tick";
 
 // Called by the server's cron every 15 minutes:
 //   curl -X POST -H "Authorization: Bearer $CRON_SECRET" http://127.0.0.1:3002/api/cron/reminders
@@ -21,5 +23,8 @@ export async function POST(request: Request) {
   // older than AI_TRACE_KEEP_DAYS (90) are deleted.
   const expiredCards = await expireProposals().catch((e) => (console.error("Expiring assistant cards failed", e), 0));
   const prunedTraces = await pruneTraces().catch((e) => (console.error("Pruning AI traces failed", e), 0));
+  // The owner's Growth section: read due feeds, score new posts, send the
+  // daily summary. Runs after the answer, since AI scoring can take minutes.
+  after(() => runGrowthTick().catch((e) => console.error("Growth tick failed", e)));
   return Response.json({ ok: true, sent, expiredCards, prunedTraces });
 }

@@ -21,8 +21,9 @@ export type QueueSort = (typeof QUEUE_SORTS)[number];
 
 export type QueueFilters = {
   q?: string;
-  // "active" (the default) hides closed and not-a-fit posts; "all" shows everything.
-  status?: GrowthStatus | "active" | "all";
+  // "active" (the default) hides closed and not-a-fit posts, and found posts
+  // the AI filtered out; "screened" shows only those; "all" shows everything.
+  status?: GrowthStatus | "active" | "screened" | "all";
   tier?: GrowthTier | "unscored";
   sourceId?: string;
   sort?: QueueSort;
@@ -46,7 +47,9 @@ export async function listOpportunities(filters: QueueFilters = {}) {
     );
   }
   const status = filters.status ?? "active";
-  if (status === "active") where.push(notInArray(growthOpportunities.status, [...CLOSED_STATUSES]));
+  if (status === "active") {
+    where.push(notInArray(growthOpportunities.status, [...CLOSED_STATUSES]), eq(growthOpportunities.screenedOut, false));
+  } else if (status === "screened") where.push(eq(growthOpportunities.screenedOut, true));
   else if (status !== "all") where.push(eq(growthOpportunities.status, status));
   if (filters.tier === "unscored") where.push(sql`${scoreSql} is null`);
   else if (filters.tier) where.push(eq(growthOpportunities.tier, filters.tier));
@@ -73,7 +76,9 @@ export async function listOpportunities(filters: QueueFilters = {}) {
       kind: growthOpportunities.kind,
       discoveredAt: growthOpportunities.discoveredAt,
       nextActionAt: growthOpportunities.nextActionAt,
+      screenedOut: growthOpportunities.screenedOut,
       sourceName: growthSources.name,
+      sourceKind: growthSources.kind,
     })
     .from(growthOpportunities)
     .leftJoin(growthSources, eq(growthSources.id, growthOpportunities.sourceId))
@@ -117,34 +122,53 @@ export type NewOpportunity = {
   authorLabel: string | null;
   publishedAt: Date | null;
   kind: (typeof GROWTH_KINDS)[number];
+  // The feed's own id for an item found automatically.
+  externalId?: string | null;
 };
 
+export type CreateResult = { id: string; duplicate: boolean; updated?: boolean } | { error: string };
+
 // Saves a post, or points at the one already saved under the same link.
-export async function createOpportunity(input: NewOpportunity): Promise<{ id: string; duplicate: boolean } | { error: string }> {
+// With `fillText`, a saved post whose text is shorter (a search snippet) gets
+// the fuller text instead: that's how the bookmark upgrades a found post.
+export async function createOpportunity(input: NewOpportunity, options: { fillText?: boolean; evidence?: string } = {}): Promise<CreateResult> {
   const canonical = canonicalUrl(input.url);
   if (!canonical) return { error: "That doesn't look like a web link." };
 
   const [existing] = await db
-    .select({ id: growthOpportunities.id })
+    .select({ id: growthOpportunities.id, excerpt: growthOpportunities.excerpt, title: growthOpportunities.title })
     .from(growthOpportunities)
     .where(eq(growthOpportunities.canonicalUrl, canonical));
-  if (existing) return { id: existing.id, duplicate: true };
+  if (existing) {
+    const longer = input.excerpt.trim().length > (existing.excerpt ?? "").trim().length + 20;
+    if (!options.fillText || !longer) return { id: existing.id, duplicate: true };
+    await db
+      .update(growthOpportunities)
+      .set({ excerpt: input.excerpt.trim(), title: existing.title || input.title, screenedOut: false, updatedAt: new Date() })
+      .where(eq(growthOpportunities.id, existing.id));
+    return { id: existing.id, duplicate: true, updated: true };
+  }
 
   return db.transaction(async (tx) => {
     const [row] = await tx
       .insert(growthOpportunities)
       .values({ ...input, url: input.url.trim(), canonicalUrl: canonical, platform: platformFromUrl(canonical) })
-      .onConflictDoNothing({ target: growthOpportunities.canonicalUrl })
+      .onConflictDoNothing()
       .returning({ id: growthOpportunities.id });
-    // Saved by someone else a moment ago (two tabs): use that one.
+    // Already there after all: saved a moment ago (two tabs), or a feed item
+    // seen before under a different link.
     if (!row) {
       const [again] = await tx
         .select({ id: growthOpportunities.id })
         .from(growthOpportunities)
-        .where(eq(growthOpportunities.canonicalUrl, canonical));
-      return { id: again.id, duplicate: true };
+        .where(
+          input.externalId && input.sourceId
+            ? or(eq(growthOpportunities.canonicalUrl, canonical), and(eq(growthOpportunities.sourceId, input.sourceId), eq(growthOpportunities.externalId, input.externalId)))
+            : eq(growthOpportunities.canonicalUrl, canonical),
+        );
+      return again ? { id: again.id, duplicate: true } : { error: "Couldn't save that post." };
     }
-    await tx.insert(growthStatusEvents).values({ opportunityId: row.id, fromStatus: null, toStatus: "new", evidence: "Saved" });
+    await tx.insert(growthStatusEvents).values({ opportunityId: row.id, fromStatus: null, toStatus: "new", evidence: options.evidence ?? "Saved" });
     return { id: row.id, duplicate: false };
   });
 }

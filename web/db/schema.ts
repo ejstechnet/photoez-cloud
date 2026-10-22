@@ -1655,6 +1655,10 @@ export const growthOpportunities = pgTable(
     scoreOverride: integer("score_override"),
     overrideReason: text("override_reason"),
     nextActionAt: timestamp("next_action_at", { withTimezone: true }),
+    // Found automatically, and the quick AI check said it isn't about running
+    // a photography business: kept (so it isn't found and paid for again) but
+    // out of the queue. Not a status: the AI never moves those.
+    screenedOut: boolean("screened_out").notNull().default(false),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
@@ -1756,8 +1760,28 @@ export const growthOutreach = pgTable(
   ],
 );
 
+// Each automatic search of a source (lib/growth/discover.ts): what it found
+// and any error, so a quiet feed can be told apart from a broken one.
+export const growthJobRuns = pgTable(
+  "growth_job_runs",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    job: text("job").notNull(),
+    sourceId: uuid("source_id").references(() => growthSources.id, { onDelete: "cascade" }),
+    startedAt: timestamp("started_at", { withTimezone: true }).notNull().defaultNow(),
+    finishedAt: timestamp("finished_at", { withTimezone: true }),
+    status: text("status", { enum: ["running", "ok", "error"] }).notNull().default("running"),
+    // Items in the feed, new posts saved, and how many the AI kept.
+    found: integer("found").notNull().default(0),
+    saved: integer("saved").notNull().default(0),
+    kept: integer("kept").notNull().default(0),
+    error: text("error"),
+  },
+  (t) => [index("growth_job_runs_source_idx").on(t.sourceId, t.startedAt)],
+);
+
 // Growth actions worth a record: exports, deletions, "forget this person",
-// setting changes. Never holds secrets.
+// setting changes, daily emails sent. Never holds secrets.
 export const growthAudit = pgTable(
   "growth_audit",
   {

@@ -62,6 +62,8 @@ export type PostFormState = {
   attempt?: number;
   // From the bookmark's small window: stay there and say it's saved.
   savedId?: string;
+  // It was already saved (found by search) and now has the full text.
+  updated?: boolean;
 };
 
 export async function addPost(prev: PostFormState, formData: FormData): Promise<PostFormState> {
@@ -84,8 +86,15 @@ export async function addPost(prev: PostFormState, formData: FormData): Promise<
     return retry({ errors });
   }
 
-  const result = await createOpportunity(parsed.data);
+  const result = await createOpportunity(parsed.data, { fillText: true });
   if ("error" in result) return retry({ errors: { url: result.error } });
+  if (result.updated) {
+    // A found post (just a search snippet) now has the full text: score it again.
+    after(() => analyzeOpportunity(result.id));
+    revalidatePath("/dashboard/growth");
+    if (formData.get("mode") === "capture") return { savedId: result.id, updated: true };
+    redirect(`/dashboard/growth/${result.id}`);
+  }
   if (result.duplicate) return retry({ message: "This post is already saved.", duplicateId: result.id });
 
   // Scored by AI right after the page answers (when Growth AI is on), so
