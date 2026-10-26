@@ -42,7 +42,8 @@ export default async function SupportPage({ searchParams }: PageProps<"/support"
 
   return (
     <div className="flex flex-1 flex-col">
-      <header className="bg-brand text-white">
+      {/* Deep navy, like the home page. */}
+      <header className="text-white" style={{ backgroundColor: "#060f1e" }}>
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-5">
           <Logo />
           <nav className="flex items-center gap-6">
