@@ -7,7 +7,7 @@ import { trialDaysLeft } from "@/lib/plans";
 import { requirePhotographer } from "@/lib/session";
 import { isOwnerEmail } from "@/lib/owner";
 import { storeOpenFor } from "@/lib/store/launch";
-import { GearIcon } from "@/components/icons";
+import { GearIcon, HelpIcon } from "@/components/icons";
 import { NavLink } from "./nav-link";
 import { NavMenu } from "./nav-menu";
 import { SignOutButton } from "./sign-out-button";
@@ -79,7 +79,6 @@ export default async function DashboardLayout({ children }: LayoutProps<"/dashbo
                 { href: "/dashboard/billing#refer", label: "Refer a photographer" },
                 { href: "/dashboard/emails", label: "Email log" },
                 { href: "/dashboard/texts", label: "Text log" },
-                { href: "/support", label: "Help & support" },
                 // PhotoEZ Cloud's owner only: Support page messages, Growth (GrowthPilot), sign-ups, AI step logs and AI costs.
                 ...(isOwnerEmail(user.email)
                   ? [
@@ -93,7 +92,17 @@ export default async function DashboardLayout({ children }: LayoutProps<"/dashbo
               ]}
             />
           </nav>
-          <SignOutButton />
+          <div className="flex items-center gap-2">
+            {/* A new tab, so the guide sits beside the page they're working on. */}
+            <Link
+              href="/support"
+              target="_blank"
+              className="flex items-center gap-1.5 rounded-full bg-lime px-4 py-1.5 text-xs font-bold tracking-wider text-brand-deep uppercase transition hover:-translate-y-0.5"
+            >
+              <HelpIcon size={15} strokeWidth={2.5} /> Help
+            </Link>
+            <SignOutButton />
+          </div>
         </div>
       </header>
       {trialLeft > 0 && (
