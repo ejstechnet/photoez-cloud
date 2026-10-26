@@ -575,18 +575,21 @@ export default async function Home() {
             <a href={PHOTOEZ_LINKS.liteWordPressOrg} className="hover:text-foreground">
               PhotoEZ Lite on WordPress.org
             </a>
-            <Link href="/terms" className="hover:text-foreground">
-              Terms of Service
+            <Link href="/support" className="hover:text-foreground">
+              Help &amp; support
             </Link>
             <a href={PHOTOEZ_LINKS.lite} className="hover:text-foreground">
               About PhotoEZ Lite
             </a>
-            <Link href="/privacy" className="hover:text-foreground">
-              Privacy Policy
+            <Link href="/terms" className="hover:text-foreground">
+              Terms of Service
             </Link>
             <a href={PHOTOEZ_LINKS.ejstech} className="hover:text-foreground">
               EJS Tech
             </a>
+            <Link href="/privacy" className="hover:text-foreground">
+              Privacy Policy
+            </Link>
           </nav>
         </div>
       </footer>

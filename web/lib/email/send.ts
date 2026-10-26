@@ -49,6 +49,8 @@ export type EmailKind =
   | "invoice_update"
   // The owner's daily Growth summary (lib/growth/digest.ts).
   | "growth_digest"
+  // A Support page message, to the owner (app/support).
+  | "support_message"
   | "test";
 
 let transport: Transporter | null | undefined;
