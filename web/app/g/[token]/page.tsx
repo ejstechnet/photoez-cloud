@@ -106,6 +106,7 @@ export default async function ClientGalleryPage({ params, searchParams }: PagePr
         logoUrl={logoUrl}
         logoBg={gallery.logoBg}
         links={gallery.studioSlug ? [{ href: `/studio/${gallery.studioSlug}#contact`, label: "Contact" }] : []}
+        help
       >
         {gallery.studioSlug && (
           <Link

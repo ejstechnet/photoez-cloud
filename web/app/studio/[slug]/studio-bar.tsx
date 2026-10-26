@@ -31,6 +31,7 @@ export async function StudioBar({
       logoUrl={logoUrl}
       logoBg={logoBg}
       links={await studioLinks(slug)}
+      help
     >
       {bookButton && (
         <Link

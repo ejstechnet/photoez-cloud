@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { HelpIcon } from "@/components/icons";
 import { isDarkColor, studioBarColor } from "@/lib/studio-bar";
 
 export type NavItem = { href: string; label: string };
@@ -14,6 +15,7 @@ export function StudioNav({
   logoBg,
   links = [],
   sticky = false,
+  help = false,
   children,
 }: {
   slug: string | null;
@@ -22,6 +24,8 @@ export function StudioNav({
   logoBg: string;
   links?: NavItem[];
   sticky?: boolean;
+  // A "Get help" link to the client guides on the Support page.
+  help?: boolean;
   // Buttons on the right, e.g. "Book now".
   children?: React.ReactNode;
 }) {
@@ -63,6 +67,24 @@ export function StudioNav({
               {link.label}
             </Link>
           ))}
+          {help && (
+            // Shown on phones too (just the icon, so it fits beside a Book
+            // button), unlike the links above. A new tab keeps the client's
+            // place in their gallery or booking.
+            <Link
+              href="/support?for=clients"
+              target="_blank"
+              aria-label="Get help"
+              title="Get help"
+              className={`flex shrink-0 items-center gap-1.5 rounded-full border-2 p-1.5 text-xs sm:px-3 font-bold tracking-wider whitespace-nowrap uppercase transition ${
+                dark
+                  ? "border-white/30 text-white hover:border-white hover:bg-white/10"
+                  : "border-brand-deep/20 text-brand-deep hover:border-brand-deep/50 hover:bg-brand-deep/5"
+              }`}
+            >
+              <HelpIcon size={16} strokeWidth={2.25} /> <span className="hidden sm:inline">Get help</span>
+            </Link>
+          )}
           {children}
         </div>
       </div>
