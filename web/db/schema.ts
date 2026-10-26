@@ -19,6 +19,7 @@ import { PLANS } from "../lib/plans";
 import { GALLERY_STATUSES } from "../lib/gallery-status";
 import { PHOTO_KINDS } from "../lib/photo-limits";
 import { WATERMARK_POSITIONS } from "../lib/watermark";
+import { SUPPORT_ROLES } from "../lib/support";
 import { INVOICE_KINDS, INVOICE_STATUSES, type LineItem, type PaymentPlan, type ScheduledPayment } from "../lib/invoices/math";
 import {
   DEFAULT_DISCLOSURE,
@@ -1792,4 +1793,28 @@ export const growthAudit = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index("growth_audit_created_idx").on(t.createdAt)],
+);
+
+// Messages from the Support page's contact form (app/support), sent by
+// photographers and by their clients. Each is also emailed to the owner; it's
+// kept here too so none are lost if that email fails (Settings > Support inbox).
+export const supportMessages = pgTable(
+  "support_messages",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    role: text("role", { enum: SUPPORT_ROLES }).notNull(),
+    topic: text("topic").notNull(),
+    name: text("name").notNull(),
+    email: text("email").notNull(),
+    // The photographer's own studio, or the studio a client booked with.
+    studio: text("studio"),
+    pageUrl: text("page_url"),
+    message: text("message").notNull(),
+    userAgent: text("user_agent"),
+    // Set when a logged-in photographer sent it.
+    photographerId: uuid("photographer_id").references(() => photographers.id, { onDelete: "set null" }),
+    status: text("status", { enum: ["new", "done"] }).notNull().default("new"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("support_messages_status_idx").on(t.status, t.createdAt), index("support_messages_email_idx").on(t.email, t.createdAt)],
 );

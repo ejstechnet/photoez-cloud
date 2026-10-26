@@ -209,7 +209,10 @@ export default async function ClientGalleryPage({ params, searchParams }: PagePr
 
       <footer className="border-t border-border py-6">
         <p className="flex items-center justify-center gap-2 text-xs text-muted">
-          <PhotoEZCloudMark className="h-5 w-7" /> Gallery by PhotoEZ Cloud
+          <PhotoEZCloudMark className="h-5 w-7" /> Gallery by PhotoEZ Cloud ·{" "}
+          <Link href="/support?for=clients" className="hover:text-foreground">
+            Help
+          </Link>
         </p>
       </footer>
     </div>

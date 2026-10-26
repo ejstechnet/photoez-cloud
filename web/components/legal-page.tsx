@@ -44,6 +44,10 @@ export function LegalFooter() {
   return (
     <footer className="mt-auto border-t border-border py-6 text-center text-sm text-muted">
       © {new Date().getFullYear()} {LEGAL.company} ·{" "}
+      <Link href="/support" className="hover:text-foreground">
+        Help &amp; support
+      </Link>{" "}
+      ·{" "}
       <Link href="/terms" className="hover:text-foreground">
         Terms of Service
       </Link>{" "}

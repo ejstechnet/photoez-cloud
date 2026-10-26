@@ -15,6 +15,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   return [
     { url: `${siteUrl}/`, priority: 1 },
     { url: `${siteUrl}/pricing`, priority: 0.8 },
+    { url: `${siteUrl}/support`, priority: 0.6 },
     { url: `${siteUrl}/articles`, priority: 0.7 },
     ...ARTICLES.map(({ meta }) => ({ url: `${siteUrl}/articles/${meta.slug}`, lastModified: meta.updated ?? meta.published, priority: 0.7 })),
     { url: `${siteUrl}/quiz`, priority: 0.5 },
