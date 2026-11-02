@@ -188,6 +188,25 @@ export default async function SettingsPage({ searchParams }: PageProps<"/dashboa
             <NotesToggle enabled={settings.photoNotesEnabled} />
             </div>
           </section>
+          <ReviewsCard requestDays={settings.reviewRequestDays} googleUrl={settings.googleReviewUrl} />
+          <ClientReferralsCard
+            enabled={settings.clientReferralsEnabled}
+            rewardCents={settings.clientReferralRewardCents}
+            discountCents={settings.clientReferralDiscountCents}
+          />
+          <GiftCardsCard
+            enabled={settings.giftCardsEnabled}
+            amounts={settings.giftCardAmounts}
+            minCents={settings.giftCardMinCents}
+            maxCents={settings.giftCardMaxCents}
+            paymentsReady={stripeReady}
+          />
+          <PlanCard
+            planLabel={PLAN_LABELS[plan.plan]}
+            upsells={plan.upsells}
+            upgradePlanLabel={PLAN_LABELS[planFor("galleryUpsells")]}
+            extraPhotoPriceCents={plan.extraPhotoPriceCents}
+          />
         </div>
         <div className="space-y-8">
           <PaymentsCard
@@ -221,37 +240,19 @@ export default async function SettingsPage({ searchParams }: PageProps<"/dashboa
           <ImportCard initial={await importView(user.id)} />
           <MigrationCard siteUrl={siteUrl} keys={await migrationKeyRows(user.id, settings.timeZone)} />
           <CalendarCard link={settings.calendarToken ? calendarUrl(settings.calendarToken) : null} />
-          <ReviewsCard requestDays={settings.reviewRequestDays} googleUrl={settings.googleReviewUrl} />
-          <ClientReferralsCard
-            enabled={settings.clientReferralsEnabled}
-            rewardCents={settings.clientReferralRewardCents}
-            discountCents={settings.clientReferralDiscountCents}
-          />
-          <GiftCardsCard
-            enabled={settings.giftCardsEnabled}
-            amounts={settings.giftCardAmounts}
-            minCents={settings.giftCardMinCents}
-            maxCents={settings.giftCardMaxCents}
-            paymentsReady={stripeReady}
-          />
-          <PlanCard
-            planLabel={PLAN_LABELS[plan.plan]}
-            upsells={plan.upsells}
-            upgradePlanLabel={PLAN_LABELS[planFor("galleryUpsells")]}
-            extraPhotoPriceCents={plan.extraPhotoPriceCents}
-          />
-          <section id="faq" className="card scroll-mt-8 p-6 sm:p-8">
-            <h2 className="font-display text-2xl font-bold">Client FAQ</h2>
-            <p className="mt-1 text-sm text-muted">
-              Answer once, and clients find it themselves: your answers appear on your studio page, and the AI uses them to
-              reply to inquiries without you. Skip any question by leaving it blank.
-            </p>
-            <div className="mt-6">
-              <FaqForm saved={faqs} suggestions={suggestions} />
-            </div>
-          </section>
         </div>
       </div>
+      {/* Full width below the columns; its questions sit in two columns of their own. */}
+      <section id="faq" className="card mt-8 scroll-mt-8 p-6 sm:p-8">
+        <h2 className="font-display text-2xl font-bold">Client FAQ</h2>
+        <p className="mt-1 text-sm text-muted">
+          Answer once, and clients find it themselves: your answers appear on your studio page, and the AI uses them to
+          reply to inquiries without you. Skip any question by leaving it blank.
+        </p>
+        <div className="mt-6">
+          <FaqForm saved={faqs} suggestions={suggestions} />
+        </div>
+      </section>
     </div>
   );
 }

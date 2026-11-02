@@ -49,7 +49,7 @@ export function FaqForm({ saved, suggestions }: { saved: { question: string; ans
           {open.size > 0 ? "Close all" : "Open all"}
         </button>
       </div>
-      <ol className="space-y-3">
+      <ol className="grid items-start gap-3 md:grid-cols-2">
         {rows.map((row, i) => {
           const empty = row.answer.trim() === "";
           const isOpen = open.has(row.key);
