@@ -51,6 +51,8 @@ export type EmailKind =
   | "growth_digest"
   // A Support page message, to the owner (app/support).
   | "support_message"
+  // A new studio signed up, to the owner (lib/signup-notice.ts).
+  | "signup_new"
   | "test";
 
 let transport: Transporter | null | undefined;

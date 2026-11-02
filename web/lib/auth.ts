@@ -4,7 +4,8 @@ import { nextCookies } from "better-auth/next-js";
 import { db } from "@/db";
 import * as schema from "@/db/schema";
 import { passwordReset, verifyEmail } from "@/lib/email/messages";
-import { sendEmail } from "@/lib/email/send";
+import { afterResponse, sendEmail } from "@/lib/email/send";
+import { notifyOwnerOfSignup } from "@/lib/signup-notice";
 import { TRIAL_DAYS } from "@/lib/plans";
 import { referrerFromCookieHeader } from "@/lib/referrals";
 import { leads } from "@/db/schema";
@@ -78,19 +79,22 @@ export const auth = betterAuth({
           },
         }),
         // Where the new studio came from (the landing page's ?src=, kept in
-        // a cookie by the sign-up page), for Settings > Sign-ups. Works for
-        // email and Google sign-ups alike; never holds sign-up up.
+        // a cookie by the sign-up page), for Settings > Sign-ups, and an
+        // email telling the owner about them. Works for email and Google
+        // sign-ups alike; never holds sign-up up.
         after: async (user, context) => {
           const cookie = context?.headers?.get("cookie");
           const source = sourceFromCookieHeader(cookie);
           // And their quiz answers, if they took the quiz (app/quiz).
           const quiz = answersFromCookieHeader(cookie);
-          if (!source && !quiz) return;
-          await db
-            .insert(leads)
-            .values({ email: user.email.toLowerCase(), source, quiz })
-            .onConflictDoNothing({ target: leads.email })
-            .catch(() => undefined);
+          if (source || quiz) {
+            await db
+              .insert(leads)
+              .values({ email: user.email.toLowerCase(), source, quiz })
+              .onConflictDoNothing({ target: leads.email })
+              .catch(() => undefined);
+          }
+          afterResponse(() => notifyOwnerOfSignup(user, { source, quiz }));
         },
       },
     },
