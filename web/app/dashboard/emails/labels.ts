@@ -39,6 +39,7 @@ export const KIND_LABELS: Record<EmailKind, string> = {
   invoice_update: "Quote or invoice update (to you)",
   growth_digest: "Daily Growth summary (to you)",
   support_message: "Support page message (to you)",
+  signup_new: "New studio signed up (to you)",
   test: "Test email",
 };
 

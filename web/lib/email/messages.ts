@@ -384,6 +384,42 @@ export function verifyEmail(name: string, url: string): EmailContent {
   };
 }
 
+// To PhotoEZ Cloud's owner, the moment a new studio creates its account.
+export function newStudioSignup(o: {
+  name: string;
+  businessName: string | null;
+  email: string;
+  // Google confirms the address, so those accounts are ready right away.
+  withGoogle: boolean;
+  referredBy: string | null;
+  // The landing page's ?src= tag, e.g. "facebook".
+  source: string | null;
+  // Their quiz answers in words (lib/quiz.ts describeAnswers).
+  quiz: string | null;
+  trialDays: number;
+  studioCount: number;
+  signupsUrl: string;
+}): EmailContent {
+  const who = o.businessName ? `${o.name} (${o.businessName})` : o.name;
+  const details: [string, string][] = [
+    ["Name", o.name],
+    ["Business", o.businessName || "Not given"],
+    ["Email", o.email],
+    ["Signed up with", o.withGoogle ? "Google" : "Email and password (not confirmed yet)"],
+  ];
+  if (o.referredBy) details.push(["Referred by", o.referredBy]);
+  details.push(["Came from", o.source ?? "A plain link (no tag)"]);
+  if (o.quiz) details.push(["Quiz answers", o.quiz]);
+  return {
+    subject: `New studio: ${who}`,
+    heading: "A new studio signed up!",
+    intro: [`${who} just created a PhotoEZ Cloud account and started a ${o.trialDays}-day Pro trial. That makes ${o.studioCount} studios.`],
+    details,
+    button: { label: "Open Sign-ups", url: o.signupsUrl },
+    outro: o.withGoogle ? [] : ["They can log in once they click the confirmation link in their email. Sign-ups shows when they do."],
+  };
+}
+
 // Sent 4 days and 1 day before a Free studio's Pro trial ends.
 export function trialEndingStudio(o: {
   name: string;
