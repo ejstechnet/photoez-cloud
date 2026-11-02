@@ -53,6 +53,8 @@ export type EmailKind =
   | "support_message"
   // A new studio signed up, to the owner (lib/signup-notice.ts).
   | "signup_new"
+  // The owner's email to a studio (Settings > Email studios).
+  | "studio_email"
   | "test";
 
 let transport: Transporter | null | undefined;
@@ -109,6 +111,8 @@ export async function sendEmail(options: {
   logo?: EmailLogo | null;
   footer: string;
   replyTo?: string | null;
+  // Extra email headers, e.g. List-Unsubscribe.
+  headers?: Record<string, string>;
   bookingId?: string | null;
   galleryId?: string | null;
   inquiryId?: string | null;
@@ -128,6 +132,7 @@ export async function sendEmail(options: {
         from: { name: headerSafe(options.fromName), address: process.env.EMAIL_FROM ?? process.env.SMTP_USER ?? "" },
         to: options.to,
         replyTo: options.replyTo || undefined,
+        headers: options.headers,
         subject: email.subject,
         html: email.html,
         text: email.text,
