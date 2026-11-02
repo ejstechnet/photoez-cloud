@@ -7,7 +7,7 @@ import { trialDaysLeft } from "@/lib/plans";
 import { requirePhotographer } from "@/lib/session";
 import { isOwnerEmail } from "@/lib/owner";
 import { storeOpenFor } from "@/lib/store/launch";
-import { GearIcon, HelpIcon } from "@/components/icons";
+import { GearIcon, HelpIcon, ShieldIcon } from "@/components/icons";
 import { NavLink } from "./nav-link";
 import { NavMenu } from "./nav-menu";
 import { SignOutButton } from "./sign-out-button";
@@ -79,19 +79,27 @@ export default async function DashboardLayout({ children }: LayoutProps<"/dashbo
                 { href: "/dashboard/billing#refer", label: "Refer a photographer" },
                 { href: "/dashboard/emails", label: "Email log" },
                 { href: "/dashboard/texts", label: "Text log" },
-                // PhotoEZ Cloud's owner only: Support page messages, emailing studios, Growth (GrowthPilot), sign-ups, AI step logs and AI costs.
-                ...(isOwnerEmail(user.email)
-                  ? [
-                      { href: "/dashboard/support", label: "Support inbox" },
-                      { href: "/dashboard/studio-emails", label: "Email studios" },
-                      { href: "/dashboard/growth", label: "Growth" },
-                      { href: "/dashboard/signups", label: "Sign-ups" },
-                      { href: "/dashboard/ai-traces", label: "AI traces" },
-                      { href: "/dashboard/ai-usage", label: "AI usage" },
-                    ]
-                  : []),
               ]}
             />
+            {/* PhotoEZ Cloud's owner only, together in one menu: Support page messages,
+                emailing studios, Growth (GrowthPilot), sign-ups, AI step logs and AI costs. */}
+            {isOwnerEmail(user.email) && (
+              <NavMenu
+                label={
+                  <>
+                    <ShieldIcon size={15} strokeWidth={2.25} /> Admin
+                  </>
+                }
+                items={[
+                  { href: "/dashboard/support", label: "Support inbox" },
+                  { href: "/dashboard/studio-emails", label: "Email studios" },
+                  { href: "/dashboard/signups", label: "Sign-ups" },
+                  { href: "/dashboard/growth", label: "Growth" },
+                  { href: "/dashboard/ai-usage", label: "AI usage" },
+                  { href: "/dashboard/ai-traces", label: "AI traces" },
+                ]}
+              />
+            )}
           </nav>
           <div className="flex items-center gap-2">
             {/* A new tab, so the guide sits beside the page they're working on. */}
