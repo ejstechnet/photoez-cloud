@@ -201,12 +201,6 @@ export default async function SettingsPage({ searchParams }: PageProps<"/dashboa
             maxCents={settings.giftCardMaxCents}
             paymentsReady={stripeReady}
           />
-          <PlanCard
-            planLabel={PLAN_LABELS[plan.plan]}
-            upsells={plan.upsells}
-            upgradePlanLabel={PLAN_LABELS[planFor("galleryUpsells")]}
-            extraPhotoPriceCents={plan.extraPhotoPriceCents}
-          />
         </div>
         <div className="space-y-8">
           <PaymentsCard
@@ -240,6 +234,12 @@ export default async function SettingsPage({ searchParams }: PageProps<"/dashboa
           <ImportCard initial={await importView(user.id)} />
           <MigrationCard siteUrl={siteUrl} keys={await migrationKeyRows(user.id, settings.timeZone)} />
           <CalendarCard link={settings.calendarToken ? calendarUrl(settings.calendarToken) : null} />
+          <PlanCard
+            planLabel={PLAN_LABELS[plan.plan]}
+            upsells={plan.upsells}
+            upgradePlanLabel={PLAN_LABELS[planFor("galleryUpsells")]}
+            extraPhotoPriceCents={plan.extraPhotoPriceCents}
+          />
         </div>
       </div>
       {/* Full width below the columns; its questions sit in two columns of their own. */}
