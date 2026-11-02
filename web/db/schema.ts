@@ -110,6 +110,9 @@ export const photographers = pgTable("photographers", {
   // Extra storage (lib/plans.ts): 500 GB blocks on their own subscription,
   // kept in step with Stripe by lib/billing.ts.
   extraStorageBlocks: integer("extra_storage_blocks").notNull().default(0),
+  // When the studio unsubscribed from the owner's emails (Settings > Email
+  // studios). Account emails like receipts and password resets still go out.
+  marketingOptOutAt: timestamp("marketing_opt_out_at", { withTimezone: true }),
   storageSubscriptionId: text("storage_subscription_id"),
   storagePeriodEnd: timestamp("storage_period_end", { withTimezone: true }),
   // Studio plan: hide "Powered by PhotoEZ Cloud" on the studio's pages.
@@ -1817,4 +1820,54 @@ export const supportMessages = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index("support_messages_status_idx").on(t.status, t.createdAt), index("support_messages_email_idx").on(t.email, t.createdAt)],
+);
+
+// The owner's emails to PhotoEZ Cloud's photographers (Settings > Email
+// studios): saved templates, each send, and who each send went to.
+export const studioEmailTemplates = pgTable("studio_email_templates", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  name: text("name").notNull(),
+  subject: text("subject").notNull(),
+  heading: text("heading").notNull().default(""),
+  // Plain text; blank lines start new paragraphs. Fill-ins like {first_name}.
+  body: text("body").notNull(),
+  buttonLabel: text("button_label").notNull().default(""),
+  buttonUrl: text("button_url").notNull().default(""),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const studioEmailSends = pgTable(
+  "studio_email_sends",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    // What was sent, kept as written even if the template changes later.
+    subject: text("subject").notNull(),
+    heading: text("heading").notNull().default(""),
+    body: text("body").notNull(),
+    buttonLabel: text("button_label").notNull().default(""),
+    buttonUrl: text("button_url").notNull().default(""),
+    templateName: text("template_name"),
+    status: text("status", { enum: ["sending", "done"] }).notNull().default("sending"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    finishedAt: timestamp("finished_at", { withTimezone: true }),
+  },
+  (t) => [index("studio_email_sends_created_idx").on(t.createdAt)],
+);
+
+export const studioEmailRecipients = pgTable(
+  "studio_email_recipients",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    sendId: uuid("send_id")
+      .notNull()
+      .references(() => studioEmailSends.id, { onDelete: "cascade" }),
+    photographerId: uuid("photographer_id").references(() => photographers.id, { onDelete: "set null" }),
+    email: text("email").notNull(),
+    // skipped: they unsubscribed between choosing and sending.
+    status: text("status", { enum: ["pending", "sent", "failed", "skipped"] }).notNull().default("pending"),
+    error: text("error"),
+    sentAt: timestamp("sent_at", { withTimezone: true }),
+  },
+  (t) => [index("studio_email_recipients_send_idx").on(t.sendId, t.status)],
 );

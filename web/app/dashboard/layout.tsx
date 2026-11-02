@@ -79,10 +79,11 @@ export default async function DashboardLayout({ children }: LayoutProps<"/dashbo
                 { href: "/dashboard/billing#refer", label: "Refer a photographer" },
                 { href: "/dashboard/emails", label: "Email log" },
                 { href: "/dashboard/texts", label: "Text log" },
-                // PhotoEZ Cloud's owner only: Support page messages, Growth (GrowthPilot), sign-ups, AI step logs and AI costs.
+                // PhotoEZ Cloud's owner only: Support page messages, emailing studios, Growth (GrowthPilot), sign-ups, AI step logs and AI costs.
                 ...(isOwnerEmail(user.email)
                   ? [
                       { href: "/dashboard/support", label: "Support inbox" },
+                      { href: "/dashboard/studio-emails", label: "Email studios" },
                       { href: "/dashboard/growth", label: "Growth" },
                       { href: "/dashboard/signups", label: "Sign-ups" },
                       { href: "/dashboard/ai-traces", label: "AI traces" },

@@ -449,6 +449,13 @@
       "when": 1793031281124,
       "tag": "0063_support_messages",
       "breakpoints": true
+    },
+    {
+      "idx": 64,
+      "version": "7",
+      "when": 1793643143592,
+      "tag": "0064_studio_emails",
+      "breakpoints": true
     }
   ]
 }
